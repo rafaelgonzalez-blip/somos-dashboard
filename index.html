@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Gestión Permisos Viales — Red Nacional Somos</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0A1628;--bg2:#111e35;--card:#162035;--card2:#0d1929;
+  --border:#253352;--border2:#3a4f72;
+  --text:#e8edf5;--muted:#7a95bb;--muted2:#4a6080;
+  --av:#10B981;--eg:#F59E0B;--cr:#EF4444;--acc:#3B82F6;
+  --r1c:#60A5FA;--r2c:#A78BFA;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-size:13px;font-family:'Segoe UI',system-ui,sans-serif}
+.app{display:flex;flex-direction:column;height:100vh}
+.hdr{background:#070f1e;border-bottom:1px solid var(--border);padding:8px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.hdr-brand{font-size:12px;font-weight:700;letter-spacing:.8px;color:#fff;display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--av);animation:pl 2s infinite;flex-shrink:0}
+@keyframes pl{0%,100%{opacity:1}50%{opacity:.3}}
+.hdr-r{font-size:10px;color:var(--muted);display:flex;gap:12px;align-items:center}
+.live-b{background:rgba(16,185,129,.15);color:var(--av);padding:2px 9px;border-radius:20px;font-size:9px;font-weight:700;border:1px solid rgba(16,185,129,.3)}
+.nav{background:#070f1e;border-bottom:1px solid var(--border);display:flex;padding:0 18px;flex-shrink:0;overflow-x:auto}
+.nb{background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;padding:9px 15px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:.14s;white-space:nowrap}
+.nb:hover{color:#fff}.nb.active{color:var(--acc);border-bottom-color:var(--acc)}
+.content{flex:1;padding:16px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:9px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:12px 14px}
+.kpi-l{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.kpi-v{font-size:22px;font-weight:700;margin:3px 0 2px;color:#fff}
+.kpi-s{font-size:9px;color:var(--muted2)}
+.kpi.av{border-left:3px solid var(--av)}.kpi.eg{border-left:3px solid var(--eg)}.kpi.cr{border-left:3px solid var(--cr)}.kpi.acc{border-left:3px solid var(--acc)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.card-h{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.card-t{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.card-b{padding:14px}
+.rpill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700}
+.rpill.r1{background:rgba(96,165,250,.15);color:var(--r1c);border:1px solid rgba(96,165,250,.3)}
+.rpill.r2{background:rgba(167,139,250,.15);color:var(--r2c);border:1px solid rgba(167,139,250,.3)}
+.sb{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700}
+.sb.av{background:rgba(16,185,129,.15);color:var(--av)}.sb.eg{background:rgba(245,158,11,.15);color:var(--eg)}.sb.cr{background:rgba(239,68,68,.15);color:var(--cr)}
+.bl{display:flex;flex-direction:column;gap:7px;overflow-y:auto;padding-right:4px}
+.bl::-webkit-scrollbar,.sc::-webkit-scrollbar{width:4px}
+.bl::-webkit-scrollbar-thumb,.sc::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+.bi{border-left:3px solid var(--border2);padding:8px 11px;border-radius:0 8px 8px 0;background:var(--card2);position:relative}
+.bi.call{border-left-color:var(--acc)}.bi.email{border-left-color:var(--av)}.bi.meeting{border-left-color:var(--eg)}.bi.response{border-left-color:var(--r2c)}
+.bi-d{font-size:9px;color:var(--muted2);display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:3px}
+.bi-g{font-size:11px;color:#fff;margin:2px 0}.bi-r{font-size:10px;color:var(--muted)}
+.bi-actions{display:flex;gap:4px;margin-top:6px}
+.ttag{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 5px;border-radius:3px}
+.ttag.call{background:rgba(59,130,246,.2);color:var(--acc)}.ttag.email{background:rgba(16,185,129,.2);color:var(--av)}.ttag.meeting{background:rgba(245,158,11,.2);color:var(--eg)}.ttag.response{background:rgba(167,139,250,.2);color:var(--r2c)}
+.fi{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--border)}
+.fb{background:transparent;border:1px solid var(--border);border-radius:20px;padding:3px 10px;color:var(--muted);font-size:9px;font-weight:600;cursor:pointer;transition:.12s}
+.fb:hover{border-color:var(--border2);color:#fff}.fb.active{background:rgba(59,130,246,.15);border-color:var(--acc);color:var(--acc)}
+.btn{padding:6px 13px;border-radius:7px;border:none;cursor:pointer;font-size:11px;font-weight:600;transition:.13s}
+.btn-p{background:var(--acc);color:#fff}.btn-p:hover{background:#2563eb}
+.btn-sm{padding:3px 9px;font-size:10px}
+.btn-g{background:transparent;border:1px solid var(--border);color:var(--muted)}.btn-g:hover{background:var(--card2);color:#fff}
+.btn-warn{background:rgba(245,158,11,.15);color:var(--eg);border:1px solid rgba(245,158,11,.3)}.btn-warn:hover{background:rgba(245,158,11,.25)}
+.btn-danger{background:rgba(239,68,68,.12);color:var(--cr);border:1px solid rgba(239,68,68,.3)}.btn-danger:hover{background:rgba(239,68,68,.22)}
+.btn-success{background:rgba(16,185,129,.13);color:var(--av);border:1px solid rgba(16,185,129,.3)}.btn-success:hover{background:rgba(16,185,129,.22)}
+.inp{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:7px 11px;font-size:12px}
+.inp:focus{outline:none;border-color:var(--acc)}
+select.inp option{background:#1a2a42}
+textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
+.pbar{height:5px;background:var(--bg);border-radius:3px;overflow:hidden;margin-top:5px}
+.pf{height:100%;border-radius:3px;transition:width .5s ease}
+.divd{height:1px;background:var(--border);margin:10px 0}
+.empty{text-align:center;padding:32px;color:var(--muted2);font-size:12px}
+.tv{display:none}.tv.active{display:flex;flex-direction:column;gap:14px}
+.map-wrap{height:460px;position:relative;border-radius:0 0 10px 10px;overflow:hidden}
+#the-map{width:100%;height:100%}
+.map-legend{position:absolute;bottom:14px;left:14px;background:rgba(7,15,30,.93);border:1px solid var(--border);border-radius:9px;padding:10px 13px;z-index:900;font-size:10px}
+.map-legend-t{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px}
+.leg-r{display:flex;align-items:center;gap:7px;margin-bottom:5px;color:#fff}
+.leg-l{width:22px;height:4px;border-radius:2px;flex-shrink:0}
+.map-side{position:absolute;top:10px;right:10px;background:rgba(7,15,30,.93);border:1px solid var(--border);border-radius:9px;padding:10px 12px;z-index:900;width:200px;max-height:400px;overflow-y:auto;font-size:10px}
+.ms-t{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px}
+.ms-item{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer}
+.ms-item:hover .ms-nm{color:var(--acc)}.ms-item:last-child{border-bottom:none}
+.ms-nm{font-size:10px;color:#fff;font-weight:500;margin-bottom:2px}
+.ms-meta{font-size:8px;color:var(--muted);display:flex;gap:5px;align-items:center}
+.ti-item{background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:10px 12px;cursor:pointer;transition:.12s}
+.ti-item:hover{border-color:var(--border2)}.ti-item.sel{border-color:var(--acc);background:rgba(59,130,246,.07)}
+.ti-n{font-size:12px;font-weight:600;color:#fff}
+.ti-m{font-size:9px;color:var(--muted);margin-top:3px;display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.tramo-edit-row{display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 11px;margin-bottom:6px}
+.coord-row{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center;margin-bottom:6px}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2000;align-items:flex-start;justify-content:center;padding-top:30px}
+.modal-overlay.open{display:flex}
+.modal{background:#142035;border:1px solid var(--border2);border-radius:13px;padding:20px;width:500px;max-width:96vw;max-height:88vh;overflow-y:auto}
+.modal-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.modal-title{font-size:14px;font-weight:700;color:#fff}
+.btn-x{background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
+.ff{display:flex;flex-direction:column;gap:9px}
+.fl{display:flex;flex-direction:column;gap:3px}
+.fl label{font-size:9px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.sec-tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding:6px 0 3px;border-top:1px solid var(--border);margin-top:4px}
+.thinking{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:11px;padding:12px 0}
+.thinking span{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acc);animation:blink 1.1s infinite}
+.thinking span:nth-child(2){animation-delay:.2s}.thinking span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,100%{opacity:.15}50%{opacity:1}}
+.toast-el{position:fixed;bottom:20px;right:20px;background:#10B981;color:#fff;padding:10px 18px;border-radius:9px;font-size:12px;font-weight:600;z-index:9999;opacity:0;transform:translateY(10px);transition:.28s;pointer-events:none}
+.toast-el.show{opacity:1;transform:none}
+/* EML styles */
+.drop-zone{border:2px dashed var(--border2);border-radius:9px;padding:28px 20px;text-align:center;cursor:pointer;transition:.15s;background:var(--card2);user-select:none}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--acc);background:rgba(59,130,246,.07)}
+.eml-file-item{display:flex;align-items:center;gap:9px;background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:8px 12px;margin-bottom:6px}
+.eml-file-name{flex:1;font-size:11px;font-weight:500;color:#fff;word-break:break-all}
+.eml-file-size{font-size:9px;color:var(--muted);flex-shrink:0}
+.eml-status{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;flex-shrink:0}
+.eml-status.pending{background:rgba(245,158,11,.2);color:var(--eg)}
+.eml-status.done{background:rgba(16,185,129,.2);color:var(--av)}
+.eml-status.error{background:rgba(239,68,68,.2);color:var(--cr)}
+.ai-box{background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.2);border-radius:8px;padding:11px 13px;margin-top:9px}
+.ai-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--acc);margin-bottom:8px}
+.ai-grid{display:grid;grid-template-columns:95px 1fr;gap:3px 10px;font-size:10px}
+.ai-key{color:var(--muted)}.ai-val{color:#fff}
+.alert-eml{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:7px;padding:8px 11px;margin-top:8px;font-size:10px;color:var(--cr);display:flex;gap:6px;align-items:flex-start}
+.eml-result-item{background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:11px 13px;margin-bottom:8px}
+.eml-result-item.confirmed{border-color:var(--av);opacity:.75}
+.step-bar{display:flex;margin-bottom:14px}
+.step-pill{flex:1;padding:7px 4px;text-align:center;font-size:10px;font-weight:600;color:var(--muted);border-bottom:2px solid var(--border);transition:.15s}
+.step-pill.active{color:var(--acc);border-bottom-color:var(--acc)}
+.step-pill.done{color:var(--av);border-bottom-color:var(--av)}
+/* API key section */
+.api-notice{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);border-radius:9px;padding:12px 14px;font-size:11px;color:var(--muted);line-height:1.6}
+.api-notice strong{color:var(--acc)}
+</style>
+</head>
+<body>
+<div class="app" id="app-root">
+
+<div class="hdr">
+  <div class="hdr-brand">
+    <span class="dot"></span>
+    RED NACIONAL SOMOS
+    <span style="font-weight:400;color:var(--muted)">— Gestión de Permisos Viales</span>
+  </div>
+  <div class="hdr-r">
+    <span class="live-b">● LIVE</span>
+    <span id="hdr-dt"></span>
+    <button class="btn-g btn btn-sm" onclick="openModal('apikey')" title="Configurar API Key">⚙ API Key</button>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="nb active" onclick="sw('overview')">Resumen</button>
+  <button class="nb" onclick="sw('mapa')">Mapa</button>
+  <button class="nb" onclick="sw('tramos')">Tramos</button>
+  <button class="nb" onclick="sw('bitacora')">Bitácora</button>
+  <button class="nb" onclick="sw('rutas')">Editar rutas</button>
+  <button class="nb" onclick="sw('gmail')">Correo / .eml</button>
+</div>
+
+<div class="content" id="main">
+
+  <!-- OVERVIEW -->
+  <div id="t-overview" class="tv active">
+    <div class="kpi-row" id="kpi-row"></div>
+    <div class="two-col">
+      <div class="card"><div class="card-h"><span class="card-t">Medellín–Barranquilla</span><span class="rpill r1">R1</span></div><div class="card-b" id="sr1"></div></div>
+      <div class="card"><div class="card-h"><span class="card-t">Medellín–Bogotá</span><span class="rpill r2">R2</span></div><div class="card-b" id="sr2"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><span class="card-t">Últimas gestiones</span><button class="btn btn-p btn-sm" onclick="openModal('gestion')">+ Nueva gestión</button></div>
+      <div class="card-b"><div id="rec-bit" class="bl" style="max-height:200px"></div></div>
+    </div>
+  </div>
+
+  <!-- MAPA -->
+  <div id="t-mapa" class="tv">
+    <div class="card" style="overflow:visible">
+      <div class="card-h">
+        <span class="card-t">Mapa de viabilidad — rutas nacionales</span>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <button class="fb active" id="mf-all" onclick="mapFilt('all')">Todos</button>
+          <button class="fb" id="mf-r1" onclick="mapFilt('r1')">MDE–BAQ</button>
+          <button class="fb" id="mf-r2" onclick="mapFilt('r2')">MDE–BOG</button>
+          <span id="extra-mf"></span>
+        </div>
+      </div>
+      <div class="map-wrap">
+        <div id="the-map"></div>
+        <div class="map-legend">
+          <div class="map-legend-t">Semáforo de estado</div>
+          <div class="leg-r"><div class="leg-l" style="background:#10B981"></div>Avanzado</div>
+          <div class="leg-r"><div class="leg-l" style="background:#F59E0B"></div>En gestión</div>
+          <div class="leg-r"><div class="leg-l" style="background:#EF4444"></div>Crítico</div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1)">
+            <div class="leg-r"><div class="leg-l" style="background:#60A5FA"></div>Ruta R1 (filtro)</div>
+            <div class="leg-r"><div class="leg-l" style="background:#A78BFA"></div>Ruta R2 (filtro)</div>
+          </div>
+        </div>
+        <div class="map-side" id="map-side"><div class="ms-t">Tramos en mapa</div><div id="map-tlist"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRAMOS -->
+  <div id="t-tramos" class="tv">
+    <div class="card">
+      <div class="fi">
+        <span style="font-size:9px;color:var(--muted);font-weight:700">RUTA:</span>
+        <button class="fb active" id="fr-all" onclick="fR('all')">Todas</button>
+        <button class="fb" id="fr-r1" onclick="fR('r1')">MDE–BAQ</button>
+        <button class="fb" id="fr-r2" onclick="fR('r2')">MDE–BOG</button>
+        <span id="extra-rf"></span>
+        <span style="flex:1"></span>
+        <button class="fb active" id="fe-all" onclick="fE('all')">Todos</button>
+        <button class="fb" id="fe-av" onclick="fE('Avanzado')">Avanzado</button>
+        <button class="fb" id="fe-eg" onclick="fE('En gestión')">En gestión</button>
+        <button class="fb" id="fe-cr" onclick="fE('Crítico')">Crítico</button>
+      </div>
+      <div style="display:grid;grid-template-columns:240px 1fr;height:420px">
+        <div style="border-right:1px solid var(--border);padding:10px;overflow-y:auto" id="tl-panel"></div>
+        <div style="padding:14px;overflow-y:auto" id="td-panel"><div class="empty" style="margin-top:50px">Selecciona un tramo</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BITÁCORA -->
+  <div id="t-bitacora" class="tv">
+    <div class="card">
+      <div class="fi">
+        <span style="font-size:9px;color:var(--muted);font-weight:700">TIPO:</span>
+        <button class="fb active" id="bt-all" onclick="fB('all')">Todos</button>
+        <button class="fb" id="bt-call" onclick="fB('call')">Llamada</button>
+        <button class="fb" id="bt-email" onclick="fB('email')">Correo</button>
+        <button class="fb" id="bt-meeting" onclick="fB('meeting')">Reunión</button>
+        <button class="fb" id="bt-response" onclick="fB('response')">Respuesta</button>
+        <span style="flex:1"></span>
+        <button class="btn btn-p btn-sm" onclick="openModal('gestion')">+ Agregar</button>
+      </div>
+      <div class="card-b">
+        <div id="bit-list" class="bl" style="max-height:500px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDITAR RUTAS -->
+  <div id="t-rutas" class="tv">
+    <div class="two-col" style="align-items:start">
+      <div class="card">
+        <div class="card-h"><span class="card-t">Rutas configuradas</span><button class="btn btn-p btn-sm" onclick="openModal('nueva-ruta')">+ Nueva ruta</button></div>
+        <div class="card-b" id="rutas-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><span class="card-t" id="editor-title">Editar tramos de ruta</span><div id="editor-actions"></div></div>
+        <div class="card-b" id="tramo-editor-body"><div class="empty">Selecciona una ruta para editar sus tramos</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CORREO / EML -->
+  <div id="t-gmail" class="tv">
+    <div class="api-notice" id="api-notice">
+      <strong>API Key de Anthropic requerida para análisis con IA.</strong>
+      Configúrala en el botón <strong>⚙ API Key</strong> (esquina superior derecha). Sin la key el importador funciona igual pero sin análisis automático.
+      Obtén tu key en <a href="https://console.anthropic.com" target="_blank" style="color:var(--acc)">console.anthropic.com</a>
+    </div>
+
+    <div class="two-col" style="align-items:start">
+      <div class="card">
+        <div class="card-h"><span class="card-t">Gmail / búsqueda de correos</span></div>
+        <div class="card-b">
+          <p style="font-size:11px;color:var(--muted);margin-bottom:10px">Simula búsqueda de correos enviados a concesiones y respuestas recibidas para agregarlos a la bitácora.</p>
+          <div class="fl" style="margin-bottom:10px">
+            <label>Buscar en correos</label>
+            <input class="inp" id="gmail-q" value="fibra óptica viabilidad ANI Invias permiso">
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-p btn-sm" onclick="buscarCorreos(false)">Buscar correos enviados</button>
+            <button class="btn btn-g btn-sm" onclick="buscarCorreos(true)">Buscar respuestas</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><span class="card-t">Correos detectados</span></div>
+        <div class="card-b" id="gmail-emails"><div class="empty">Haz una búsqueda para ver correos</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">
+        <span class="card-t">📎 Importar archivos .eml a bitácora</span>
+        <span style="font-size:9px;background:rgba(59,130,246,.15);color:var(--acc);border:1px solid rgba(59,130,246,.3);padding:2px 9px;border-radius:4px;font-weight:700">Análisis IA</span>
+      </div>
+      <div class="card-b">
+        <div class="step-bar">
+          <div class="step-pill active" id="sp-1">1. Cargar .eml</div>
+          <div class="step-pill" id="sp-2">2. Analizar con IA</div>
+          <div class="step-pill" id="sp-3">3. Revisar y guardar</div>
+        </div>
+
+        <div id="eml-zone-panel">
+          <div class="drop-zone" id="drop-zone">
+            <input type="file" id="eml-input" accept=".eml" multiple style="display:none">
+            <div style="font-size:36px;margin-bottom:10px">📧</div>
+            <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:4px">Arrastra archivos .eml aquí o haz clic para seleccionar</div>
+            <div style="font-size:10px;color:var(--muted)">Múltiples archivos · correos enviados y respuestas recibidas</div>
+          </div>
+          <div id="eml-file-list" style="margin-top:10px"></div>
+          <div id="eml-analyze-row" style="display:none;justify-content:flex-end;gap:8px;margin-top:10px">
+            <button class="btn btn-g btn-sm" onclick="clearEML()">Limpiar</button>
+            <button class="btn btn-p btn-sm" id="btn-analyze-eml" onclick="analyzeAllEML()">✨ Analizar con IA</button>
+          </div>
+        </div>
+
+        <div id="eml-results-panel" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span id="eml-count" style="font-size:11px;color:var(--muted)"></span>
+            <div style="display:flex;gap:7px">
+              <button class="btn btn-g btn-sm" onclick="resetEML()">← Cargar más</button>
+              <button class="btn btn-success btn-sm" onclick="confirmAllEML()">✓ Importar todos</button>
+            </div>
+          </div>
+          <div id="eml-results-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="eml-log-card" style="display:none">
+      <div class="card-h">
+        <span class="card-t">✓ Gestiones importadas a bitácora</span>
+        <button class="btn btn-g btn-sm" onclick="resetEML()">+ Importar más .eml</button>
+      </div>
+      <div class="card-b" id="eml-log"></div>
+    </div>
+  </div>
+
+</div><!-- end content -->
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal-inner">
+    <div class="modal-hd">
+      <span class="modal-title" id="modal-title">Modal</span>
+      <button class="btn-x" onclick="closeModal()">×</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div class="toast-el" id="toast"></div>
+
+</div><!-- end app -->
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ─── DATA ───────────────────────────────────────────────────
+const SC={Avanzado:"#10B981","En gestión":"#F59E0B","Crítico":"#EF4444"};
+
+let tramos=[
+  {id:"1",ruta:"r1",tramo:"GTD – Barbosa",actor:"Tigo",km:43,estado:"Avanzado",proxima:"Solicitar planos Tigo",fp:"2026-05-10",concesion:"Devimed",coords:[[6.2476,-75.5658],[6.38,-75.32],[6.4368,-75.1937]]},
+  {id:"2",ruta:"r1",tramo:"Barbosa – Puerto Berrío",actor:"ANI / Devimed",km:61,estado:"En gestión",proxima:"Reunión Devimed",fp:"2026-05-14",concesion:"Devimed",coords:[[6.4368,-75.1937],[6.52,-74.95],[6.4893,-74.4066]]},
+  {id:"3",ruta:"r1",tramo:"Puerto Berrío – Caucasia",actor:"Invias",km:82,estado:"En gestión",proxima:"Radicación oficio Invias",fp:"2026-05-15",concesion:"",coords:[[6.4893,-74.4066],[7.15,-74.8],[7.9853,-75.1975]]},
+  {id:"4",ruta:"r1",tramo:"Caucasia – Planeta Rica",actor:"Invias",km:74,estado:"Crítico",proxima:"Escalar dirección técnica",fp:"2026-05-08",concesion:"",coords:[[7.9853,-75.1975],[8.3,-75.45],[8.4089,-75.58]]},
+  {id:"5",ruta:"r1",tramo:"Planeta Rica – Montería",actor:"Covipacífico",km:65,estado:"Avanzado",proxima:"Cerrar planos",fp:"2026-05-20",concesion:"Covipacífico",coords:[[8.4089,-75.58],[8.6,-75.65],[8.7575,-75.8908]]},
+  {id:"6",ruta:"r1",tramo:"Montería – Barranquilla",actor:"Ruta del Mar",km:90,estado:"En gestión",proxima:"Confirmar reunión ANI",fp:"2026-05-12",concesion:"Ruta del Mar",coords:[[8.7575,-75.8908],[9.5,-75.6],[10.35,-74.95],[10.9639,-74.7964]]},
+  {id:"7",ruta:"r2",tramo:"GTD – La Pintada",actor:"Autopistas del Café",km:55,estado:"Avanzado",proxima:"Cierre técnico",fp:"2026-05-09",concesion:"Autopistas del Café",coords:[[6.2476,-75.5658],[5.75,-75.55],[5.5897,-75.5897]]},
+  {id:"8",ruta:"r2",tramo:"La Pintada – Honda",actor:"Invias",km:70,estado:"En gestión",proxima:"Oficio formal Invias",fp:"2026-05-13",concesion:"",coords:[[5.5897,-75.5897],[5.2,-75.0],[5.21,-74.7456]]},
+  {id:"9",ruta:"r2",tramo:"Honda – Villeta",actor:"Devifibra/ANI",km:48,estado:"Avanzado",proxima:"Revisión acuerdo",fp:"2026-05-11",concesion:"Devifibra",coords:[[5.21,-74.7456],[5.05,-74.6],[4.92,-74.48]]},
+  {id:"10",ruta:"r2",tramo:"Villeta – Bogotá",actor:"Malla Vial",km:38,estado:"Crítico",proxima:"Reunión urgente ANI",fp:"2026-05-07",concesion:"Malla Vial",coords:[[4.92,-74.48],[4.8,-74.25],[4.711,-74.0721]]},
+];
+
+let routes={
+  r1:{id:"r1",nombre:"Medellín–Barranquilla",color:"#60A5FA"},
+  r2:{id:"r2",nombre:"Medellín–Bogotá",color:"#A78BFA"}
+};
+
+let bitacora=[
+  {id:"b1",fecha:"2026-05-05",tipo:"call",tramo:"GTD – Barbosa",actor:"Tigo",gestion:"Llamada con gerente de proyectos Tigo para solicitar planos del ducto GTD–Barbosa.",resultado:"Confirmaron envío de planos esta semana.",proxima:"Verificar recepción de planos",fp:"2026-05-09"},
+  {id:"b2",fecha:"2026-05-04",tipo:"email",tramo:"Barbosa – Puerto Berrío",actor:"ANI/Devimed",gestion:"Envío de oficio formal solicitando viabilidad de tendido de fibra en la vía.",resultado:"Pendiente respuesta oficial.",proxima:"Seguimiento por correo",fp:"2026-05-12"},
+  {id:"b3",fecha:"2026-05-03",tipo:"meeting",tramo:"Caucasia – Planeta Rica",actor:"Invias",gestion:"Reunión presencial en Bogotá con subdirector de infraestructura Invias.",resultado:"Piden carta de compromiso de la empresa.",proxima:"Enviar carta a Invias",fp:"2026-05-08"},
+  {id:"b4",fecha:"2026-05-02",tipo:"response",tramo:"Villeta – Bogotá",actor:"Malla Vial",gestion:"Respuesta oficial negando acceso por el corredor vial.",resultado:"Requiere apelación ante la ANI.",proxima:"Preparar recurso ANI",fp:"2026-05-07"},
+];
+
+let apiKey = localStorage.getItem('somos_api_key') || '';
+let activeTab="overview", fRuta="all", fEst="all", fBit="all";
+let selTramo=null, mapFiltVal="all", editingRoute=null;
+let mapInst=null, mapLines={};
+let emlFiles=[], emlResults=[], emlImported=[];
+
+// ─── HELPERS ────────────────────────────────────────────────
+const fmt=d=>d?d.split("-").reverse().join("/"):"-";
+const today=()=>new Date().toISOString().slice(0,10);
+const uid=()=>"id"+Date.now()+Math.random().toString(36).slice(2,7);
+const sb=e=>{const c=e==="Avanzado"?"av":e==="En gestión"?"eg":"cr";return`<span class="sb ${c}">${e}</span>`;};
+const tt=t=>{const l={call:"📞 Llamada",email:"📧 Correo",meeting:"🤝 Reunión",response:"📩 Respuesta"};return`<span class="ttag ${t}">${l[t]||t}</span>`;};
+const gv=id=>{const el=document.getElementById(id);return el?el.value:"";}
+
+function toast(msg,type){
+  const el=document.getElementById("toast");
+  el.textContent=msg; el.style.background=type==="err"?"#EF4444":"#10B981";
+  el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),3200);
+}
+
+// ─── KPIs ────────────────────────────────────────────────────
+function kpis(){
+  const av=tramos.filter(t=>t.estado==="Avanzado");
+  const eg=tramos.filter(t=>t.estado==="En gestión");
+  const cr=tramos.filter(t=>t.estado==="Crítico");
+  const km=a=>a.reduce((s,t)=>s+t.km,0);
+  document.getElementById("kpi-row").innerHTML=`
+    <div class="kpi acc"><div class="kpi-l">Tramos</div><div class="kpi-v">${tramos.length}</div><div class="kpi-s">${km(tramos)} km totales</div></div>
+    <div class="kpi av"><div class="kpi-l">Avanzados</div><div class="kpi-v">${av.length}</div><div class="kpi-s">${km(av)} km</div></div>
+    <div class="kpi eg"><div class="kpi-l">En gestión</div><div class="kpi-v">${eg.length}</div><div class="kpi-s">${km(eg)} km</div></div>
+    <div class="kpi cr"><div class="kpi-l">Críticos</div><div class="kpi-v">${cr.length}</div><div class="kpi-s">${km(cr)} km</div></div>
+    <div class="kpi acc"><div class="kpi-l">% Activa</div><div class="kpi-v">${tramos.length?((av.length+eg.length)/tramos.length*100).toFixed(0):0}%</div><div class="kpi-s">avanz + gestión</div></div>
+    <div class="kpi"><div class="kpi-l">Bitácora</div><div class="kpi-v">${bitacora.length}</div><div class="kpi-s">gestiones registradas</div></div>
+  `;
+}
+
+function routeSummary(elId,rid){
+  const r=tramos.filter(t=>t.ruta===rid);
+  if(!r.length){document.getElementById(elId).innerHTML='<div class="empty">Sin tramos configurados</div>';return;}
+  const av=r.filter(t=>t.estado==="Avanzado").length;
+  const eg=r.filter(t=>t.estado==="En gestión").length;
+  const cr=r.filter(t=>t.estado==="Crítico").length;
+  const km=r.reduce((s,t)=>s+t.km,0);
+  const pct=r.length?((av+eg)/r.length*100).toFixed(0):0;
+  document.getElementById(elId).innerHTML=`
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--av)">${av}</div><div style="font-size:8px;color:var(--muted)">avanzados</div></div>
+      <div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--eg)">${eg}</div><div style="font-size:8px;color:var(--muted)">en gestión</div></div>
+      <div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--cr)">${cr}</div><div style="font-size:8px;color:var(--muted)">críticos</div></div>
+    </div>
+    <div style="font-size:9px;color:var(--muted);margin-bottom:4px">${km} km · ${r.length} tramos</div>
+    <div class="pbar"><div class="pf" style="width:${pct}%;background:linear-gradient(90deg,var(--av),var(--acc))"></div></div>
+    <div style="font-size:8px;color:var(--muted);margin-top:3px">${pct}% gestión activa</div>
+    ${r.filter(t=>t.estado==="Crítico").map(t=>`<div style="margin-top:6px;display:flex;justify-content:space-between;font-size:10px"><span style="color:#fff">${t.tramo}</span><span style="color:var(--cr);font-size:8px;font-weight:700">⚠ ${fmt(t.fp)}</span></div>`).join("")}`;
+}
+
+function recBit(){
+  const s=[...bitacora].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,5);
+  document.getElementById("rec-bit").innerHTML=s.map(b=>`
+    <div class="bi ${b.tipo}">
+      <div class="bi-d">${tt(b.tipo)}<strong style="color:#fff">${b.tramo}</strong><span>· ${fmt(b.fecha)}</span></div>
+      <div class="bi-g">${b.gestion}</div>
+      ${b.resultado?`<div class="bi-r">→ ${b.resultado}</div>`:""}
+    </div>`).join("")||'<div class="empty">Sin gestiones registradas</div>';
+}
+
+// ─── BITÁCORA EDITABLE ───────────────────────────────────────
+function renderBitList(){
+  const f=bitacora.filter(b=>fBit==="all"||b.tipo===fBit).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  document.getElementById("bit-list").innerHTML=f.map(b=>`
+    <div class="bi ${b.tipo}" id="bi-${b.id}">
+      <div class="bi-d">
+        <span>${tt(b.tipo)}</span>
+        <strong style="color:#fff">${b.tramo}</strong>
+        <span style="color:var(--muted)">· ${b.actor}</span>
+        <span style="margin-left:auto;color:var(--muted2)">${fmt(b.fecha)}</span>
+      </div>
+      <div class="bi-g">${b.gestion}</div>
+      ${b.resultado?`<div class="bi-r">→ ${b.resultado}</div>`:""}
+      ${b.proxima?`<div style="font-size:9px;color:var(--acc);margin-top:3px">📌 ${b.proxima}${b.fp?" · "+fmt(b.fp):""}</div>`:""}
+      <div class="bi-actions">
+        <button class="btn btn-warn btn-sm" onclick="openModal('edit-bit','${b.id}')">✏ Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteBit('${b.id}')">🗑 Eliminar</button>
+      </div>
+    </div>`).join("")||'<div class="empty">No hay gestiones para mostrar</div>';
+}
+
+function deleteBit(id){
+  if(!confirm("¿Eliminar esta gestión de la bitácora?"))return;
+  bitacora=bitacora.filter(b=>b.id!==id);
+  renderAll(); refreshLines();
+  toast("Gestión eliminada");
+}
+
+// ─── MAPA ────────────────────────────────────────────────────
+function initMap(){
+  if(mapInst)return;
+  mapInst=L.map("the-map",{zoomControl:true,preferCanvas:true});
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{
+    attribution:"© OpenStreetMap contributors © CARTO",maxZoom:18,subdomains:"abcd"
+  }).addTo(mapInst);
+  drawAllLines();
+  const all=tramos.flatMap(t=>t.coords.map(c=>[c[0],c[1]]));
+  if(all.length)mapInst.fitBounds(L.latLngBounds(all),{padding:[40,40]});
+  renderMapSide();
+}
+
+function lineColor(t){
+  if(mapFiltVal!=="all"){if(t.ruta!==mapFiltVal)return null;return routes[t.ruta]?.color||SC[t.estado];}
+  return SC[t.estado];
+}
+
+function buildPopup(t){
+  const lb=bitacora.filter(b=>b.tramo===t.tramo).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
+  const c=SC[t.estado];
+  return`<div style="font-family:'Segoe UI',sans-serif;min-width:200px">
+    <div style="font-weight:700;font-size:13px;color:#111;margin-bottom:6px">${t.tramo}</div>
+    <span style="background:${c}22;color:${c};border:1px solid ${c}44;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700">${t.estado}</span>
+    <div style="margin-top:8px;font-size:11px;color:#333;line-height:1.8">
+      <b>Actor:</b> ${t.actor}<br><b>Concesión:</b> ${t.concesion||"Invias/directo"}<br><b>Km:</b> ${t.km} km<br>
+      <b>Próxima:</b> ${t.proxima||"—"}<br><b>Fecha:</b> ${fmt(t.fp)}
+    </div>
+    ${lb?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee;font-size:10px">
+      <div style="color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-size:9px;margin-bottom:3px">Última gestión · ${fmt(lb.fecha)}</div>
+      <div style="color:#333">${lb.gestion}</div>
+      ${lb.resultado?`<div style="color:#555;margin-top:2px">→ ${lb.resultado}</div>`:""}
+    </div>`:""}
+  </div>`;
+}
+
+function drawAllLines(){
+  if(!mapInst)return;
+  Object.values(mapLines).forEach(l=>{try{l.remove();}catch(e){}});
+  mapLines={};
+  tramos.forEach(t=>{
+    const color=lineColor(t); if(!color)return;
+    const line=L.polyline(t.coords.map(c=>[c[0],c[1]]),{color,weight:6,opacity:.88,lineCap:"round",lineJoin:"round"}).addTo(mapInst);
+    line.bindPopup(buildPopup(t),{maxWidth:270});
+    line.on("click",()=>hlSide(t.id));
+    mapLines[t.id]=line;
+  });
+}
+
+function refreshLines(){
+  if(!mapInst)return;
+  tramos.forEach(t=>{
+    const color=lineColor(t);
+    if(!mapLines[t.id]){
+      if(!color)return;
+      const line=L.polyline(t.coords.map(c=>[c[0],c[1]]),{color,weight:6,opacity:.88,lineCap:"round",lineJoin:"round"}).addTo(mapInst);
+      line.bindPopup(buildPopup(t),{maxWidth:270});
+      line.on("click",()=>hlSide(t.id));
+      mapLines[t.id]=line;
+    } else {
+      if(!color){mapLines[t.id].setStyle({opacity:0});return;}
+      mapLines[t.id].setStyle({color,opacity:.88});
+      mapLines[t.id].setPopupContent(buildPopup(t));
+    }
+  });
+  renderMapSide();
+}
+
+function renderMapSide(){
+  const vis=mapFiltVal==="all"?tramos:tramos.filter(t=>t.ruta===mapFiltVal);
+  document.getElementById("map-tlist").innerHTML=vis.map(t=>`
+    <div class="ms-item" onclick="focusT('${t.id}')">
+      <div class="ms-nm">${t.tramo}</div>
+      <div class="ms-meta">${sb(t.estado)}<span>${t.km} km</span></div>
+    </div>`).join("");
+}
+
+function focusT(id){
+  const t=tramos.find(x=>x.id===id); if(!t||!mapInst)return;
+  const c=t.coords[Math.floor(t.coords.length/2)];
+  mapInst.setView([c[0],c[1]],11,{animate:true});
+  if(mapLines[id])mapLines[id].openPopup();
+  hlSide(id);
+}
+function hlSide(id){
+  document.querySelectorAll(".ms-item").forEach((el,i)=>{
+    const vis=mapFiltVal==="all"?tramos:tramos.filter(t=>t.ruta===mapFiltVal);
+    el.style.background=vis[i]?.id===id?"rgba(59,130,246,.15)":"";
+  });
+}
+function mapFilt(v){
+  mapFiltVal=v;
+  document.querySelectorAll("[id^='mf-']").forEach(el=>el.classList.remove("active"));
+  const el=document.getElementById("mf-"+v); if(el)el.classList.add("active");
+  if(mapInst)drawAllLines(); else if(activeTab==="mapa")setTimeout(()=>initMap(),80);
+  renderMapSide();
+}
+
+// ─── TRAMOS ──────────────────────────────────────────────────
+function renderTramoList(){
+  const f=tramos.filter(t=>(fRuta==="all"||t.ruta===fRuta)&&(fEst==="all"||t.estado===fEst));
+  document.getElementById("tl-panel").innerHTML=f.map(t=>`
+    <div class="ti-item${selTramo===t.id?" sel":""}" onclick="selT('${t.id}')">
+      <div class="ti-n">${t.tramo}</div>
+      <div class="ti-m">${sb(t.estado)}<span class="rpill ${t.ruta}" style="padding:1px 6px;font-size:8px">${routes[t.ruta]?.nombre?.split("–")[1]||t.ruta}</span><span>${t.km} km</span></div>
+    </div>`).join("")||'<div class="empty">Sin tramos</div>';
+}
+
+function selT(id){
+  selTramo=id; renderTramoList();
+  const t=tramos.find(x=>x.id===id); if(!t)return;
+  const tb=bitacora.filter(b=>b.tramo===t.tramo).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  document.getElementById("td-panel").innerHTML=`
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#fff">${t.tramo}</div>
+          <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${sb(t.estado)}<span class="rpill ${t.ruta}">${routes[t.ruta]?.nombre||t.ruta}</span></div>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <button class="btn btn-warn btn-sm" onclick="openModal('edit-tramo','${t.id}')">Editar</button>
+          <button class="btn btn-p btn-sm" onclick="openModal('gestion',null,'${t.tramo}')">+ Gestión</button>
+        </div>
+      </div>
+      <div class="divd"></div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:11px;margin-bottom:10px">
+        <span style="color:var(--muted)">Actor</span><span style="color:#fff">${t.actor}</span>
+        <span style="color:var(--muted)">Concesión</span><span style="color:#fff">${t.concesion||"Invias/directo"}</span>
+        <span style="color:var(--muted)">Kilómetros</span><span style="color:#fff">${t.km} km</span>
+        <span style="color:var(--muted)">Próxima acción</span><span style="color:#fff">${t.proxima||"—"}</span>
+        <span style="color:var(--muted)">Fecha próxima</span><span style="color:#fff">${fmt(t.fp)}</span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn btn-warn btn-sm" onclick="openModal('dividir-tramo','${t.id}')">Dividir en subtramos</button>
+        <button class="btn btn-g btn-sm" onclick="openModal('alt-ruta','${t.id}')">Ruta alternativa</button>
+      </div>
+      <div class="divd"></div>
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Historial de gestiones (${tb.length})</div>
+      ${tb.map(b=>`
+        <div class="bi ${b.tipo}" style="margin-bottom:7px">
+          <div class="bi-d">${tt(b.tipo)}<span>${fmt(b.fecha)}</span></div>
+          <div class="bi-g">${b.gestion}</div>
+          ${b.resultado?`<div class="bi-r">→ ${b.resultado}</div>`:""}
+          <div class="bi-actions">
+            <button class="btn btn-warn btn-sm" onclick="openModal('edit-bit','${b.id}')">✏ Editar</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteBit('${b.id}')">🗑</button>
+          </div>
+        </div>`).join("")||'<div class="empty" style="padding:10px">Sin gestiones registradas</div>'}
+    </div>`;
+}
+
+// ─── RUTAS ───────────────────────────────────────────────────
+function renderRutasList(){
+  document.getElementById("rutas-list").innerHTML=Object.values(routes).map(r=>{
+    const rt=tramos.filter(t=>t.ruta===r.id);
+    return`<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;margin-bottom:7px;cursor:pointer" onclick="selEditRoute('${r.id}')">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="width:13px;height:13px;border-radius:50%;background:${r.color};flex-shrink:0"></div>
+          <div><div style="font-size:12px;font-weight:600;color:#fff">${r.nombre}</div><div style="font-size:9px;color:var(--muted)">${rt.length} tramos · ${rt.reduce((s,t)=>s+t.km,0)} km</div></div>
+        </div>
+        <div style="display:flex;gap:5px">
+          <button class="btn btn-warn btn-sm" onclick="event.stopPropagation();openModal('edit-ruta','${r.id}')">Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();eliminarRuta('${r.id}')">×</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("")||'<div class="empty">Sin rutas configuradas</div>';
+}
+
+function selEditRoute(rid){
+  editingRoute=rid;
+  const r=routes[rid]; if(!r)return;
+  document.getElementById("editor-title").textContent="Tramos: "+r.nombre;
+  document.getElementById("editor-actions").innerHTML=`<button class="btn btn-p btn-sm" onclick="openModal('nuevo-tramo','${rid}')">+ Agregar tramo</button>`;
+  const rt=tramos.filter(t=>t.ruta===rid);
+  document.getElementById("tramo-editor-body").innerHTML=`<div style="max-height:380px;overflow-y:auto" class="sc">${
+    rt.map(t=>`<div class="tramo-edit-row">
+      <div style="width:5px;height:36px;border-radius:3px;background:${SC[t.estado]};flex-shrink:0"></div>
+      <div style="flex:1"><div style="font-size:12px;color:#fff">${t.tramo}</div><div style="font-size:9px;color:var(--muted)">${t.actor} · ${t.km} km · ${t.estado}</div></div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        ${sb(t.estado)}
+        <button class="btn btn-warn btn-sm" onclick="openModal('edit-tramo','${t.id}')">Editar</button>
+        <button class="btn btn-warn btn-sm" onclick="openModal('dividir-tramo','${t.id}')">Dividir</button>
+        <button class="btn btn-danger btn-sm" onclick="qDelTramo('${t.id}')">×</button>
+      </div>
+    </div>`).join("")||'<div class="empty">Sin tramos en esta ruta</div>'}</div>`;
+}
+
+function eliminarRuta(rid){
+  if(!confirm("¿Eliminar la ruta y todos sus tramos? Esta acción no se puede deshacer."))return;
+  tramos=tramos.filter(t=>t.ruta!==rid);
+  delete routes[rid];
+  renderAll(); renderRutasList(); renderExtraFilters();
+  document.getElementById("tramo-editor-body").innerHTML='<div class="empty">Selecciona una ruta</div>';
+  document.getElementById("editor-title").textContent="Editar tramos de ruta";
+  document.getElementById("editor-actions").innerHTML="";
+  if(mapInst)drawAllLines();
+  toast("Ruta eliminada");
+}
+
+function qDelTramo(id){
+  if(!confirm("¿Eliminar este tramo?"))return;
+  tramos=tramos.filter(t=>t.id!==id);
+  if(editingRoute)selEditRoute(editingRoute);
+  renderAll(); if(mapInst)drawAllLines();
+  toast("Tramo eliminado");
+}
+
+function renderExtraFilters(){
+  const extra=Object.keys(routes).filter(k=>k!=="r1"&&k!=="r2");
+  document.getElementById("extra-mf").innerHTML=extra.map(k=>`<button class="fb" id="mf-${k}" onclick="mapFilt('${k}')" style="margin-left:4px">${routes[k].nombre.slice(0,10)}</button>`).join("");
+  document.getElementById("extra-rf").innerHTML=extra.map(k=>`<button class="fb" id="fr-${k}" onclick="fR('${k}')" style="margin-left:4px">${routes[k].nombre.slice(0,10)}</button>`).join("");
+}
+
+// ─── FILTROS ─────────────────────────────────────────────────
+function fR(v){
+  fRuta=v;
+  document.querySelectorAll("[id^='fr-']").forEach(el=>el.classList.remove("active"));
+  const el=document.getElementById("fr-"+v); if(el)el.classList.add("active");
+  renderTramoList();
+}
+function fE(v){
+  fEst=v;
+  const map={all:"all",Avanzado:"av","En gestión":"eg","Crítico":"cr"};
+  Object.entries(map).forEach(([k,x])=>{const el=document.getElementById("fe-"+x);if(el)el.classList.toggle("active",k===v);});
+  renderTramoList();
+}
+function fB(v){
+  fBit=v;
+  ["all","call","email","meeting","response"].forEach(x=>{const el=document.getElementById("bt-"+x);if(el)el.classList.toggle("active",x===v);});
+  renderBitList();
+}
+
+// ─── NAVEGACIÓN ──────────────────────────────────────────────
+function sw(name){
+  activeTab=name;
+  document.querySelectorAll(".tv").forEach(el=>el.classList.remove("active"));
+  document.querySelectorAll(".nb").forEach(el=>el.classList.remove("active"));
+  document.getElementById("t-"+name).classList.add("active");
+  const tabs=["overview","mapa","tramos","bitacora","rutas","gmail"];
+  document.querySelectorAll(".nb")[tabs.indexOf(name)]?.classList.add("active");
+  if(name==="mapa")setTimeout(()=>{if(!mapInst)initMap();else mapInst.invalidateSize();},80);
+  if(name==="tramos")renderTramoList();
+  if(name==="bitacora")renderBitList();
+  if(name==="rutas"){renderRutasList();renderExtraFilters();}
+}
+
+// ─── MODAL ───────────────────────────────────────────────────
+function openModal(type,id,preTramo){
+  const mw=document.getElementById("modal-overlay");
+  const mb=document.getElementById("modal-body");
+  const mt=document.getElementById("modal-title");
+  mw.classList.add("open");
+
+  if(type==="apikey"){
+    mt.textContent="⚙ Configurar API Key de Anthropic";
+    mb.innerHTML=`<div class="ff">
+      <p style="font-size:11px;color:var(--muted);line-height:1.6">La API Key permite el análisis automático con IA al importar archivos .eml. Se guarda localmente en tu navegador y nunca se envía a ningún servidor externo más que a <strong style="color:#fff">api.anthropic.com</strong>.</p>
+      <div class="fl">
+        <label>API Key de Anthropic</label>
+        <input type="password" class="inp" id="ak-inp" value="${apiKey}" placeholder="sk-ant-...">
+      </div>
+      <p style="font-size:10px;color:var(--muted2)">Obtén tu key en <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--acc)">console.anthropic.com/settings/keys</a></p>
+      <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:4px">
+        <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-p" onclick="saveApiKey()">Guardar</button>
+      </div>
+    </div>`;
+  }
+
+  else if(type==="gestion"){
+    mt.textContent="Registrar gestión";
+    mb.innerHTML=`<div class="ff">
+      <div class="frow">
+        <div class="fl"><label>Fecha</label><input type="date" class="inp" id="f-fecha" value="${today()}"></div>
+        <div class="fl"><label>Tipo</label><select class="inp" id="f-tipo"><option value="call">📞 Llamada</option><option value="email">📧 Correo</option><option value="meeting">🤝 Reunión</option><option value="response">📩 Respuesta</option></select></div>
+      </div>
+      <div class="frow">
+        <div class="fl"><label>Tramo</label><select class="inp" id="f-tramo">${tramos.map(t=>`<option value="${t.tramo}"${preTramo===t.tramo?" selected":""}>${t.tramo}</option>`).join("")}</select></div>
+        <div class="fl"><label>Actor / Entidad</label><input type="text" class="inp" id="f-actor" placeholder="Invias, ANI, Concesión…"></div>
+      </div>
+      <div class="fl"><label>Descripción de la gestión</label><textarea class="inp" id="f-desc" placeholder="¿Qué se gestionó? ¿Con quién? ¿Qué se solicitó?"></textarea></div>
+      <div class="fl"><label>Resultado / Respuesta obtenida</label><textarea class="inp" id="f-res" placeholder="Resultado, acuerdo, compromiso, respuesta…"></textarea></div>
+      <div class="frow">
+        <div class="fl"><label>Próxima acción</label><input type="text" class="inp" id="f-prox" placeholder="Seguimiento, reunión, envío…"></div>
+        <div class="fl"><label>Fecha próxima acción</label><input type="date" class="inp" id="f-fprox"></div>
+      </div>
+      <div class="fl"><label>Actualizar semáforo del tramo</label><select class="inp" id="f-est"><option value="">— sin cambio —</option><option value="Avanzado">Avanzado</option><option value="En gestión">En gestión</option><option value="Crítico">Crítico</option></select></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
+        <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-p" onclick="saveGestion()">Guardar gestión</button>
+      </div>
+    </div>`;
+  }
+
+  else if(type==="edit-bit"){
+    const b=bitacora.find(x=>x.id===id); if(!b)return;
+    mt.textContent="Editar gestión";
+    mb.innerHTML=`<div class="ff">
+      <div class="frow">
+        <div class="fl"><label>Fecha</label><input type="date" class="inp" id="eb-fecha" value="${b.fecha}"></div>
+        <div class="fl"><label>Tipo</label><select class="inp" id="eb-tipo"><option value="call"${b.tipo==="call"?" selected":""}>📞 Llamada</option><option value="email"${b.tipo==="email"?" selected":""}>📧 Correo</option><option value="meeting"${b.tipo==="meeting"?" selected":""}>🤝 Reunión</option><option value="response"${b.tipo==="response"?" selected":""}>📩 Respuesta</option></select></div>
+      </div>
+      <div class="frow">
+        <div class="fl"><label>Tramo</label><select class="inp" id="eb-tramo">${tramos.map(t=>`<option value="${t.tramo}"${b.tramo===t.tramo?" selected":""}>${t.tramo}</option>`).join("")}</select></div>
+        <div class="fl"><label>Actor</label><input type="text" class="inp" id="eb-actor" value="${b.actor||""}"></div>
+      </div>
+      <div class="fl"><label>Descripción</label><textarea class="inp" id="eb-gestion">${b.gestion||""}</textarea></div>
+      <div class="fl"><label>Resultado</label><textarea class="inp" id="eb-resultado">${b.resultado||""}</textarea></div>
+      <div class="frow">
+        <div class="fl"><label>Próxima acción</label><input type="text" class="inp" id="eb-prox" value="${b.proxima||""}"></div>
+        <div class="fl"><label>Fecha próxima</label><input type="date" class="inp" id="eb-fp" value="${b.fp||""}"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
+        <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteBit('${id}');closeModal()">🗑 Eliminar</button>
+        <button class="btn btn-p" onclick="updateBit('${id}')">Guardar cambios</button>
+      </div>
+    </div>`;
+  }
+
+  else if(type==="nueva-ruta"){
+    mt.textContent="Nueva ruta";
+    const nid="r"+(Object.keys(routes).length+1);
+    mb.innerHTML=`<div class="ff">
+      <div class="fl"><label>Nombre de la ruta</label><input type="text" class="inp" id="nr-n" placeholder="Ej: Medellín–Cali"></div>
+      <div class="frow">
+        <div class="fl"><label>ID interno</label><input type="text" class="inp" id="nr-id" value="${nid}"></div>
+        <div class="fl"><label>Color en mapa (hex)</label><input type="text" class="inp" id="nr-c" value="#34D399" placeholder="#34D399"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
+        <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-p" onclick="saveNuevaRuta()">Crear ruta</button>
+      </div>
+    </div>`;
+  }
+
+  else if(type==="edit-ruta"){
+    const r=routes[id]; if(!r)return;
+    mt.textContent="Editar ruta";
+    mb.innerHTML=`<div class="ff">
+      <div class="fl"><label>Nombre</label><input type="text" class="inp" id="er-n" value="${r.nombre}"></div>
+      <div class="fl"><label>Color (hex)</label><input type="text" class="inp" id="er-c" value="${r.color}"></div>
+      <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
+        <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-p" onclick="saveEditRuta('${id}')">Guardar</button>
+      </div>
+    </div>`;
+  }
+
+  else if(type==="nuevo-tramo"){
+    mt.textContent="Agregar tramo a: "+(routes[id]?.nombre||id);
+    mb.innerHTML=`<div class="ff">
+      <div class="fl"><label>Nombre del tramo</label><input type="text" class="inp" id="nt-n" placeholder="Ciudad A – Ciudad B"></div>
+      <div class="frow">
+        <div class="fl"><label>Actor / Entidad</label><input type="text" class="inp" id="nt-a" placeholder="Invias, ANI, Concesión…"></div>
+        <div class="fl"><label>Concesión</label><input type="text" class="inp" id="nt-c" placeholder="Nombre concesión"></div>
+      </div>
+      <div class="frow">
+        <div class="fl"><label>Kilómetros</label><input type="number" class="inp" id="nt-km" value="0" min="0"></div>
+        <div class="fl"><label>Estado inicial</label><select class="inp" id="nt-e"><option value="En gestión">En gestión</option><option value="Avanzado">Avanzado</option><option value="Crítico">Crítico</option></select></div>
+      </div>
+      <div class="sec-tag">Coordenadas del trazado (lat, lng por punto)</div>
+      <div id="coords-cont"></div>
+      <button class="btn btn-g btn-sm" onclick="addCoord()" style="align-self:flex-start;margin-bottom:4px">+ Agregar punto</button>
+      <div class="fl"><label>Primera acción a realizar</label><input type="text" class="inp" id="nt-p" placeholder="Primera gestión a realizar"></div>
+      <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
+        <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-p" onclick="saveNuevoTramo('${id}')">Agregar tramo</button>
+      </div>
+    </div>`;
+    addCoord(); addCoord();
+  }
+
+  else if(type==="edit-tramo"){
+    const t=tramos.find(x=>x.id===id); if(!t)return;
+    mt.textContent="Editar tramo";
+    const rOpts=Object.values(routes).map(r=>`<option value="${r.id}"${r.id===t.ruta?" selected":""}>${r.nombre}</option>`).join("");
+    mb.innerHTML=`<div class="ff">
+      <div class="fl"><label>Nombre del tramo</label><input type="text" class="inp" id="et-n" value="${t.tramo}"></div>
+      <div class="frow">
+        <div class="fl"><label>Ruta</label><select class="inp" id="et-r">${rOpts}</select></div>
+        <div class="fl"><label>Estado (semáforo)</label><select class="inp" id="et-e"><option value="Avanzado"${t.estado==="Avanzado"?" selected":""}>Avanzado</option><option value="En gestión"${t.estado==="En gestión"?" selected":""}>En gestión</option><option value="Crítico"${t.estado==="Crítico"?" selected":""}>Crítico</option></select></div>
+      </div>
+      <div class="frow">
+        <div class="fl"><label>Actor</label><input type="text" class="inp" id="et-a" value="${t.actor}"></div>
+        <div class="fl"><label>Concesión</label><input type="text" class="inp" id="et-c" value="${t.concesion||""}"></div>
+      </div>
+      <div class="frow">
+        <div class="fl"><label>Kilómetros</label><input type="number" class="inp" id="et-km" value="${t.km}"></div>
+        <div class="fl"><label>Fecha próxima acción</label><input type="date" class="inp" id="et-fp" value="${t.fp||""}"></div>
+      </div>
+      <div class="fl"><label>Próxima acción</label><input type="text" class="inp" id="et-p" value="${t.proxima||""}"></div>
+      <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
+        <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-p" onclick="saveEditTramo('${id}')">Guardar cambios</button>
+      </div>
+    </div>`;
+  }
+
+  else if(type==="dividir-tramo"){
+    const t=tramos.find(x=>x.id===id); if(!t)return;
+    const p=t.tramo.split("–");
+    mt.textContent="Dividir: "+t.tramo;
+    mb.innerHTML=`<div class="ff">
+      <p style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.6">Divide "${t.tramo}" (${t.km} km) en dos subtramos. El tramo original será reemplazado por los dos nuevos.</p>
+      <div class="sec-tag">Subtramo 1</div>
+      <div class="frow">
+        <div class="fl"><label>Nombre</label><input type="text" class="inp" id="s1-n" value="${p[0]?.trim()||""} – Punto medio"></div>
+        <div class="fl"><label>Km</label><input type="number" class="inp" id="s1-km" value="${Math.round(t.km/2)}"></div>
+      </div>
+      <div class="frow">
+        <div class="fl"><label>Actor</label><input type="text" class="inp" id="s1-a" value="${t.actor}"></div>
+        <div class="fl"><label>Estado</label><select class="inp" id="s1-e"><option value="En gestión">En gestión</option><option value="Avanzado">Avanzado</option><option value="Crítico">Crítico</option></select></div>
+      </div>
+      <div class="sec-tag">Subtramo 2</div>
+      <div class="frow">
+        <div class="fl"><label>Nombre</label><input type="text" class="inp" id="s2-n" value="Punto medio – ${p[1]?.trim()||""}"></div>
+        <div class="fl"><label>Km</label><input type="number" class="inp" id="s2-km" value="${Math.round(t.km/2)}"></div>
+      </div>
+      <div class="frow">
+        <div class="fl"><label>Actor</label><input type="text" class="inp" id="s2-a" value="${t.actor}"></div>
+        <div class="fl"><label>Estado</label><select class="inp" id="s2-e"><option value="En gestión">En gestión</option><option value="Avanzado">Avanzado</option><option value="Crítico">Crítico</option></select></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:8px">
+        <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-p" onclick="doDividir('${id}')">Dividir tramo</button>
+      </div>
+    </div>`;
+  }
+
+  else if(type==="alt-ruta"){
+    const t=tramos.find(x=>x.id===id); if(!t)return;
+    mt.textContent="Ruta alternativa para: "+t.tramo;
+    mb.innerHTML=`<div class="ff">
+      <p style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.6">Crea un tramo alternativo con el mismo origen y destino pero por un corredor diferente.</p>
+      <div class="fl"><label>Nombre alternativa</label><input type="text" class="inp" id="alt-n" value="${t.tramo} (Alternativa)"></div>
+      <div class="frow">
+        <div class="fl"><label>Actor</label><input type="text" class="inp" id="alt-a" value="${t.actor}"></div>
+        <div class="fl"><label>Km estimados</label><input type="number" class="inp" id="alt-km" value="${Math.round(t.km*1.1)}"></div>
+      </div>
+      <div class="fl"><label>Ruta</label><select class="inp" id="alt-r">${Object.values(routes).map(r=>`<option value="${r.id}"${r.id===t.ruta?" selected":""}>${r.nombre}</option>`).join("")}</select></div>
+      <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
+        <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-p" onclick="saveAlt('${id}')">Crear ruta alternativa</button>
+      </div>
+    </div>`;
+  }
+}
+
+function closeModal(){document.getElementById("modal-overlay").classList.remove("open");}
+document.getElementById("modal-overlay").addEventListener("click",e=>{if(e.target===document.getElementById("modal-overlay"))closeModal();});
+
+// ─── GUARDAR FORMULARIOS ─────────────────────────────────────
+function saveApiKey(){
+  apiKey=gv("ak-inp").trim();
+  localStorage.setItem("somos_api_key",apiKey);
+  closeModal();
+  toast(apiKey?"API Key guardada correctamente":"API Key eliminada");
+}
+
+function saveGestion(){
+  const tn=gv("f-tramo"), gestion=gv("f-desc");
+  if(!tn||!gestion){toast("Completa el tramo y la descripción","err");return;}
+  const ne=gv("f-est");
+  bitacora.unshift({id:uid(),fecha:gv("f-fecha"),tipo:gv("f-tipo"),tramo:tn,actor:gv("f-actor"),gestion,resultado:gv("f-res"),proxima:gv("f-prox"),fp:gv("f-fprox")});
+  const t=tramos.find(x=>x.tramo===tn);
+  if(t){if(ne)t.estado=ne;if(gv("f-prox"))t.proxima=gv("f-prox");if(gv("f-fprox"))t.fp=gv("f-fprox");}
+  closeModal(); renderAll(); refreshLines(); if(selTramo)selT(selTramo);
+  toast("Gestión registrada · Mapa actualizado");
+}
+
+function updateBit(id){
+  const b=bitacora.find(x=>x.id===id); if(!b)return;
+  b.fecha=gv("eb-fecha"); b.tipo=gv("eb-tipo"); b.tramo=gv("eb-tramo");
+  b.actor=gv("eb-actor"); b.gestion=gv("eb-gestion"); b.resultado=gv("eb-resultado");
+  b.proxima=gv("eb-prox"); b.fp=gv("eb-fp");
+  closeModal(); renderAll(); refreshLines(); if(selTramo)selT(selTramo);
+  toast("Gestión actualizada");
+}
+
+function saveNuevaRuta(){
+  const n=gv("nr-n").trim(), rid=gv("nr-id").trim()||"r"+uid(), c=gv("nr-c");
+  if(!n){toast("Ingresa el nombre de la ruta","err");return;}
+  routes[rid]={id:rid,nombre:n,color:c||"#34D399"};
+  closeModal(); renderRutasList(); renderExtraFilters(); renderAll();
+  toast("Ruta creada: "+n);
+}
+
+function saveEditRuta(rid){
+  routes[rid].nombre=gv("er-n"); routes[rid].color=gv("er-c");
+  closeModal(); renderRutasList(); renderAll(); if(mapInst)drawAllLines();
+  toast("Ruta actualizada");
+}
+
+function addCoord(){
+  const c=document.getElementById("coords-cont"); if(!c)return;
+  const row=document.createElement("div"); row.className="coord-row";
+  row.innerHTML=`<input type="number" step="0.0001" class="inp" placeholder="Lat (ej: 6.2476)" style="font-size:11px"><input type="number" step="0.0001" class="inp" placeholder="Lng (ej: -75.56)" style="font-size:11px"><button class="btn btn-danger btn-sm" onclick="this.parentNode.remove()" style="padding:4px 8px">×</button>`;
+  c.appendChild(row);
+}
+
+function saveNuevoTramo(rutaId){
+  const n=gv("nt-n").trim(); if(!n){toast("Ingresa el nombre del tramo","err");return;}
+  const rows=document.getElementById("coords-cont").querySelectorAll(".coord-row");
+  const coords=[];
+  rows.forEach(r=>{const ins=r.querySelectorAll("input");const lat=parseFloat(ins[0].value),lng=parseFloat(ins[1].value);if(!isNaN(lat)&&!isNaN(lng))coords.push([lat,lng]);});
+  if(coords.length<2){const ex=tramos.filter(t=>t.ruta===rutaId);coords.push(...(ex.length?ex[ex.length-1].coords.slice(-2):[[6.2476,-75.5658],[6.5,-75.0]]));}
+  tramos.push({id:uid(),ruta:rutaId,tramo:n,actor:gv("nt-a"),concesion:gv("nt-c"),km:parseFloat(gv("nt-km"))||0,estado:gv("nt-e"),proxima:gv("nt-p"),fp:"",coords});
+  closeModal(); if(editingRoute===rutaId)selEditRoute(rutaId); renderAll(); if(mapInst)drawAllLines();
+  toast("Tramo agregado al mapa");
+}
+
+function saveEditTramo(id){
+  const t=tramos.find(x=>x.id===id); if(!t)return;
+  t.tramo=gv("et-n"); t.ruta=gv("et-r"); t.estado=gv("et-e");
+  t.actor=gv("et-a"); t.concesion=gv("et-c");
+  t.km=parseFloat(gv("et-km"))||t.km; t.fp=gv("et-fp"); t.proxima=gv("et-p");
+  closeModal(); renderAll(); refreshLines(); if(selTramo)selT(selTramo); if(editingRoute)selEditRoute(editingRoute);
+  toast("Tramo actualizado · Semáforo actualizado en mapa");
+}
+
+function doDividir(id){
+  const t=tramos.find(x=>x.id===id); if(!t)return;
+  const mi=Math.floor(t.coords.length/2);
+  const c1=t.coords.slice(0,mi+1), c2=t.coords.slice(mi);
+  const mk=(n,a,km,e,cr,fp,coords)=>({id:uid(),ruta:t.ruta,tramo:n,actor:a,km:parseFloat(km)||Math.round(t.km/2),estado:e,proxima:t.proxima,fp:fp||t.fp,concesion:t.concesion,coords});
+  const sub1=mk(gv("s1-n"),gv("s1-a"),gv("s1-km"),gv("s1-e"),t.concesion,t.fp,c1.length>=2?c1:[t.coords[0],t.coords[Math.floor(t.coords.length/2)]]);
+  const sub2=mk(gv("s2-n"),gv("s2-a"),gv("s2-km"),gv("s2-e"),t.concesion,"",c2.length>=2?c2:[t.coords[Math.floor(t.coords.length/2)],t.coords[t.coords.length-1]]);
+  tramos.splice(tramos.findIndex(x=>x.id===id),1,sub1,sub2);
+  closeModal(); renderAll(); if(mapInst)drawAllLines(); if(editingRoute)selEditRoute(editingRoute);
+  toast("Tramo dividido en 2 subtramos · Mapa actualizado");
+}
+
+function saveAlt(id){
+  const t=tramos.find(x=>x.id===id); if(!t)return;
+  tramos.push({id:uid(),ruta:gv("alt-r"),tramo:gv("alt-n"),actor:gv("alt-a"),km:parseFloat(gv("alt-km"))||t.km,estado:"En gestión",proxima:"Evaluar viabilidad ruta alternativa",fp:"",concesion:"",coords:t.coords.map((c,i)=>[c[0]+(i%2===0?.08:-.05),c[1]+(i%2===0?-.05:.07)])});
+  closeModal(); renderAll(); if(mapInst)drawAllLines(); if(editingRoute)selEditRoute(editingRoute);
+  toast("Ruta alternativa creada y visible en el mapa");
+}
+
+// ─── GMAIL SIMULADO ──────────────────────────────────────────
+async function buscarCorreos(resp){
+  const el=document.getElementById("gmail-emails");
+  el.innerHTML='<div class="thinking"><span></span><span></span><span></span><span style="margin-left:8px;font-size:11px">Buscando correos…</span></div>';
+  await new Promise(r=>setTimeout(r,600));
+  const mails=resp?[
+    {id:"g3",subj:"RE: Solicitud viabilidad – Caucasia/Planeta Rica",from:"subdirector@invias.gov.co",date:"2026-05-05",snip:"Adjuntamos concepto técnico preliminar. Requiere documentación adicional: estudio de suelos y formato FT-2301. Plazo respuesta: 30 días hábiles.",tipo:"response"},
+    {id:"g4",subj:"Acuerdo Ruta del Mar KM 45-90 firmado",from:"permisos@rutadelmar.com.co",date:"2026-05-04",snip:"Confirmamos firma del acuerdo marco para tendido de fibra. Adjunto contrato de uso de infraestructura y cronograma aprobado.",tipo:"response"},
+    {id:"g5",subj:"Negación acceso – Villeta–Bogotá",from:"concesiones@mallavial.com.co",date:"2026-05-02",snip:"La solicitud para el tramo Villeta–Bogotá no puede ser atendida por restricciones del contrato ANI vigente. Se sugiere elevar la solicitud directamente.",tipo:"response"},
+  ]:[
+    {id:"g1",subj:"Solicitud viabilidad fibra – Tramo Puerto Berrío",from:"gestor@somos.com.co",to:"proyectos@devimed.com.co",date:"2026-05-04",snip:"Remitimos solicitud formal de viabilidad para tendido de fibra óptica en el corredor Barbosa–Puerto Berrío. Adjuntamos memoria técnica y trazado GPS.",tipo:"sent"},
+    {id:"g2",subj:"Oficio ANI – Permiso corredor Montería/Barranquilla",from:"gestor@somos.com.co",to:"permisos@ani.gov.co",date:"2026-05-03",snip:"Solicitamos permiso de uso del corredor vial de la Ruta del Mar para tendido de fibra óptica en el tramo Montería–Barranquilla (90 km).",tipo:"sent"},
+  ];
+  el.innerHTML=mails.map(m=>`
+    <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:7px">
+        <div style="font-size:12px;font-weight:600;color:#fff">${m.subj}</div>
+        <span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;flex-shrink:0;background:${m.tipo==="sent"?"rgba(59,130,246,.2)":"rgba(16,185,129,.2)"};color:${m.tipo==="sent"?"var(--acc)":"var(--av)"}">${m.tipo==="sent"?"ENVIADO":"RECIBIDO"}</span>
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-top:3px">${m.from||(m.to?"→ "+m.to:"")} · ${fmt(m.date)}</div>
+      <div style="font-size:10px;color:var(--muted2);margin-top:5px;line-height:1.5">${m.snip}</div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn btn-success btn-sm" onclick='importarGmail(${JSON.stringify(m)})'>+ Bitácora</button>
+        <button class="btn btn-p btn-sm" onclick='analizarGmail(${JSON.stringify(m)})'>✨ Analizar IA</button>
+      </div>
+    </div>`).join("");
+}
+
+function detectTramo(txt){
+  const t=tramos.find(tr=>{const p=tr.tramo.toLowerCase().split("–");return p.some(s=>txt.toLowerCase().includes(s.trim()));});
+  return t?.tramo||null;
+}
+
+function importarGmail(m){
+  bitacora.unshift({id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",tramo:detectTramo((m.subj||"")+" "+(m.snip||""))||"Pendiente asignar",actor:(m.from||m.to||"").split("@")[1]||"",gestion:"[Gmail] "+m.subj,resultado:m.tipo==="response"?m.snip.slice(0,120):"",proxima:"",fp:""});
+  renderAll(); toast("Correo importado a bitácora");
+}
+
+async function analizarGmail(m){
+  if(!apiKey){toast("Configura la API Key primero (botón ⚙ API Key)","err");return;}
+  const el=document.getElementById("gmail-emails");
+  el.innerHTML='<div class="thinking"><span></span><span></span><span></span><span style="margin-left:8px;font-size:11px">Analizando con IA…</span></div>';
+  try{
+    const ctx=tramos.map(t=>`- ${t.tramo} (${t.estado}, ${t.actor})`).join("\n");
+    const resp=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01"},
+      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:350,messages:[{role:"user",content:`Analiza este correo de gestión vial y responde SOLO con JSON válido sin markdown:\n{"tramo":null,"actor":"","gestion":"","resultado":"","estado_sugerido":"En gestión","proxima_accion":"","alerta":null}\n\nCorreo:\nAsunto: ${m.subj}\nDe: ${m.from||m.to}\nFecha: ${m.date}\nContenido: ${m.snip}\n\nTramos disponibles:\n${ctx}`}]})
+    });
+    const data=await resp.json();
+    const raw=data.content?.find(c=>c.type==="text")?.text||"{}";
+    const r=JSON.parse(raw.replace(/```json|```/g,"").trim());
+    const t=tramos.find(x=>x.tramo===r.tramo);
+    if(t&&r.estado_sugerido)t.estado=r.estado_sugerido;
+    bitacora.unshift({id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",tramo:r.tramo||"Pendiente",actor:r.actor||"",gestion:"[Gmail/IA] "+m.subj+" — "+r.gestion,resultado:r.resultado||"",proxima:r.proxima_accion||"",fp:""});
+    renderAll(); refreshLines();
+    toast("Análisis IA aplicado · Dashboard y mapa actualizados");
+    buscarCorreos(m.tipo==="response");
+  }catch(e){
+    toast("Error al llamar la API: "+e.message,"err");
+    buscarCorreos(m.tipo==="response");
+  }
+}
+
+// ─── EML IMPORTADOR ──────────────────────────────────────────
+function setupDropZone(){
+  const dz=document.getElementById("drop-zone");
+  const inp=document.getElementById("eml-input");
+  if(!dz||!inp)return;
+  dz.addEventListener("click",()=>inp.click());
+  dz.addEventListener("dragover",e=>{e.preventDefault();e.stopPropagation();dz.classList.add("drag");});
+  dz.addEventListener("dragleave",e=>{e.preventDefault();dz.classList.remove("drag");});
+  dz.addEventListener("drop",e=>{
+    e.preventDefault(); e.stopPropagation(); dz.classList.remove("drag");
+    handleEML(e.dataTransfer.files);
+  });
+  inp.addEventListener("change",e=>handleEML(e.target.files));
+}
+
+function handleEML(files){
+  [...files].forEach(f=>{if(f.name.toLowerCase().endsWith(".eml")&&!emlFiles.find(x=>x.name===f.name))emlFiles.push(f);});
+  renderEMLFiles();
+}
+
+function renderEMLFiles(){
+  const el=document.getElementById("eml-file-list");
+  el.innerHTML=emlFiles.map((f,i)=>`
+    <div class="eml-file-item">
+      <span style="font-size:20px">📧</span>
+      <span class="eml-file-name">${f.name}</span>
+      <span class="eml-file-size">${(f.size/1024).toFixed(1)} KB</span>
+      <span class="eml-status pending">Pendiente</span>
+      <button class="btn btn-danger btn-sm" onclick="removeEML(${i})" style="padding:3px 7px">×</button>
+    </div>`).join("");
+  document.getElementById("eml-analyze-row").style.display=emlFiles.length?"flex":"none";
+  setEMLStep(1);
+}
+
+function removeEML(i){emlFiles.splice(i,1); renderEMLFiles();}
+function clearEML(){emlFiles=[]; renderEMLFiles(); document.getElementById("eml-analyze-row").style.display="none";}
+
+function parseEML(text){
+  const lines=text.split(/\r?\n/);
+  const hdr={}; let i=0;
+  while(i<lines.length&&lines[i].trim()!==""){
+    const m=lines[i].match(/^([\w\-]+):\s*(.*)/);
+    if(m){let k=m[1].toLowerCase(),v=m[2];while(i+1<lines.length&&/^\s+/.test(lines[i+1])){i++;v+=" "+lines[i].trim();}hdr[k]=v;}
+    i++;
+  }
+  let body=lines.slice(i+1).join("\n")
+    .replace(/=\r?\n/g,"")
+    .replace(/=[0-9A-Fa-f]{2}/g,m=>String.fromCharCode(parseInt(m.slice(1),16)))
+    .replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim().slice(0,700);
+  const dec=h=>(h||"").replace(/=\?[^?]+\?[BbQq]\?([^?]+)\?=/g,(_,e)=>{try{return atob(e);}catch(x){return e;}}).trim();
+  let fecha=today();
+  try{const d=new Date(hdr["date"]||"");if(!isNaN(d.getTime()))fecha=d.toISOString().slice(0,10);}catch(e){}
+  return{from:dec(hdr["from"]),to:dec(hdr["to"]),subject:dec(hdr["subject"])||"(sin asunto)",date:fecha,body:body||"(sin cuerpo)"};
+}
+
+async function analyzeAllEML(){
+  if(!emlFiles.length)return;
+  setEMLStep(2);
+  document.getElementById("eml-analyze-row").style.display="none";
+  emlResults=[];
+  const rList=document.getElementById("eml-results-list");
+  const rPanel=document.getElementById("eml-results-panel");
+  rPanel.style.display="block";
+
+  for(let i=0;i<emlFiles.length;i++){
+    rList.innerHTML=`<div class="thinking"><span></span><span></span><span></span><span style="margin-left:8px;font-size:11px">Analizando <strong>${emlFiles[i].name}</strong> (${i+1}/${emlFiles.length})…</span></div>`;
+    try{
+      const text=await new Promise((res,rej)=>{
+        const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=()=>rej(new Error("Error leyendo archivo")); r.readAsText(emlFiles[i],"utf-8");
+      });
+      const parsed=parseEML(text);
+      let ai=null;
+      if(apiKey){
+        try{ai=await callEMLAI(parsed);}catch(e){ai=null;}
+      }
+      if(!ai){
+        ai={tipo:"email",tramo:detectTramo(parsed.subject+" "+parsed.body)||null,actor:(parsed.from||parsed.to||"").split("@")[1]||"",gestion:parsed.subject,resultado:"",proxima_accion:"Revisar y clasificar",estado_sugerido:"En gestión",alerta:null,es_respuesta:false};
+      }
+      emlResults.push({file:emlFiles[i].name,parsed,ai,confirmed:false});
+    }catch(e){
+      emlResults.push({file:emlFiles[i].name,parsed:null,ai:null,error:e.message,confirmed:false});
+    }
+  }
+  renderEMLResults();
+  setEMLStep(3);
+}
+
+async function callEMLAI(parsed){
+  const ctx=tramos.map(t=>`- ${t.tramo} (${t.ruta}, ${t.estado}, actor: ${t.actor})`).join("\n");
+  const prompt=`Eres asistente de gestión de permisos viales de Red Nacional Somos Colombia.
+Analiza el correo y responde SOLO JSON válido sin markdown ni texto adicional:
+{"tipo":"email","tramo":null,"actor":"","gestion":"","resultado":"","proxima_accion":"","estado_sugerido":"En gestión","alerta":null,"es_respuesta":false}
+
+Tramos disponibles:
+${ctx}
+
+Correo:
+De: ${parsed.from}
+Para: ${parsed.to}
+Asunto: ${parsed.subject}
+Fecha: ${parsed.date}
+Contenido: ${parsed.body}`;
+
+  const resp=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01"},
+    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:380,messages:[{role:"user",content:prompt}]})
+  });
+  const data=await resp.json();
+  if(data.error)throw new Error(data.error.message||"Error API");
+  const raw=data.content?.find(c=>c.type==="text")?.text||"{}";
+  return JSON.parse(raw.replace(/```json|```/g,"").trim());
+}
+
+function renderEMLResults(){
+  const el=document.getElementById("eml-results-list");
+  const cnt=document.getElementById("eml-count");
+  if(cnt)cnt.textContent=`${emlResults.length} archivo(s) analizados · ${apiKey?"Análisis IA activo":"Sin API Key — clasificación básica"}`;
+
+  el.innerHTML=emlResults.map((r,i)=>{
+    if(r.error)return`<div class="eml-result-item"><div style="color:var(--cr);font-size:11px">⚠ Error en ${r.file}: ${r.error}</div></div>`;
+    const a=r.ai||{};
+    const tipoBadge=a.es_respuesta?`<span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;background:rgba(167,139,250,.2);color:var(--r2c)">RESPUESTA</span>`:`<span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;background:rgba(16,185,129,.2);color:var(--av)">ENVIADO</span>`;
+    return`<div class="eml-result-item" id="er-${i}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+        <div style="font-size:12px;font-weight:600;color:#fff;flex:1">${r.parsed?.subject||r.file}</div>
+        <div style="display:flex;gap:4px;flex-shrink:0">${tipoBadge}${sb(a.estado_sugerido||"En gestión")}</div>
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-bottom:8px">${r.parsed?.from||r.parsed?.to||""} · ${r.parsed?.date||""} · <em>${r.file}</em></div>
+      <div class="ai-box">
+        <div class="ai-title">✨ ${apiKey?"Análisis IA":"Clasificación automática"}</div>
+        <div class="ai-grid">
+          <span class="ai-key">Tramo detectado</span><span class="ai-val">${a.tramo||"No detectado — editar abajo"}</span>
+          <span class="ai-key">Actor</span><span class="ai-val">${a.actor||"—"}</span>
+          <span class="ai-key">Gestión</span><span class="ai-val">${a.gestion||"—"}</span>
+          ${a.resultado?`<span class="ai-key">Resultado</span><span class="ai-val">${a.resultado}</span>`:""}
+          <span class="ai-key">Próxima acción</span><span class="ai-val" style="color:var(--acc)">${a.proxima_accion||"—"}</span>
+        </div>
+        ${a.alerta?`<div class="alert-eml">⚠ ${a.alerta}</div>`:""}
+      </div>
+      <div id="ee-${i}" style="display:none;margin-top:10px">
+        <div class="ff">
+          <div class="frow">
+            <div class="fl"><label>Tramo</label><select class="inp" id="ee-tr-${i}"><option value="">— seleccionar —</option>${tramos.map(t=>`<option value="${t.tramo}"${a.tramo===t.tramo?" selected":""}>${t.tramo}</option>`).join("")}</select></div>
+            <div class="fl"><label>Actor</label><input class="inp" id="ee-ac-${i}" value="${a.actor||""}"></div>
+          </div>
+          <div class="fl"><label>Descripción de la gestión</label><textarea class="inp" id="ee-gs-${i}">${a.gestion||""}</textarea></div>
+          <div class="fl"><label>Resultado obtenido</label><textarea class="inp" id="ee-rs-${i}">${a.resultado||""}</textarea></div>
+          <div class="frow">
+            <div class="fl"><label>Próxima acción</label><input class="inp" id="ee-px-${i}" value="${a.proxima_accion||""}"></div>
+            <div class="fl"><label>Actualizar semáforo</label><select class="inp" id="ee-es-${i}"><option value="">— sin cambio —</option><option value="Avanzado"${a.estado_sugerido==="Avanzado"?" selected":""}>Avanzado</option><option value="En gestión"${a.estado_sugerido==="En gestión"?" selected":""}>En gestión</option><option value="Crítico"${a.estado_sugerido==="Crítico"?" selected":""}>Crítico</option></select></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-g btn-sm" onclick="toggleEE(${i})">✏ Editar</button>
+        <button class="btn btn-success btn-sm" id="eb-${i}" onclick="confirmEML(${i})">✓ Agregar a bitácora</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function toggleEE(i){const el=document.getElementById("ee-"+i);if(el)el.style.display=el.style.display==="none"?"block":"none";}
+
+function getEMLData(i){
+  const r=emlResults[i], a=r.ai||{};
+  return{
+    tramo:document.getElementById("ee-tr-"+i)?.value||a.tramo||"Pendiente asignar",
+    actor:document.getElementById("ee-ac-"+i)?.value||a.actor||"",
+    gestion:document.getElementById("ee-gs-"+i)?.value||a.gestion||r.parsed?.subject||"",
+    resultado:document.getElementById("ee-rs-"+i)?.value||a.resultado||"",
+    proxima:document.getElementById("ee-px-"+i)?.value||a.proxima_accion||"",
+    estado:document.getElementById("ee-es-"+i)?.value||"",
+    fecha:r.parsed?.date||today(),
+    tipo:r.ai?.es_respuesta?"response":"email",
+    file:r.file
+  };
+}
+
+function confirmEML(i){
+  if(emlResults[i].confirmed)return;
+  const d=getEMLData(i);
+  bitacora.unshift({id:uid(),fecha:d.fecha,tipo:d.tipo,tramo:d.tramo,actor:d.actor,gestion:"[.eml] "+d.gestion,resultado:d.resultado,proxima:d.proxima,fp:""});
+  if(d.estado){const t=tramos.find(x=>x.tramo===d.tramo);if(t)t.estado=d.estado;}
+  emlResults[i].confirmed=true; emlImported.push(d);
+  const item=document.getElementById("er-"+i);if(item)item.classList.add("confirmed");
+  const btn=document.getElementById("eb-"+i);if(btn){btn.textContent="✓ Importado";btn.disabled=true;}
+  renderAll(); refreshLines(); renderEMLLog();
+  toast("Gestión .eml agregada · Mapa actualizado");
+}
+
+function confirmAllEML(){emlResults.forEach((_,i)=>{if(!emlResults[i].confirmed)confirmEML(i);});}
+
+function renderEMLLog(){
+  const card=document.getElementById("eml-log-card");
+  const log=document.getElementById("eml-log");
+  card.style.display=emlImported.length?"block":"none";
+  log.innerHTML=emlImported.map(d=>`
+    <div class="eml-result-item confirmed">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="font-size:12px;font-weight:600;color:#fff;flex:1">${d.tramo}</div>
+        <span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;background:${d.tipo==="response"?"rgba(167,139,250,.2)":"rgba(16,185,129,.2)"};color:${d.tipo==="response"?"var(--r2c)":"var(--av)"}">${d.tipo==="response"?"RESPUESTA":"ENVIADO"}</span>
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-top:2px">${d.actor} · ${d.fecha} · <em>${d.file}</em></div>
+      <div style="font-size:11px;color:#fff;margin-top:5px">${d.gestion}</div>
+      ${d.resultado?`<div style="font-size:10px;color:var(--muted);margin-top:3px">→ ${d.resultado}</div>`:""}
+      ${d.proxima?`<div style="font-size:9px;color:var(--acc);margin-top:3px">📌 ${d.proxima}</div>`:""}
+      ${d.estado?`<div style="margin-top:4px">${sb(d.estado)}</div>`:""}
+    </div>`).join("");
+}
+
+function resetEML(){
+  emlFiles=[]; emlResults=[];
+  document.getElementById("eml-file-list").innerHTML="";
+  document.getElementById("eml-analyze-row").style.display="none";
+  document.getElementById("eml-results-panel").style.display="none";
+  document.getElementById("eml-results-list").innerHTML="";
+  setEMLStep(1);
+}
+
+function setEMLStep(n){
+  [1,2,3].forEach(i=>{
+    const el=document.getElementById("sp-"+i); if(!el)return;
+    el.className="step-pill"+(i<n?" done":i===n?" active":"");
+  });
+}
+
+// ─── RENDER ALL ──────────────────────────────────────────────
+function renderAll(){
+  kpis();
+  const keys=Object.keys(routes);
+  routeSummary("sr1",keys[0]||"r1");
+  routeSummary("sr2",keys[1]||"r2");
+  recBit();
+  if(activeTab==="tramos")renderTramoList();
+  if(activeTab==="bitacora")renderBitList();
+  if(activeTab==="rutas"){renderRutasList();if(editingRoute)selEditRoute(editingRoute);}
+}
+
+// ─── INIT ────────────────────────────────────────────────────
+document.getElementById("hdr-dt").textContent="Actualizado: "+fmt(today());
+if(apiKey)document.getElementById("api-notice").style.display="none";
+renderAll();
+renderExtraFilters();
+// Setup drop zone after DOM is ready
+setTimeout(setupDropZone, 100);
+</script>
+</body>
+</html>

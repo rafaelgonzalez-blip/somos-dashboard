@@ -134,6 +134,10 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
 .layer-toggle:hover{color:#fff;border-color:var(--border2)}
 .layer-toggle input{accent-color:var(--acc);cursor:pointer;width:11px;height:11px}
 .layer-toggle.active-lay{color:var(--acc);border-color:var(--acc);background:rgba(59,130,246,.1)}
+
+#t-mapa.active{display:block !important;}
+#t-mapa .card{display:flex;flex-direction:column;}
+#the-map{width:100%;height:460px;min-height:460px;}
 </style>
 </head>
 <body>
@@ -761,7 +765,13 @@ function sw(name){
   document.getElementById("t-"+name).classList.add("active");
   const tabs=["overview","mapa","tramos","bitacora","rutas","gmail"];
   document.querySelectorAll(".nb")[tabs.indexOf(name)]?.classList.add("active");
-  if(name==="mapa")setTimeout(()=>{if(!mapInst)initMap();else mapInst.invalidateSize();},80);
+  if(name==="mapa"){
+    setTimeout(function(){
+      if(!mapInst){initMap();}
+      else{mapInst.invalidateSize();drawAllLines();drawPuntos();}
+    },100);
+    setTimeout(function(){if(mapInst)mapInst.invalidateSize();},400);
+  }
   if(name==="tramos")renderTramoList();
   if(name==="bitacora")renderBitList();
   if(name==="rutas"){renderRutasList();renderExtraFilters();}

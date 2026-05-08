@@ -511,19 +511,32 @@ function deleteBit(id){
 
 function initMap(){
   if(mapInst)return;
-  mapInst=L.map('the-map',{zoomControl:true});
+  mapInst=L.map('the-map',{zoomControl:true,center:[7.5,-74.5],zoom:6});
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
     attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:18,subdomains:'abcd'
   }).addTo(mapInst);
   markerGroups.nodos=L.layerGroup().addTo(mapInst);
   markerGroups.peajes=L.layerGroup().addTo(mapInst);
-  markerGroups.obstaculos=L.layerGroup();
+  markerGroups.obstaculos=L.layerGroup().addTo(mapInst);
   drawAllLines();
-  drawPuntos();
-  var allc=[];
-  for(var i=0;i<tramos.length;i++)for(var j=0;j<tramos[i].coords.length;j++)allc.push(tramos[i].coords[j]);
-  if(allc.length)mapInst.fitBounds(L.latLngBounds(allc),{padding:[30,30]});
   renderMapSide();
+  setTimeout(function(){
+    drawPuntos();
+    try{
+      var validCoords=[];
+      for(var i=0;i<tramos.length;i++){
+        for(var j=0;j<tramos[i].coords.length;j++){
+          var c=tramos[i].coords[j];
+          if(c&&c.length===2&&!isNaN(c[0])&&!isNaN(c[1])&&c[0]!==0&&c[1]!==0)
+            validCoords.push([c[0],c[1]]);
+        }
+      }
+      if(validCoords.length>1){
+        var bounds=L.latLngBounds(validCoords);
+        if(bounds.isValid())mapInst.fitBounds(bounds,{padding:[30,30]});
+      }
+    }catch(e){console.log('fitBounds:',e);}
+  },300);
 }
 function lineColor(t){
   if(mapFiltVal!=='all'&&t.ruta!==mapFiltVal)return null;
@@ -569,12 +582,17 @@ function drawPuntos(){
   for(var i=0;i<KMZ_PUNTOS.length;i++){
     (function(p){
       if(mapFiltVal!=='all'&&p.ruta!==mapFiltVal)return;
+      if(!p.lat||!p.lng||isNaN(p.lat)||isNaN(p.lng))return;
+      if(p.lat<1||p.lat>12||p.lng<-80||p.lng>-65)return;
       var color=(p.tipo==='PEAJES')?'#EF4444':(p.tipo==='PUENTES')?'#10B981':(p.tipo==='POSIBLES OBSTACULOS')?'#F59E0B':'#60A5FA';
       var gkey=(p.tipo==='PEAJES'||p.tipo==='PUENTES')?'peajes':(p.tipo==='POSIBLES OBSTACULOS')?'obstaculos':'nodos';
-      var grp=markerGroups[gkey];if(!grp)return;
-      var mk=L.circleMarker([p.lat,p.lng],{radius:4,fillColor:color,color:'#fff',weight:1,fillOpacity:0.9,opacity:0.9});
-      mk.bindPopup('<b>'+(p.nombre||'Sin nombre')+'</b><br><small>'+(p.tipo||'')+'</small>');
-      grp.addLayer(mk);
+      var grp=markerGroups[gkey];
+      if(!grp||!mapInst)return;
+      try{
+        var mk=L.circleMarker([p.lat,p.lng],{radius:4,fillColor:color,color:'#fff',weight:1,fillOpacity:0.9,opacity:0.9});
+        mk.bindPopup('<b>'+(p.nombre||'Sin nombre')+'</b><br><small>'+(p.tipo||'')+'</small>');
+        grp.addLayer(mk);
+      }catch(e){}
     })(KMZ_PUNTOS[i]);
   }
 }

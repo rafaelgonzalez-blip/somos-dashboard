@@ -1394,10 +1394,17 @@ function saveAlt(id){
 
 // ─── GMAIL SIMULADO ──────────────────────────────────────────
 function importarGmail(m){
-  const nb={id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",tramo:detectTramo((m.subj||"")+" "+(m.snip||""))||"Pendiente asignar",actor:(m.from||m.to||"").split("@")[1]||"",gestion:"[Gmail] "+m.subj,resultado:m.tipo==="response"?m.snip.slice(0,120):"",proxima:"",fp:"",hito_rad:"",hito_prop:"",hito_cierre:"",hito_venc:""};
+  var tramoDetectado = detectTramo((m.subj||"")+" "+(m.snip||"")) || "Pendiente asignar";
+  var actor = (m.from||m.to||"").replace(/<[^>]+>/g,"").split("@")[1]||m.from||"";
+  const nb={id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",
+    tramo:tramoDetectado, actor:actor,
+    gestion:"[Gmail] "+m.subj,
+    resultado:m.tipo==="response"?m.snip.slice(0,150):"",
+    proxima:"",fp:"",hito_rad:"",hito_prop:"",hito_cierre:"",hito_venc:""};
   bitacora.unshift(nb);
   saveBitacoraEntryToDB(nb);
-  renderAll(); toast("Correo importado y guardado en base de datos");
+  renderAll();
+  toast("Correo importado: tramo="+tramoDetectado);
 }
 
 async function analizarGmail(m){
@@ -1558,7 +1565,20 @@ async function gmailSearch(soloRespuestas){
   }
 }
 
-function _gmailImport(mid){ importarGmail(window._gmailMsgs[mid]); }
+function _gmailImport(idx){
+  var m=window._gmailMsgs[idx];
+  if(!m)return;
+  importarGmail(m);
+  // Visual feedback on button
+  var btns=document.querySelectorAll('.btn-success');
+  for(var i=0;i<btns.length;i++){
+    if(btns[i].onclick && btns[i].getAttribute('onclick') && btns[i].getAttribute('onclick').includes('_gmailImport('+idx+')')) {
+      btns[i].textContent='Importado';
+      btns[i].disabled=true;
+      btns[i].style.opacity='0.6';
+    }
+  }
+}
 function _gmailAnalizar(mid){ analizarGmail(window._gmailMsgs[mid]); }
 
 function _parseGmailDate(dateStr){

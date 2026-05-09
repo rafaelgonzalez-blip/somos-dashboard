@@ -301,36 +301,50 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
   <!-- CORREO / EML -->
   <div id="t-gmail" class="tv">
     <div class="api-notice" id="api-notice">
-      <strong>API Key de Anthropic requerida para análisis con IA.</strong>
-      Configúrala en el botón <strong>⚙ API Key</strong> (esquina superior derecha). Sin la key el importador funciona igual pero sin análisis automático.
-      Obtén tu key en <a href="https://console.anthropic.com" target="_blank" style="color:var(--acc)">console.anthropic.com</a>
+      <strong>API Key de Anthropic requerida para analisis IA.</strong>
+      Configurala en <strong>&#9881; API Key</strong> (esquina superior derecha).
+      Obtentela en <a href="https://console.anthropic.com" target="_blank" style="color:var(--acc)">console.anthropic.com</a>
     </div>
 
     <div class="two-col" style="align-items:start">
       <div class="card">
-        <div class="card-h"><span class="card-t">Gmail / búsqueda de correos</span></div>
+        <div class="card-h">
+          <span class="card-t">Conectar Gmail</span>
+          <span id="gmail-conn-badge" style="display:none;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700"></span>
+        </div>
         <div class="card-b">
-          <p style="font-size:11px;color:var(--muted);margin-bottom:10px">Simula búsqueda de correos enviados a concesiones y respuestas recibidas para agregarlos a la bitácora.</p>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6">Conecta tu cuenta Gmail para buscar correos reales enviados y recibidos con concesiones, ANI e Invias y agregarlos directamente a la bitacora.</p>
+          <button class="btn btn-success btn-sm" id="btn-gmail-connect" onclick="gmailAuth()">Conectar con Gmail</button>
+          <button class="btn btn-danger btn-sm" id="btn-gmail-disconnect" onclick="gmailDisconnect()" style="display:none;margin-left:8px">Desconectar</button>
+          <div id="gmail-user-info" style="margin-top:10px;font-size:11px;color:var(--muted)"></div>
+          <div class="divd"></div>
           <div class="fl" style="margin-bottom:10px">
-            <label>Buscar en correos</label>
-            <input class="inp" id="gmail-q" value="fibra óptica viabilidad ANI Invias permiso">
+            <label>Buscar correos relacionados con</label>
+            <input class="inp" id="gmail-q" value="fibra optica viabilidad ANI Invias permiso concesion">
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn btn-p btn-sm" onclick="buscarCorreos(false)">Buscar correos enviados</button>
-            <button class="btn btn-g btn-sm" onclick="buscarCorreos(true)">Buscar respuestas</button>
+            <button class="btn btn-p btn-sm" onclick="gmailSearch(false)">Buscar enviados</button>
+            <button class="btn btn-g btn-sm" onclick="gmailSearch(true)">Buscar recibidos</button>
+          </div>
+          <div id="gmail-thinking" style="display:none" class="thinking">
+            <span></span><span></span><span></span>
+            <span style="margin-left:8px;font-size:11px">Buscando en Gmail...</span>
           </div>
         </div>
       </div>
       <div class="card">
-        <div class="card-h"><span class="card-t">Correos detectados</span></div>
-        <div class="card-b" id="gmail-emails"><div class="empty">Haz una búsqueda para ver correos</div></div>
+        <div class="card-h">
+          <span class="card-t">Correos encontrados</span>
+          <span id="gmail-count-badge" style="font-size:9px;color:var(--muted)"></span>
+        </div>
+        <div class="card-b" id="gmail-emails"><div class="empty">Conecta Gmail y realiza una busqueda</div></div>
       </div>
     </div>
 
     <div class="card">
       <div class="card-h">
-        <span class="card-t">📎 Importar archivos .eml a bitácora</span>
-        <span style="font-size:9px;background:rgba(59,130,246,.15);color:var(--acc);border:1px solid rgba(59,130,246,.3);padding:2px 9px;border-radius:4px;font-weight:700">Análisis IA</span>
+        <span class="card-t">Importar archivos .eml a bitacora</span>
+        <span style="font-size:9px;background:rgba(59,130,246,.15);color:var(--acc);border:1px solid rgba(59,130,246,.3);padding:2px 9px;border-radius:4px;font-weight:700">Analisis IA</span>
       </div>
       <div class="card-b">
         <div class="step-bar">
@@ -338,27 +352,25 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
           <div class="step-pill" id="sp-2">2. Analizar con IA</div>
           <div class="step-pill" id="sp-3">3. Revisar y guardar</div>
         </div>
-
         <div id="eml-zone-panel">
           <div class="drop-zone" id="drop-zone">
             <input type="file" id="eml-input" accept=".eml" multiple style="display:none">
-            <div style="font-size:36px;margin-bottom:10px">📧</div>
-            <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:4px">Arrastra archivos .eml aquí o haz clic para seleccionar</div>
-            <div style="font-size:10px;color:var(--muted)">Múltiples archivos · correos enviados y respuestas recibidas</div>
+            <div style="font-size:36px;margin-bottom:10px">&#128231;</div>
+            <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:4px">Arrastra archivos .eml aqui o haz clic para seleccionar</div>
+            <div style="font-size:10px;color:var(--muted)">Multiples archivos</div>
           </div>
           <div id="eml-file-list" style="margin-top:10px"></div>
           <div id="eml-analyze-row" style="display:none;justify-content:flex-end;gap:8px;margin-top:10px">
             <button class="btn btn-g btn-sm" onclick="clearEML()">Limpiar</button>
-            <button class="btn btn-p btn-sm" id="btn-analyze-eml" onclick="analyzeAllEML()">✨ Analizar con IA</button>
+            <button class="btn btn-p btn-sm" onclick="analyzeAllEML()">Analizar con IA</button>
           </div>
         </div>
-
         <div id="eml-results-panel" style="display:none">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
             <span id="eml-count" style="font-size:11px;color:var(--muted)"></span>
             <div style="display:flex;gap:7px">
-              <button class="btn btn-g btn-sm" onclick="resetEML()">← Cargar más</button>
-              <button class="btn btn-success btn-sm" onclick="confirmAllEML()">✓ Importar todos</button>
+              <button class="btn btn-g btn-sm" onclick="resetEML()">Cargar mas</button>
+              <button class="btn btn-success btn-sm" onclick="confirmAllEML()">Importar todos</button>
             </div>
           </div>
           <div id="eml-results-list"></div>
@@ -368,8 +380,8 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
 
     <div class="card" id="eml-log-card" style="display:none">
       <div class="card-h">
-        <span class="card-t">✓ Gestiones importadas a bitácora</span>
-        <button class="btn btn-g btn-sm" onclick="resetEML()">+ Importar más .eml</button>
+        <span class="card-t">Gestiones importadas a bitacora</span>
+        <button class="btn btn-g btn-sm" onclick="resetEML()">+ Importar mas</button>
       </div>
       <div class="card-b" id="eml-log"></div>
     </div>
@@ -530,16 +542,8 @@ async function loadFromDB(){
     
   } catch(e){
     console.error('loadFromDB:', e);
-    var msg = e.message||'';
-    if(msg.includes('fetch') || msg.includes('CORS') || msg.includes('network')){
-      showDBStatus('Sin conexion a base de datos - modo local activo', true);
-      console.warn('Trabajando sin Supabase. Verifica: Settings > API > Allowed Origins en Supabase y agrega tu dominio de Netlify.');
-    } else {
-      showDBStatus('Error BD: ' + msg, true);
-    }
-    // Still render with local data
-    dbLoaded = true;
-    renderAll();
+    showDBStatus('Error BD - modo local activo', true);
+    dbLoaded=true; renderAll();
   }
 }
 
@@ -1341,38 +1345,6 @@ function saveAlt(id){
 }
 
 // ─── GMAIL SIMULADO ──────────────────────────────────────────
-async function buscarCorreos(resp){
-  const el=document.getElementById("gmail-emails");
-  el.innerHTML='<div class="thinking"><span></span><span></span><span></span><span style="margin-left:8px;font-size:11px">Buscando correos…</span></div>';
-  await new Promise(r=>setTimeout(r,600));
-  const mails=resp?[
-    {id:"g3",subj:"RE: Solicitud viabilidad – Caucasia/Planeta Rica",from:"subdirector@invias.gov.co",date:"2026-05-05",snip:"Adjuntamos concepto técnico preliminar. Requiere documentación adicional: estudio de suelos y formato FT-2301. Plazo respuesta: 30 días hábiles.",tipo:"response"},
-    {id:"g4",subj:"Acuerdo Ruta del Mar KM 45-90 firmado",from:"permisos@rutadelmar.com.co",date:"2026-05-04",snip:"Confirmamos firma del acuerdo marco para tendido de fibra. Adjunto contrato de uso de infraestructura y cronograma aprobado.",tipo:"response"},
-    {id:"g5",subj:"Negación acceso – Villeta–Bogotá",from:"concesiones@mallavial.com.co",date:"2026-05-02",snip:"La solicitud para el tramo Villeta–Bogotá no puede ser atendida por restricciones del contrato ANI vigente. Se sugiere elevar la solicitud directamente.",tipo:"response"},
-  ]:[
-    {id:"g1",subj:"Solicitud viabilidad fibra – Tramo Puerto Berrío",from:"gestor@somos.com.co",to:"proyectos@devimed.com.co",date:"2026-05-04",snip:"Remitimos solicitud formal de viabilidad para tendido de fibra óptica en el corredor Barbosa–Puerto Berrío. Adjuntamos memoria técnica y trazado GPS.",tipo:"sent"},
-    {id:"g2",subj:"Oficio ANI – Permiso corredor Montería/Barranquilla",from:"gestor@somos.com.co",to:"permisos@ani.gov.co",date:"2026-05-03",snip:"Solicitamos permiso de uso del corredor vial de la Ruta del Mar para tendido de fibra óptica en el tramo Montería–Barranquilla (90 km).",tipo:"sent"},
-  ];
-  el.innerHTML=mails.map(m=>`
-    <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:7px">
-        <div style="font-size:12px;font-weight:600;color:#fff">${m.subj}</div>
-        <span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;flex-shrink:0;background:${m.tipo==="sent"?"rgba(59,130,246,.2)":"rgba(16,185,129,.2)"};color:${m.tipo==="sent"?"var(--acc)":"var(--av)"}">${m.tipo==="sent"?"ENVIADO":"RECIBIDO"}</span>
-      </div>
-      <div style="font-size:9px;color:var(--muted);margin-top:3px">${m.from||(m.to?"→ "+m.to:"")} · ${fmt(m.date)}</div>
-      <div style="font-size:10px;color:var(--muted2);margin-top:5px;line-height:1.5">${m.snip}</div>
-      <div style="display:flex;gap:6px;margin-top:8px">
-        <button class="btn btn-success btn-sm" onclick='importarGmail(${JSON.stringify(m)})'>+ Bitácora</button>
-        <button class="btn btn-p btn-sm" onclick='analizarGmail(${JSON.stringify(m)})'>✨ Analizar IA</button>
-      </div>
-    </div>`).join("");
-}
-
-function detectTramo(txt){
-  const t=tramos.find(tr=>{const p=tr.tramo.toLowerCase().split("–");return p.some(s=>txt.toLowerCase().includes(s.trim()));});
-  return t?.tramo||null;
-}
-
 function importarGmail(m){
   const nb={id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",tramo:detectTramo((m.subj||"")+" "+(m.snip||""))||"Pendiente asignar",actor:(m.from||m.to||"").split("@")[1]||"",gestion:"[Gmail] "+m.subj,resultado:m.tipo==="response"?m.snip.slice(0,120):"",proxima:"",fp:"",hito_rad:"",hito_prop:"",hito_cierre:"",hito_venc:""};
   bitacora.unshift(nb);
@@ -1396,11 +1368,11 @@ async function analizarGmail(m){
     const r=JSON.parse(raw.replace(/```json|```/g,"").trim());
     const t=tramos.find(x=>x.tramo===r.tramo);
     if(t&&r.estado_sugerido)t.estado=r.estado_sugerido;
-    const agb={id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",tramo:r.tramo||"Pendiente",actor:r.actor||"",gestion:"[Gmail/IA] "+m.subj+" — "+r.gestion,resultado:r.resultado||"",proxima:r.proxima_accion||"",fp:"",hito_rad:"",hito_prop:"",hito_cierre:"",hito_venc:""};
+    const agb={id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",tramo:r.tramo||"Pendiente",actor:r.actor||"",gestion:"[Gmail/IA] "+m.subj+" - "+r.gestion,resultado:r.resultado||"",proxima:r.proxima_accion||"",fp:"",hito_rad:"",hito_prop:"",hito_cierre:"",hito_venc:""};
     bitacora.unshift(agb);
     saveBitacoraEntryToDB(agb);
     renderAll(); refreshLines();
-    toast("Análisis IA aplicado y guardado en base de datos");
+    toast("Analisis IA aplicado y guardado en base de datos");
     buscarCorreos(m.tipo==="response");
   }catch(e){
     toast("Error al llamar la API: "+e.message,"err");
@@ -1409,6 +1381,143 @@ async function analizarGmail(m){
 }
 
 // ─── EML IMPORTADOR ──────────────────────────────────────────
+// ─── GMAIL REAL API ──────────────────────────────────────────
+const GMAIL_CLIENT_ID = '513976139222-k71997gmkqe3o4h3ueuu0gg8clt2pn3k.apps.googleusercontent.com';
+const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
+let gmailToken = null;
+let gmailUser = null;
+
+function gmailAuth(){
+  if(!window.google || !window.google.accounts){
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.onload = function(){ _gmailInitClient(); };
+    script.onerror = function(){ toast('Error cargando Google Auth','err'); };
+    document.head.appendChild(script);
+  } else {
+    _gmailInitClient();
+  }
+}
+
+function _gmailInitClient(){
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GMAIL_CLIENT_ID,
+    scope: GMAIL_SCOPE,
+    callback: function(resp){
+      if(resp.error){ toast('Error de autenticacion: '+resp.error,'err'); return; }
+      gmailToken = resp.access_token;
+      _gmailGetUser();
+    }
+  });
+  client.requestAccessToken();
+}
+
+async function _gmailGetUser(){
+  try{
+    const r = await fetch('https://www.googleapis.com/oauth2/v2/userinfo',{
+      headers: {'Authorization': 'Bearer '+gmailToken}
+    });
+    const u = await r.json();
+    gmailUser = u.email;
+    document.getElementById('btn-gmail-connect').style.display='none';
+    document.getElementById('btn-gmail-disconnect').style.display='inline-flex';
+    document.getElementById('gmail-user-info').innerHTML = '<span style="color:var(--av)">Conectado como <strong>'+gmailUser+'</strong></span>';
+    const badge = document.getElementById('gmail-conn-badge');
+    if(badge){ badge.textContent='CONECTADO'; badge.style.cssText='font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;background:rgba(16,185,129,.15);color:var(--av);border:1px solid rgba(16,185,129,.3)'; badge.style.display='inline'; }
+    toast('Gmail conectado como '+gmailUser);
+  }catch(e){
+    toast('Error obteniendo perfil: '+e.message,'err');
+  }
+}
+
+function gmailDisconnect(){
+  gmailToken = null; gmailUser = null;
+  document.getElementById('btn-gmail-connect').style.display='inline-flex';
+  document.getElementById('btn-gmail-disconnect').style.display='none';
+  document.getElementById('gmail-user-info').innerHTML='';
+  const badge = document.getElementById('gmail-conn-badge');
+  if(badge) badge.style.display='none';
+  document.getElementById('gmail-emails').innerHTML='<div class="empty">Conecta Gmail y realiza una busqueda</div>';
+  toast('Gmail desconectado');
+}
+
+async function gmailSearch(soloRespuestas){
+  if(!gmailToken){ toast('Primero conecta tu cuenta Gmail','err'); return; }
+  const q = document.getElementById('gmail-q').value.trim();
+  if(!q){ toast('Ingresa palabras clave para buscar','err'); return; }
+  const thinking = document.getElementById('gmail-thinking');
+  const emailsEl = document.getElementById('gmail-emails');
+  thinking.style.display = 'flex';
+  emailsEl.innerHTML = '';
+  try{
+    const query = soloRespuestas ? q+' in:inbox' : q+' in:sent';
+    const searchResp = await fetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages?q='+encodeURIComponent(query)+'&maxResults=15',
+      { headers: {'Authorization': 'Bearer '+gmailToken} }
+    );
+    if(!searchResp.ok){ throw new Error('Gmail API error '+searchResp.status); }
+    const searchData = await searchResp.json();
+    if(!searchData.messages || searchData.messages.length===0){
+      thinking.style.display='none';
+      emailsEl.innerHTML='<div class="empty">No se encontraron correos con esas palabras clave</div>';
+      return;
+    }
+    const msgs = searchData.messages.slice(0,10);
+    const details = await Promise.all(msgs.map(function(m){
+      return fetch(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/'+m.id+'?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date',
+        { headers: {'Authorization': 'Bearer '+gmailToken} }
+      ).then(function(r){ return r.json(); });
+    }));
+    thinking.style.display='none';
+    const badge = document.getElementById('gmail-count-badge');
+    if(badge) badge.textContent = details.length+' correos encontrados';
+    // Store message data indexed by id for onclick access
+    window._gmailMsgs = {};
+    emailsEl.innerHTML = details.map(function(msg){
+      var hdrs = {};
+      ((msg.payload && msg.payload.headers)||[]).forEach(function(h){ hdrs[h.name.toLowerCase()]=h.value; });
+      var subj = hdrs['subject']||'(sin asunto)';
+      var from = hdrs['from']||'';
+      var to   = hdrs['to']||'';
+      var snip = (msg.snippet||'').slice(0,200);
+      var tipo = soloRespuestas ? 'response' : 'sent';
+      var fechaISO = _parseGmailDate(hdrs['date']||'');
+      var mid = msg.id;
+      window._gmailMsgs[mid] = {id:mid, subj:subj, from:from, to:to, date:fechaISO, snip:snip, tipo:tipo};
+      return '<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;margin-bottom:8px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:7px">'
+        +'<div style="font-size:12px;font-weight:600;color:#fff;flex:1">'+_escHtml(subj)+'</div>'
+        +'<span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;flex-shrink:0;background:'+(tipo==='sent'?'rgba(59,130,246,.2)':'rgba(16,185,129,.2)')+';color:'+(tipo==='sent'?'var(--acc)':'var(--av)')+'">'+( tipo==='sent'?'ENVIADO':'RECIBIDO')+'</span>'
+        +'</div>'
+        +'<div style="font-size:9px;color:var(--muted);margin-top:3px">'+_escHtml(from||(to?'Para: '+to:''))+' &middot; '+fechaISO+'</div>'
+        +'<div style="font-size:10px;color:var(--muted2);margin-top:5px;line-height:1.5">'+_escHtml(snip.slice(0,150))+'</div>'
+        +'<div style="display:flex;gap:6px;margin-top:8px">'
+        +'<button class="btn btn-success btn-sm" onclick="importarGmail(window._gmailMsgs[''+mid+''])">+ Bitacora</button>'
+        +'<button class="btn btn-p btn-sm" onclick="analizarGmail(window._gmailMsgs[''+mid+''])">IA</button>'
+        +'</div>'
+        +'</div>';
+    }).join('');
+  }catch(e){
+    thinking.style.display='none';
+    if(e.message && (e.message.includes('401')||e.message.includes('403'))){
+      toast('Sesion Gmail expirada. Reconecta tu cuenta.','err');
+      gmailDisconnect();
+    } else {
+      toast('Error Gmail: '+e.message,'err');
+    }
+    emailsEl.innerHTML='<div class="empty">Error al buscar. Intenta de nuevo.</div>';
+  }
+}
+
+function _parseGmailDate(dateStr){
+  try{ const d=new Date(dateStr); if(!isNaN(d.getTime()))return d.toISOString().slice(0,10); }catch(e){}
+  return today();
+}
+function _escHtml(str){
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 function setupDropZone(){
   const dz=document.getElementById("drop-zone");
   const inp=document.getElementById("eml-input");
@@ -1590,15 +1699,15 @@ function getEMLData(i){
 function confirmEML(i){
   if(emlResults[i].confirmed)return;
   const d=getEMLData(i);
-  const newBit={id:uid(),fecha:d.fecha,tipo:d.tipo,tramo:d.tramo,actor:d.actor,gestion:"[.eml] "+d.gestion,resultado:d.resultado,proxima:d.proxima,fp:"",hito_rad:"",hito_prop:"",hito_cierre:"",hito_venc:""};
-  bitacora.unshift(newBit);
-  saveBitacoraEntryToDB(newBit);
+  const nb={id:uid(),fecha:d.fecha,tipo:d.tipo,tramo:d.tramo,actor:d.actor,gestion:"[.eml] "+d.gestion,resultado:d.resultado,proxima:d.proxima,fp:"",hito_rad:"",hito_prop:"",hito_cierre:"",hito_venc:""};
+  bitacora.unshift(nb);
+  saveBitacoraEntryToDB(nb);
   if(d.estado){const t=tramos.find(x=>x.tramo===d.tramo);if(t){t.estado=d.estado;saveTramoToDB(t);}}
   emlResults[i].confirmed=true; emlImported.push(d);
   const item=document.getElementById("er-"+i);if(item)item.classList.add("confirmed");
   const btn=document.getElementById("eb-"+i);if(btn){btn.textContent="✓ Importado";btn.disabled=true;}
   renderAll(); refreshLines(); renderEMLLog();
-  toast("Gestión .eml guardada en base de datos");
+  toast("Gestión .eml agregada · Mapa actualizado");
 }
 
 function confirmAllEML(){emlResults.forEach((_,i)=>{if(!emlResults[i].confirmed)confirmEML(i);});}
@@ -1651,7 +1760,7 @@ function renderHitos(){
     if(b.hito_cierre)hm[b.tramo].cierre=b.hito_cierre;
     if(b.hito_venc)hm[b.tramo].venc=b.hito_venc;
   });
-  var td=today(), rows="";
+  var td=today(),rows="";
   tramos.forEach(function(t){
     var h=hm[t.tramo];
     if(!h||(!h.rad&&!h.prop&&!h.cierre&&!h.venc))return;
@@ -1660,7 +1769,7 @@ function renderHitos(){
     var rn=(routes[t.ruta]&&routes[t.ruta].nombre)||t.ruta;
     function cell(d){
       if(!d)return "<td style='padding:8px 13px;text-align:center;color:var(--muted2)'>-</td>";
-      var ov=d<td, near=!ov&&d<=addDays(td,7);
+      var ov=d<td,near=!ov&&d<=addDays(td,7);
       var c=ov?"#EF4444":near?"#F59E0B":"#10B981";
       var bg=ov?"rgba(239,68,68,.1)":near?"rgba(245,158,11,.1)":"rgba(16,185,129,.08)";
       var tag=ov?" [!]":near?" [~]":"";
@@ -1673,7 +1782,7 @@ function renderHitos(){
       +"<td style='padding:8px 13px;text-align:center'><span style='background:"+sc+"22;color:"+sc+";padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700'>"+t.estado+"</span></td>"
       +"</tr>";
   });
-  tbody.innerHTML=rows||"<tr><td colspan='7' style='padding:28px;text-align:center;color:var(--muted2);font-size:11px'>Sin hitos registrados. Agrégalos al crear o editar una gestión.</td></tr>";
+  tbody.innerHTML=rows||"<tr><td colspan='7' style='padding:28px;text-align:center;color:var(--muted2);font-size:11px'>Sin hitos registrados. Agrégalos al crear una gestión.</td></tr>";
 }
 
 function renderAll(){

@@ -1374,8 +1374,10 @@ function detectTramo(txt){
 }
 
 function importarGmail(m){
-  bitacora.unshift({id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",tramo:detectTramo((m.subj||"")+" "+(m.snip||""))||"Pendiente asignar",actor:(m.from||m.to||"").split("@")[1]||"",gestion:"[Gmail] "+m.subj,resultado:m.tipo==="response"?m.snip.slice(0,120):"",proxima:"",fp:""});
-  renderAll(); toast("Correo importado a bitácora");
+  const nb={id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",tramo:detectTramo((m.subj||"")+" "+(m.snip||""))||"Pendiente asignar",actor:(m.from||m.to||"").split("@")[1]||"",gestion:"[Gmail] "+m.subj,resultado:m.tipo==="response"?m.snip.slice(0,120):"",proxima:"",fp:"",hito_rad:"",hito_prop:"",hito_cierre:"",hito_venc:""};
+  bitacora.unshift(nb);
+  saveBitacoraEntryToDB(nb);
+  renderAll(); toast("Correo importado y guardado en base de datos");
 }
 
 async function analizarGmail(m){
@@ -1394,9 +1396,11 @@ async function analizarGmail(m){
     const r=JSON.parse(raw.replace(/```json|```/g,"").trim());
     const t=tramos.find(x=>x.tramo===r.tramo);
     if(t&&r.estado_sugerido)t.estado=r.estado_sugerido;
-    bitacora.unshift({id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",tramo:r.tramo||"Pendiente",actor:r.actor||"",gestion:"[Gmail/IA] "+m.subj+" — "+r.gestion,resultado:r.resultado||"",proxima:r.proxima_accion||"",fp:""});
+    const agb={id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",tramo:r.tramo||"Pendiente",actor:r.actor||"",gestion:"[Gmail/IA] "+m.subj+" — "+r.gestion,resultado:r.resultado||"",proxima:r.proxima_accion||"",fp:"",hito_rad:"",hito_prop:"",hito_cierre:"",hito_venc:""};
+    bitacora.unshift(agb);
+    saveBitacoraEntryToDB(agb);
     renderAll(); refreshLines();
-    toast("Análisis IA aplicado · Dashboard y mapa actualizados");
+    toast("Análisis IA aplicado y guardado en base de datos");
     buscarCorreos(m.tipo==="response");
   }catch(e){
     toast("Error al llamar la API: "+e.message,"err");
@@ -1586,13 +1590,15 @@ function getEMLData(i){
 function confirmEML(i){
   if(emlResults[i].confirmed)return;
   const d=getEMLData(i);
-  bitacora.unshift({id:uid(),fecha:d.fecha,tipo:d.tipo,tramo:d.tramo,actor:d.actor,gestion:"[.eml] "+d.gestion,resultado:d.resultado,proxima:d.proxima,fp:""});
-  if(d.estado){const t=tramos.find(x=>x.tramo===d.tramo);if(t)t.estado=d.estado;}
+  const newBit={id:uid(),fecha:d.fecha,tipo:d.tipo,tramo:d.tramo,actor:d.actor,gestion:"[.eml] "+d.gestion,resultado:d.resultado,proxima:d.proxima,fp:"",hito_rad:"",hito_prop:"",hito_cierre:"",hito_venc:""};
+  bitacora.unshift(newBit);
+  saveBitacoraEntryToDB(newBit);
+  if(d.estado){const t=tramos.find(x=>x.tramo===d.tramo);if(t){t.estado=d.estado;saveTramoToDB(t);}}
   emlResults[i].confirmed=true; emlImported.push(d);
   const item=document.getElementById("er-"+i);if(item)item.classList.add("confirmed");
   const btn=document.getElementById("eb-"+i);if(btn){btn.textContent="✓ Importado";btn.disabled=true;}
   renderAll(); refreshLines(); renderEMLLog();
-  toast("Gestión .eml agregada · Mapa actualizado");
+  toast("Gestión .eml guardada en base de datos");
 }
 
 function confirmAllEML(){emlResults.forEach((_,i)=>{if(!emlResults[i].confirmed)confirmEML(i);});}

@@ -170,6 +170,28 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
       <div class="card-h"><span class="card-t">Últimas gestiones</span><button class="btn btn-p btn-sm" onclick="openModal('gestion')">+ Nueva gestión</button></div>
       <div class="card-b"><div id="rec-bit" class="bl" style="max-height:200px"></div></div>
     </div>
+    <div class="card">
+      <div class="card-h">
+        <span class="card-t">Seguimiento de hitos por tramo</span>
+        <span style="font-size:9px;color:var(--muted)">Alimentado desde bitacora</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:680px">
+          <thead>
+            <tr style="background:var(--card2);border-bottom:1px solid var(--border)">
+              <th style="padding:9px 13px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Tramo</th>
+              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Ruta</th>
+              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Radicacion</th>
+              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Propuesta</th>
+              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Cierre contrato</th>
+              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Vencimiento</th>
+              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="hitos-tbody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <!-- MAPA -->

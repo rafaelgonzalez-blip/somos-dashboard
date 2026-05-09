@@ -1073,9 +1073,27 @@ function openModal(type,id,preTramo){
         <div class="fl"><label>Fecha próxima acción</label><input type="date" class="inp" id="f-fprox"></div>
       </div>
       <div class="fl"><label>Actualizar semáforo del tramo</label><select class="inp" id="f-est"><option value="">— sin cambio —</option><option value="Avanzado">Avanzado</option><option value="En gestión">En gestión</option><option value="Crítico">Crítico</option></select></div>
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);padding:8px 0 3px;border-top:1px solid var(--border);margin-top:4px">Hitos de fecha (opcional)</div>
-      <div class="frow"><div class="fl"><label>Fecha radicacion</label><input type="date" class="inp" id="f-hito-rad"></div><div class="fl"><label>Envio propuesta</label><input type="date" class="inp" id="f-hito-prop"></div></div>
-      <div class="frow"><div class="fl"><label>Cierre contrato</label><input type="date" class="inp" id="f-hito-cierre"></div><div class="fl"><label>Proximo vencimiento</label><input type="date" class="inp" id="f-hito-venc"></div></div>
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);padding:8px 0 6px;border-top:1px solid var(--border);margin-top:4px">Registrar hito de fecha (opcional)</div>
+      <div class="fl" style="margin-bottom:6px">
+        <label>Tipo de hito que representa esta gestion</label>
+        <select class="inp" id="f-hito-tipo" onchange="toggleHitoField()">
+          <option value="">— Esta gestion no marca un hito —</option>
+          <option value="rad">📅 Radicacion de solicitud</option>
+          <option value="prop">📤 Envio de propuesta</option>
+          <option value="cierre">✅ Cierre / firma de contrato</option>
+          <option value="venc">🔔 Vencimiento / fecha limite</option>
+        </select>
+      </div>
+      <div id="f-hito-fecha-wrap" style="display:none">
+        <div class="fl">
+          <label id="f-hito-fecha-label">Fecha del hito</label>
+          <input type="date" class="inp" id="f-hito-fecha" value="">
+        </div>
+      </div>
+      <input type="hidden" id="f-hito-rad">
+      <input type="hidden" id="f-hito-prop">
+      <input type="hidden" id="f-hito-cierre">
+      <input type="hidden" id="f-hito-venc">
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
         <button class="btn btn-p" onclick="saveGestion()">Guardar gestión</button>
@@ -1101,9 +1119,25 @@ function openModal(type,id,preTramo){
         <div class="fl"><label>Próxima acción</label><input type="text" class="inp" id="eb-prox" value="${b.proxima||""}"></div>
         <div class="fl"><label>Fecha próxima</label><input type="date" class="inp" id="eb-fp" value="${b.fp||""}"></div>
       </div>
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);padding:8px 0 3px;border-top:1px solid var(--border);margin-top:4px">Hitos de fecha</div>
-      <div class="frow"><div class="fl"><label>Radicacion</label><input type="date" class="inp" id="eb-hito-rad" value="${b.hito_rad||''}"></div><div class="fl"><label>Propuesta</label><input type="date" class="inp" id="eb-hito-prop" value="${b.hito_prop||''}"></div></div>
-      <div class="frow"><div class="fl"><label>Cierre</label><input type="date" class="inp" id="eb-hito-cierre" value="${b.hito_cierre||''}"></div><div class="fl"><label>Vencimiento</label><input type="date" class="inp" id="eb-hito-venc" value="${b.hito_venc||''}"></div></div>
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);padding:8px 0 6px;border-top:1px solid var(--border);margin-top:4px">Hitos de fecha</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fl">
+          <label style="display:flex;align-items:center;gap:5px"><span style="font-size:14px">📅</span> Radicacion</label>
+          <input type="date" class="inp" id="eb-hito-rad" value="${b.hito_rad||''}" placeholder="Sin fecha">
+        </div>
+        <div class="fl">
+          <label style="display:flex;align-items:center;gap:5px"><span style="font-size:14px">📤</span> Envio propuesta</label>
+          <input type="date" class="inp" id="eb-hito-prop" value="${b.hito_prop||''}" placeholder="Sin fecha">
+        </div>
+        <div class="fl">
+          <label style="display:flex;align-items:center;gap:5px"><span style="font-size:14px">✅</span> Cierre contrato</label>
+          <input type="date" class="inp" id="eb-hito-cierre" value="${b.hito_cierre||''}" placeholder="Sin fecha">
+        </div>
+        <div class="fl">
+          <label style="display:flex;align-items:center;gap:5px"><span style="font-size:14px">🔔</span> Vencimiento</label>
+          <input type="date" class="inp" id="eb-hito-venc" value="${b.hito_venc||''}" placeholder="Sin fecha">
+        </div>
+      </div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
         <button class="btn btn-danger btn-sm" onclick="deleteBit('${id}');closeModal()">🗑 Eliminar</button>
@@ -1252,11 +1286,25 @@ function saveApiKey(){
   toast(apiKey?"API Key guardada correctamente":"API Key eliminada");
 }
 
+function toggleHitoField(){
+  var tipo=document.getElementById('f-hito-tipo').value;
+  var wrap=document.getElementById('f-hito-fecha-wrap');
+  var lbl=document.getElementById('f-hito-fecha-label');
+  if(!tipo){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  var labels={rad:'Fecha de radicacion',prop:'Fecha envio propuesta',cierre:'Fecha cierre / firma contrato',venc:'Fecha limite / vencimiento'};
+  lbl.textContent=labels[tipo]||'Fecha del hito';
+  var fi=document.getElementById('f-hito-fecha');
+  if(!fi.value)fi.value=today();
+}
+
 function saveGestion(){
   const tn=gv("f-tramo"), gestion=gv("f-desc");
   if(!tn||!gestion){toast("Completa el tramo y la descripción","err");return;}
   const ne=gv("f-est");
-  bitacora.unshift({id:uid(),fecha:gv("f-fecha"),tipo:gv("f-tipo"),tramo:tn,actor:gv("f-actor"),gestion,resultado:gv("f-res"),proxima:gv("f-prox"),fp:gv("f-fprox"),hito_rad:gv("f-hito-rad")||"",hito_prop:gv("f-hito-prop")||"",hito_cierre:gv("f-hito-cierre")||"",hito_venc:gv("f-hito-venc")||""});
+  var hitoTipo=gv("f-hito-tipo");var hitoFecha=gv("f-hito-fecha")||"";var hRad="",hProp="",hCierre="",hVenc="";
+  if(hitoTipo==="rad")hRad=hitoFecha;if(hitoTipo==="prop")hProp=hitoFecha;if(hitoTipo==="cierre")hCierre=hitoFecha;if(hitoTipo==="venc")hVenc=hitoFecha;
+    bitacora.unshift({id:uid(),fecha:gv("f-fecha"),tipo:gv("f-tipo"),tramo:tn,actor:gv("f-actor"),gestion,resultado:gv("f-res"),proxima:gv("f-prox"),fp:gv("f-fprox"),hito_rad:hRad,hito_prop:hProp,hito_cierre:hCierre,hito_venc:hVenc});
   const t=tramos.find(x=>x.tramo===tn);
   if(t){if(ne)t.estado=ne;if(gv("f-prox"))t.proxima=gv("f-prox");if(gv("f-fprox"))t.fp=gv("f-fprox");}
   closeModal(); renderAll(); refreshLines(); if(selTramo)selT(selTramo);
@@ -1473,7 +1521,7 @@ async function gmailSearch(soloRespuestas){
     const badge = document.getElementById('gmail-count-badge');
     if(badge) badge.textContent = details.length+' correos encontrados';
     // Store message data indexed by id for onclick access
-    window._gmailMsgs = {};
+    window._gmailMsgs = [];
     emailsEl.innerHTML = details.map(function(msg){
       var hdrs = {};
       ((msg.payload && msg.payload.headers)||[]).forEach(function(h){ hdrs[h.name.toLowerCase()]=h.value; });
@@ -1484,7 +1532,7 @@ async function gmailSearch(soloRespuestas){
       var tipo = soloRespuestas ? 'response' : 'sent';
       var fechaISO = _parseGmailDate(hdrs['date']||'');
       var mid = msg.id;
-      window._gmailMsgs[mid] = {id:mid, subj:subj, from:from, to:to, date:fechaISO, snip:snip, tipo:tipo};
+      var idx=window._gmailMsgs.length; window._gmailMsgs.push({id:mid, subj:subj, from:from, to:to, date:fechaISO, snip:snip, tipo:tipo});
       return '<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;margin-bottom:8px">'
         +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:7px">'
         +'<div style="font-size:12px;font-weight:600;color:#fff;flex:1">'+_escHtml(subj)+'</div>'
@@ -1493,8 +1541,8 @@ async function gmailSearch(soloRespuestas){
         +'<div style="font-size:9px;color:var(--muted);margin-top:3px">'+_escHtml(from||(to?'Para: '+to:''))+' &middot; '+fechaISO+'</div>'
         +'<div style="font-size:10px;color:var(--muted2);margin-top:5px;line-height:1.5">'+_escHtml(snip.slice(0,150))+'</div>'
         +'<div style="display:flex;gap:6px;margin-top:8px">'
-        +'<button class="btn btn-success btn-sm" onclick="_gmailImport('+JSON.stringify(mid)+')">+ Bitacora</button>'
-        +'<button class="btn btn-p btn-sm" onclick="_gmailAnalizar('+JSON.stringify(mid)+')">IA</button>'
+        +'<button class="btn btn-success btn-sm" onclick="_gmailImport('+idx+')">+ Bitacora</button>'
+        +'<button class="btn btn-p btn-sm" onclick="_gmailAnalizar('+idx+')">IA</button>'
         +'</div>'
         +'</div>';
     }).join('');

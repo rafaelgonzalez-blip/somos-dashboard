@@ -170,27 +170,28 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
       <div class="card-h"><span class="card-t">Últimas gestiones</span><button class="btn btn-p btn-sm" onclick="openModal('gestion')">+ Nueva gestión</button></div>
       <div class="card-b"><div id="rec-bit" class="bl" style="max-height:200px"></div></div>
     </div>
-    <div class="card">
-      <div class="card-h">
-        <span class="card-t">Seguimiento de hitos por tramo</span>
-        <span style="font-size:9px;color:var(--muted)">Alimentado desde bitacora</span>
-      </div>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:680px">
-          <thead>
-            <tr style="background:var(--card2);border-bottom:1px solid var(--border)">
-              <th style="padding:9px 13px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Tramo</th>
-              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Ruta</th>
-              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Radicacion</th>
-              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Propuesta</th>
-              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Cierre contrato</th>
-              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Vencimiento</th>
-              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Estado</th>
-            </tr>
-          </thead>
-          <tbody id="hitos-tbody"></tbody>
-        </table>
-      </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">
+      <span class="card-t">Seguimiento de hitos por tramo</span>
+      <span style="font-size:9px;color:var(--muted)">Alimentado desde bitacora</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:680px">
+        <thead>
+          <tr style="background:var(--card2);border-bottom:1px solid var(--border)">
+            <th style="padding:9px 13px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Tramo</th>
+            <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Ruta</th>
+            <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Radicacion</th>
+            <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Propuesta</th>
+            <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Cierre contrato</th>
+            <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Vencimiento</th>
+            <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Estado</th>
+          </tr>
+        </thead>
+        <tbody id="hitos-tbody"></tbody>
+      </table>
     </div>
   </div>
 
@@ -446,8 +447,7 @@ function sbHeaders(){
 }
 
 async function sbGet(table, params){
-  var url = SB_URL + '/rest/v1/' + table + '?order=created_at.asc';
-  if(params) url += '&' + params;
+  var url = SB_URL + '/rest/v1/' + table + (params ? '?' + params : '');
   var r = await fetch(url, {headers: sbHeaders()});
   if(!r.ok) throw new Error('sbGet ' + table + ': ' + r.status);
   return r.json();
@@ -480,14 +480,14 @@ async function loadFromDB(){
     showDBStatus('Cargando datos...');
     
     // Load rutas
-    var dbRutas = await sbGet('rutas');
+    var dbRutas = await sbGet('rutas','order=id.asc');
     if(dbRutas && dbRutas.length > 0){
       routes = {};
       dbRutas.forEach(function(r){ routes[r.id] = {id:r.id, nombre:r.nombre, color:r.color}; });
     }
     
     // Load tramos
-    var dbTramos = await sbGet('tramos');
+    var dbTramos = await sbGet('tramos','order=id.asc');
     if(dbTramos && dbTramos.length > 0){
       // Merge DB state with KMZ coords (coords stay from KMZ, state from DB)
       dbTramos.forEach(function(dt){
@@ -512,7 +512,7 @@ async function loadFromDB(){
     }
     
     // Load bitacora
-    var dbBit = await sbGet('bitacora', 'order=fecha.desc');
+    var dbBit = await sbGet('bitacora','order=fecha.desc');
     if(dbBit && dbBit.length > 0){
       bitacora = dbBit.map(function(b){
         return {id:b.id, fecha:b.fecha, tipo:b.tipo, tramo:b.tramo,
@@ -530,7 +530,16 @@ async function loadFromDB(){
     
   } catch(e){
     console.error('loadFromDB:', e);
-    showDBStatus('Error cargando datos: ' + e.message, true);
+    var msg = e.message||'';
+    if(msg.includes('fetch') || msg.includes('CORS') || msg.includes('network')){
+      showDBStatus('Sin conexion a base de datos - modo local activo', true);
+      console.warn('Trabajando sin Supabase. Verifica: Settings > API > Allowed Origins en Supabase y agrega tu dominio de Netlify.');
+    } else {
+      showDBStatus('Error BD: ' + msg, true);
+    }
+    // Still render with local data
+    dbLoaded = true;
+    renderAll();
   }
 }
 
@@ -1060,15 +1069,9 @@ function openModal(type,id,preTramo){
         <div class="fl"><label>Fecha próxima acción</label><input type="date" class="inp" id="f-fprox"></div>
       </div>
       <div class="fl"><label>Actualizar semáforo del tramo</label><select class="inp" id="f-est"><option value="">— sin cambio —</option><option value="Avanzado">Avanzado</option><option value="En gestión">En gestión</option><option value="Crítico">Crítico</option></select></div>
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 0 4px;border-top:1px solid var(--border);margin-top:4px">Hitos de fecha (opcional)</div>
-      <div class="frow">
-        <div class="fl"><label>Fecha radicacion</label><input type="date" class="inp" id="f-hito-rad"></div>
-        <div class="fl"><label>Fecha envio propuesta</label><input type="date" class="inp" id="f-hito-prop"></div>
-      </div>
-      <div class="frow">
-        <div class="fl"><label>Fecha cierre contrato</label><input type="date" class="inp" id="f-hito-cierre"></div>
-        <div class="fl"><label>Proximo vencimiento</label><input type="date" class="inp" id="f-hito-venc"></div>
-      </div>
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);padding:8px 0 3px;border-top:1px solid var(--border);margin-top:4px">Hitos de fecha (opcional)</div>
+      <div class="frow"><div class="fl"><label>Fecha radicacion</label><input type="date" class="inp" id="f-hito-rad"></div><div class="fl"><label>Envio propuesta</label><input type="date" class="inp" id="f-hito-prop"></div></div>
+      <div class="frow"><div class="fl"><label>Cierre contrato</label><input type="date" class="inp" id="f-hito-cierre"></div><div class="fl"><label>Proximo vencimiento</label><input type="date" class="inp" id="f-hito-venc"></div></div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
         <button class="btn btn-p" onclick="saveGestion()">Guardar gestión</button>
@@ -1094,15 +1097,9 @@ function openModal(type,id,preTramo){
         <div class="fl"><label>Próxima acción</label><input type="text" class="inp" id="eb-prox" value="${b.proxima||""}"></div>
         <div class="fl"><label>Fecha próxima</label><input type="date" class="inp" id="eb-fp" value="${b.fp||""}"></div>
       </div>
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 0 4px;border-top:1px solid var(--border);margin-top:4px">Hitos de fecha</div>
-      <div class="frow">
-        <div class="fl"><label>Radicacion</label><input type="date" class="inp" id="eb-hito-rad" value="${b.hito_rad||''}"></div>
-        <div class="fl"><label>Propuesta</label><input type="date" class="inp" id="eb-hito-prop" value="${b.hito_prop||''}"></div>
-      </div>
-      <div class="frow">
-        <div class="fl"><label>Cierre contrato</label><input type="date" class="inp" id="eb-hito-cierre" value="${b.hito_cierre||''}"></div>
-        <div class="fl"><label>Vencimiento</label><input type="date" class="inp" id="eb-hito-venc" value="${b.hito_venc||''}"></div>
-      </div>
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);padding:8px 0 3px;border-top:1px solid var(--border);margin-top:4px">Hitos de fecha</div>
+      <div class="frow"><div class="fl"><label>Radicacion</label><input type="date" class="inp" id="eb-hito-rad" value="${b.hito_rad||''}"></div><div class="fl"><label>Propuesta</label><input type="date" class="inp" id="eb-hito-prop" value="${b.hito_prop||''}"></div></div>
+      <div class="frow"><div class="fl"><label>Cierre</label><input type="date" class="inp" id="eb-hito-cierre" value="${b.hito_cierre||''}"></div><div class="fl"><label>Vencimiento</label><input type="date" class="inp" id="eb-hito-venc" value="${b.hito_venc||''}"></div></div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
         <button class="btn btn-danger btn-sm" onclick="deleteBit('${id}');closeModal()">🗑 Eliminar</button>
@@ -1648,7 +1645,7 @@ function renderHitos(){
     if(b.hito_cierre)hm[b.tramo].cierre=b.hito_cierre;
     if(b.hito_venc)hm[b.tramo].venc=b.hito_venc;
   });
-  var td=today(),rows="";
+  var td=today(), rows="";
   tramos.forEach(function(t){
     var h=hm[t.tramo];
     if(!h||(!h.rad&&!h.prop&&!h.cierre&&!h.venc))return;
@@ -1657,15 +1654,20 @@ function renderHitos(){
     var rn=(routes[t.ruta]&&routes[t.ruta].nombre)||t.ruta;
     function cell(d){
       if(!d)return "<td style='padding:8px 13px;text-align:center;color:var(--muted2)'>-</td>";
-      var ov=d<td,near=!ov&&d<=addDays(td,7);
+      var ov=d<td, near=!ov&&d<=addDays(td,7);
       var c=ov?"#EF4444":near?"#F59E0B":"#10B981";
       var bg=ov?"rgba(239,68,68,.1)":near?"rgba(245,158,11,.1)":"rgba(16,185,129,.08)";
       var tag=ov?" [!]":near?" [~]":"";
       return "<td style='padding:8px 13px;text-align:center'><span style='background:"+bg+";color:"+c+";padding:3px 9px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap'>"+fmt(d)+tag+"</span></td>";
     }
-    rows+="<tr style='border-bottom:1px solid rgba(255,255,255,.04)' onmouseover="this.style.background='rgba(59,130,246,.05)'" onmouseout="this.style.background=''">"      +"<td style='padding:8px 13px;color:#fff;font-weight:500;white-space:nowrap'>"+t.tramo+"</td>"      +"<td style='padding:8px 13px;text-align:center'><span style='background:"+rc+"22;color:"+rc+";padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700'>"+rn+"</span></td>"      +cell(h.rad)+cell(h.prop)+cell(h.cierre)+cell(h.venc)      +"<td style='padding:8px 13px;text-align:center'><span style='background:"+sc+"22;color:"+sc+";padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700'>"+t.estado+"</span></td>"      +"</tr>";
+    rows+="<tr style='border-bottom:1px solid rgba(255,255,255,.04)'>"
+      +"<td style='padding:8px 13px;color:#fff;font-weight:500;white-space:nowrap'>"+t.tramo+"</td>"
+      +"<td style='padding:8px 13px;text-align:center'><span style='background:"+rc+"22;color:"+rc+";padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700'>"+rn+"</span></td>"
+      +cell(h.rad)+cell(h.prop)+cell(h.cierre)+cell(h.venc)
+      +"<td style='padding:8px 13px;text-align:center'><span style='background:"+sc+"22;color:"+sc+";padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700'>"+t.estado+"</span></td>"
+      +"</tr>";
   });
-  tbody.innerHTML=rows||"<tr><td colspan='7' style='padding:28px;text-align:center;color:var(--muted2);font-size:11px'>Sin hitos registrados. Agrégalos al crear una gestión.</td></tr>";
+  tbody.innerHTML=rows||"<tr><td colspan='7' style='padding:28px;text-align:center;color:var(--muted2);font-size:11px'>Sin hitos registrados. Agrégalos al crear o editar una gestión.</td></tr>";
 }
 
 function renderAll(){

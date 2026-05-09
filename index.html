@@ -1393,6 +1393,15 @@ function saveAlt(id){
 }
 
 // ─── GMAIL SIMULADO ──────────────────────────────────────────
+function detectTramo(txt){
+  if(!txt)return null;
+  var t=tramos.find(function(tr){
+    var parts=tr.tramo.toLowerCase().split('–');
+    return parts.some(function(p){return txt.toLowerCase().includes(p.trim());});
+  });
+  return t?t.tramo:null;
+}
+
 function importarGmail(m){
   var tramoDetectado = detectTramo((m.subj||"")+" "+(m.snip||"")) || "Pendiente asignar";
   var actor = (m.from||m.to||"").replace(/<[^>]+>/g,"").split("@")[1]||m.from||"";

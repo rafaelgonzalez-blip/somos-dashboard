@@ -1493,8 +1493,8 @@ async function gmailSearch(soloRespuestas){
         +'<div style="font-size:9px;color:var(--muted);margin-top:3px">'+_escHtml(from||(to?'Para: '+to:''))+' &middot; '+fechaISO+'</div>'
         +'<div style="font-size:10px;color:var(--muted2);margin-top:5px;line-height:1.5">'+_escHtml(snip.slice(0,150))+'</div>'
         +'<div style="display:flex;gap:6px;margin-top:8px">'
-        +'<button class="btn btn-success btn-sm" onclick="importarGmail(window._gmailMsgs[''+mid+''])">+ Bitacora</button>'
-        +'<button class="btn btn-p btn-sm" onclick="analizarGmail(window._gmailMsgs[''+mid+''])">IA</button>'
+        +'<button class="btn btn-success btn-sm" onclick="_gmailImport('+JSON.stringify(mid)+')">+ Bitacora</button>'
+        +'<button class="btn btn-p btn-sm" onclick="_gmailAnalizar('+JSON.stringify(mid)+')">IA</button>'
         +'</div>'
         +'</div>';
     }).join('');
@@ -1509,6 +1509,9 @@ async function gmailSearch(soloRespuestas){
     emailsEl.innerHTML='<div class="empty">Error al buscar. Intenta de nuevo.</div>';
   }
 }
+
+function _gmailImport(mid){ importarGmail(window._gmailMsgs[mid]); }
+function _gmailAnalizar(mid){ analizarGmail(window._gmailMsgs[mid]); }
 
 function _parseGmailDate(dateStr){
   try{ const d=new Date(dateStr); if(!isNaN(d.getTime()))return d.toISOString().slice(0,10); }catch(e){}
@@ -1798,13 +1801,21 @@ function renderAll(){
 }
 
 // ─── INIT ────────────────────────────────────────────────────
-document.getElementById("hdr-dt").textContent="Actualizado: "+fmt(today());
-var apiNotice=document.getElementById("api-notice");
-if(apiNotice&&apiKey)apiNotice.style.display="none";
-renderAll();
-setTimeout(setupDropZone,100);
-// Load data from Supabase
-loadFromDB();
+try{
+  document.getElementById("hdr-dt").textContent="Actualizado: "+fmt(today());
+  var apiNotice=document.getElementById("api-notice");
+  if(apiNotice&&apiKey)apiNotice.style.display="none";
+  renderAll();
+  setTimeout(setupDropZone,100);
+  loadFromDB();
+}catch(initErr){
+  console.error('INIT ERROR:',initErr);
+  document.body.innerHTML='<div style="padding:40px;font-family:monospace;background:#0A1628;color:#EF4444;font-size:14px">'
+    +'<h2>Error de inicializacion</h2>'
+    +'<pre>'+initErr.message+'\n'+initErr.stack+'</pre>'
+    +'<p style="color:#7a95bb;margin-top:20px">Abre DevTools (F12) → Console para ver el error completo.</p>'
+    +'</div>';
+}
 
 </script>
 </body>

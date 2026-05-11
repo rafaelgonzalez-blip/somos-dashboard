@@ -296,6 +296,88 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
         <div class="card-b" id="tramo-editor-body"><div class="empty">Selecciona una ruta para editar sus tramos</div></div>
       </div>
     </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="card-h">
+        <span class="card-t">Actualizar KMZ</span>
+        <span style="font-size:9px;background:rgba(59,130,246,.15);color:var(--acc);border:1px solid rgba(59,130,246,.3);padding:2px 9px;border-radius:4px;font-weight:700">Importador flexible</span>
+      </div>
+      <div class="card-b">
+        <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">
+          Sube un KMZ actualizado para sincronizar tramos y puntos del mapa. El sistema detecta
+          <strong style="color:#fff">LineStrings como tramos</strong> y <strong style="color:#fff">Points como POIs</strong>
+          sin depender de la estructura de carpetas. Los estados de gestion existentes se conservan.
+        </p>
+
+        <div class="step-bar" id="kmz-steps">
+          <div class="step-pill active" id="kstep-1">1. Subir KMZ</div>
+          <div class="step-pill" id="kstep-2">2. Previsualizar</div>
+          <div class="step-pill" id="kstep-3">3. Confirmar</div>
+        </div>
+
+        <!-- Step 1: Upload -->
+        <div id="kmz-panel-1">
+          <div class="drop-zone" id="kmz-drop-zone" style="margin-bottom:10px">
+            <input type="file" id="kmz-input" accept=".kmz,.kml" style="display:none">
+            <div style="font-size:36px;margin-bottom:8px">🗺️</div>
+            <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:4px">Arrastra un archivo .kmz o .kml aqui</div>
+            <div style="font-size:10px;color:var(--muted)">Estructura flexible — detecta tramos y puntos automaticamente</div>
+          </div>
+          <div id="kmz-upload-status" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
+        </div>
+
+        <!-- Step 2: Preview -->
+        <div id="kmz-panel-2" style="display:none">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+            <div class="kpi av"><div class="kpi-l">Tramos detectados</div><div class="kpi-v" id="kmz-count-tramos">0</div></div>
+            <div class="kpi acc"><div class="kpi-l">Puntos de interes</div><div class="kpi-v" id="kmz-count-puntos">0</div></div>
+            <div class="kpi eg"><div class="kpi-l">Carpetas/capas</div><div class="kpi-v" id="kmz-count-capas">0</div></div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+            <!-- Tramos preview -->
+            <div>
+              <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Tramos detectados</div>
+              <div id="kmz-tramos-preview" style="max-height:300px;overflow-y:auto" class="sc"></div>
+            </div>
+            <!-- Comparison with existing -->
+            <div>
+              <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Comparacion con tramos actuales</div>
+              <div id="kmz-compare-preview" style="max-height:300px;overflow-y:auto" class="sc"></div>
+            </div>
+          </div>
+
+          <!-- Route assignment -->
+          <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Asignar ruta</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <label style="font-size:11px;color:var(--muted)">Asignar todos los tramos nuevos a:</label>
+              <select class="inp" id="kmz-ruta-assign" style="width:auto;flex:1;min-width:180px">
+                <option value="r1">Medellin–Barranquilla (R1)</option>
+                <option value="r2">Medellin–Bogota (R2)</option>
+              </select>
+              <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px">
+                <input type="checkbox" id="kmz-keep-states" checked style="accent-color:var(--acc)">
+                Conservar estados existentes
+              </label>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-g btn-sm" onclick="kmzReset()">Cancelar</button>
+            <button class="btn btn-p" onclick="kmzApply()">Aplicar y sincronizar mapa</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Done -->
+        <div id="kmz-panel-3" style="display:none;text-align:center;padding:24px">
+          <div style="font-size:36px;margin-bottom:10px">✅</div>
+          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:6px" id="kmz-done-msg">KMZ aplicado</div>
+          <div style="font-size:11px;color:var(--muted)" id="kmz-done-detail"></div>
+          <button class="btn btn-g btn-sm" style="margin-top:14px" onclick="kmzReset()">Subir otro KMZ</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- CORREO / EML -->
@@ -404,46 +486,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
 
 </div><!-- end app -->
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><div id="t-mapa" class="tv">
-    <div class="card" style="overflow:visible">
-      <div class="card-h">
-        <span class="card-t">&#128506; Mapa KMZ &#8212; trazados reales HORIZON</span>
-        <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
-          <button class="fb active" id="mf-all" onclick="mapFilt('all')">Todas las rutas</button>
-          <button class="fb" id="mf-r1" onclick="mapFilt('r1')">MDE&#8211;BAQ</button>
-          <button class="fb" id="mf-r2" onclick="mapFilt('r2')">MDE&#8211;BOG</button>
-        </div>
-      </div>
-      <div style="display:flex;gap:7px;align-items:center;padding:8px 14px;border-bottom:1px solid #253352;flex-wrap:wrap">
-        <span style="font-size:9px;color:#7a95bb;font-weight:700">CAPAS:</span>
-        <label style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;font-size:10px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.1)"><input type="checkbox" id="lay-tramos" checked onchange="toggleLayer('tramos')" style="accent-color:#3B82F6"> Tramos</label>
-        <label style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;font-size:10px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.1)"><input type="checkbox" id="lay-nodos" checked onchange="toggleLayer('nodos')" style="accent-color:#3B82F6"> Nodos/POPs</label>
-        <label style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;font-size:10px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.1)"><input type="checkbox" id="lay-peajes" checked onchange="toggleLayer('peajes')" style="accent-color:#3B82F6"> Peajes/Puentes</label>
-        <label style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;font-size:10px;color:#7a95bb;cursor:pointer;border:1px solid #253352;border-radius:20px"><input type="checkbox" id="lay-obstaculos" onchange="toggleLayer('obstaculos')" style="accent-color:#3B82F6"> Obs&#769;taculos</label>
-      </div>
-      <div style="position:relative;height:480px;border-radius:0 0 10px 10px;overflow:hidden">
-        <div id="the-map" style="position:absolute;top:0;left:0;width:100%;height:100%"></div>
-        <div class="map-legend">
-          <div class="map-legend-t">Sema&#769;foro tramos</div>
-          <div class="leg-r"><div class="leg-l" style="background:#10B981"></div>Avanzado</div>
-          <div class="leg-r"><div class="leg-l" style="background:#F59E0B"></div>En gesti&#243;n</div>
-          <div class="leg-r"><div class="leg-l" style="background:#EF4444"></div>Cr&#237;tico</div>
-          <div style="margin-top:7px;padding-top:7px;border-top:1px solid rgba(255,255,255,.1)">
-          <div class="map-legend-t">Puntos de inter&#233;s</div>
-          <div class="leg-r"><span style="width:9px;height:9px;border-radius:50%;background:#60A5FA;display:inline-block;margin-right:2px"></span>Nodo/POP</div>
-          <div class="leg-r"><span style="width:9px;height:9px;border-radius:50%;background:#EF4444;display:inline-block;margin-right:2px"></span>Peaje</div>
-          <div class="leg-r"><span style="width:9px;height:9px;border-radius:50%;background:#10B981;display:inline-block;margin-right:2px"></span>Puente</div>
-          </div>
-        </div>
-        <div class="map-side" id="map-side" style="max-height:420px">
-          <div class="ms-t">Tramos KMZ</div>
-          <div id="map-tlist"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // ─── SUPABASE ─────────────────────────────────────────────
 const SB_URL = 'https://ayjkwlykkqhkehkihzel.supabase.co';
@@ -1592,6 +1635,345 @@ function _parseGmailDate(dateStr){
   return today();
 }
 function _escHtml(str){
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+
+// ─── KMZ IMPORTER ────────────────────────────────────────────
+var kmzParsed = {tramos:[], puntos:[], capas:[]};
+
+function kmzSetStep(n){
+  [1,2,3].forEach(function(i){
+    var el=document.getElementById('kstep-'+i);
+    if(!el)return;
+    el.className='step-pill'+(i<n?' done':i===n?' active':'');
+  });
+  [1,2,3].forEach(function(i){
+    var p=document.getElementById('kmz-panel-'+i);
+    if(p) p.style.display=(i===n?'block':'none');
+  });
+}
+
+function kmzReset(){
+  kmzParsed={tramos:[],puntos:[],capas:[]};
+  document.getElementById('kmz-upload-status').textContent='';
+  document.getElementById('kmz-input').value='';
+  kmzSetStep(1);
+}
+
+function setupKMZDropZone(){
+  var dz=document.getElementById('kmz-drop-zone');
+  var inp=document.getElementById('kmz-input');
+  if(!dz||!inp)return;
+  dz.addEventListener('click',function(){inp.click();});
+  dz.addEventListener('dragover',function(e){e.preventDefault();dz.style.borderColor='var(--acc)';});
+  dz.addEventListener('dragleave',function(){dz.style.borderColor='';});
+  dz.addEventListener('drop',function(e){
+    e.preventDefault();dz.style.borderColor='';
+    var f=e.dataTransfer.files[0];
+    if(f) processKMZFile(f);
+  });
+  inp.addEventListener('change',function(e){
+    if(e.target.files[0]) processKMZFile(e.target.files[0]);
+  });
+}
+
+function processKMZFile(file){
+  var status=document.getElementById('kmz-upload-status');
+  status.textContent='Leyendo archivo...';
+  status.style.color='var(--muted)';
+
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var data=e.target.result;
+    try{
+      // KMZ is a ZIP - use a simple approach to extract KML
+      // Try as plain KML first (if .kml file)
+      if(file.name.toLowerCase().endsWith('.kml')){
+        parseKMLString(new TextDecoder().decode(data));
+      } else {
+        // KMZ = ZIP, need to extract doc.kml
+        extractKMZAndParse(data);
+      }
+    }catch(err){
+      status.textContent='Error leyendo archivo: '+err.message;
+      status.style.color='var(--cr)';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function extractKMZAndParse(arrayBuffer){
+  var status=document.getElementById('kmz-upload-status');
+  // Load JSZip dynamically
+  if(typeof JSZip==='undefined'){
+    var script=document.createElement('script');
+    script.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    script.onload=function(){ doExtractKMZ(arrayBuffer); };
+    script.onerror=function(){ status.textContent='Error cargando libreria ZIP. Intenta con un archivo .kml'; status.style.color='var(--cr)'; };
+    document.head.appendChild(script);
+  } else {
+    doExtractKMZ(arrayBuffer);
+  }
+}
+
+function doExtractKMZ(arrayBuffer){
+  var status=document.getElementById('kmz-upload-status');
+  JSZip.loadAsync(arrayBuffer).then(function(zip){
+    // Find the KML file inside
+    var kmlFile=null;
+    zip.forEach(function(path,file){
+      if(path.toLowerCase().endsWith('.kml') && !kmlFile) kmlFile=file;
+    });
+    if(!kmlFile){
+      status.textContent='No se encontro archivo KML dentro del KMZ';
+      status.style.color='var(--cr)';
+      return;
+    }
+    return kmlFile.async('string').then(function(kmlStr){
+      parseKMLString(kmlStr);
+    });
+  }).catch(function(err){
+    status.textContent='Error abriendo KMZ: '+err.message;
+    status.style.color='var(--cr)';
+  });
+}
+
+function parseKMLString(kmlStr){
+  var status=document.getElementById('kmz-upload-status');
+  status.textContent='Analizando estructura...';
+
+  var parser=new DOMParser();
+  var doc=parser.parseFromString(kmlStr,'text/xml');
+
+  // Strip namespace for easier querying
+  var cleaned=kmlStr.replace(/xmlns[^=]*="[^"]*"/g,'').replace(/<kml:/g,'<').replace(/<\/kml:/g,'</');
+  doc=parser.parseFromString(cleaned,'text/xml');
+
+  var tramos=[];
+  var puntos=[];
+  var capas=new Set();
+
+  // Get all Placemark elements regardless of nesting
+  var placemarks=doc.querySelectorAll('Placemark');
+
+  placemarks.forEach(function(pm){
+    var name=(pm.querySelector('name')||{textContent:''}).textContent.trim()||'Sin nombre';
+    // Find parent folder name
+    var folderName='';
+    var parent=pm.parentElement;
+    while(parent){
+      if(parent.tagName==='Folder'||parent.tagName==='Document'){
+        var fn=(parent.querySelector(':scope > name')||{textContent:''}).textContent.trim();
+        if(fn){ folderName=fn; capas.add(fn); break; }
+      }
+      parent=parent.parentElement;
+    }
+
+    // LineString = tramo
+    var ls=pm.querySelector('LineString');
+    if(ls){
+      var coordsTxt=(ls.querySelector('coordinates')||{textContent:''}).textContent.trim();
+      var coords=parseCoords(coordsTxt);
+      if(coords.length>=2){
+        tramos.push({
+          name: name,
+          folder: folderName,
+          coords: coords,
+          // Try to detect ruta from folder name
+          ruta: detectRutaFromFolder(folderName+' '+name)
+        });
+      }
+    }
+
+    // Point = POI
+    var pt=pm.querySelector('Point');
+    if(pt){
+      var cTxt=(pt.querySelector('coordinates')||{textContent:''}).textContent.trim();
+      var parts=cTxt.split(',');
+      if(parts.length>=2){
+        var lat=parseFloat(parts[1]);
+        var lng=parseFloat(parts[0]);
+        if(!isNaN(lat)&&!isNaN(lng)&&lat>=1&&lat<=12&&lng>=-80&&lng<=-65){
+          puntos.push({
+            nombre: name,
+            tipo: folderName||'Marcador',
+            lat: lat,
+            lng: lng,
+            ruta: detectRutaFromFolder(folderName+' '+name)
+          });
+        }
+      }
+    }
+  });
+
+  kmzParsed={tramos:tramos, puntos:puntos, capas:Array.from(capas)};
+
+  if(tramos.length===0&&puntos.length===0){
+    status.textContent='No se detectaron tramos ni puntos. Verifica que el KMZ tenga geometrias.';
+    status.style.color='var(--cr)';
+    return;
+  }
+
+  status.textContent='Detectados: '+tramos.length+' tramos y '+puntos.length+' puntos en '+capas.size+' capas.';
+  status.style.color='var(--av)';
+
+  showKMZPreview();
+  kmzSetStep(2);
+}
+
+function parseCoords(txt){
+  var coords=[];
+  txt.trim().split(/\s+/).forEach(function(c){
+    var p=c.split(',');
+    if(p.length>=2){
+      var lng=parseFloat(p[0]);
+      var lat=parseFloat(p[1]);
+      if(!isNaN(lat)&&!isNaN(lng)&&lat>=1&&lat<=12&&lng>=-80&&lng<=-65)
+        coords.push([parseFloat(lat.toFixed(6)),parseFloat(lng.toFixed(6))]);
+    }
+  });
+  // Simplify to max 100 points per tramo
+  if(coords.length>100){
+    var step=Math.floor(coords.length/100);
+    var simple=[coords[0]];
+    for(var i=step;i<coords.length-1;i+=step) simple.push(coords[i]);
+    simple.push(coords[coords.length-1]);
+    return simple;
+  }
+  return coords;
+}
+
+function detectRutaFromFolder(txt){
+  var t=txt.toLowerCase();
+  if(t.includes('barranquilla')||t.includes('baq')||t.includes('r1')) return 'r1';
+  if(t.includes('bogot')||t.includes('bog')||t.includes('r2')) return 'r2';
+  return document.getElementById('kmz-ruta-assign')?document.getElementById('kmz-ruta-assign').value:'r1';
+}
+
+function showKMZPreview(){
+  // Update counters
+  document.getElementById('kmz-count-tramos').textContent=kmzParsed.tramos.length;
+  document.getElementById('kmz-count-puntos').textContent=kmzParsed.puntos.length;
+  document.getElementById('kmz-count-capas').textContent=kmzParsed.capas.length;
+
+  // Tramos list
+  var tp=document.getElementById('kmz-tramos-preview');
+  tp.innerHTML=kmzParsed.tramos.map(function(t,i){
+    var rutaColor=t.ruta==='r1'?'#60A5FA':'#A78BFA';
+    return '<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin-bottom:5px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="font-size:11px;color:#fff;font-weight:500">'+escHtmlKmz(t.name)+'</span>'
+      +'<span style="font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:'+rutaColor+'22;color:'+rutaColor+'">'+t.ruta.toUpperCase()+'</span>'
+      +'</div>'
+      +'<div style="font-size:9px;color:var(--muted);margin-top:2px">'+escHtmlKmz(t.folder||'Raiz')+' &middot; '+t.coords.length+' puntos</div>'
+      +'<select class="inp" id="kmz-ruta-t-'+i+'" style="margin-top:5px;font-size:10px;padding:3px 7px;height:auto">'
+      +'<option value="r1"'+(t.ruta==='r1'?' selected':'')+'>MDE–BAQ (R1)</option>'
+      +'<option value="r2"'+(t.ruta==='r2'?' selected':'')+'>MDE–BOG (R2)</option>'
+      +'</select>'
+      +'</div>';
+  }).join('')||'<div class="empty">Sin tramos</div>';
+
+  // Comparison with existing tramos
+  var cp=document.getElementById('kmz-compare-preview');
+  var existing=tramos.map(function(t){return t.tramo.toLowerCase();});
+  var newNames=kmzParsed.tramos.map(function(t){return t.name.toLowerCase();});
+
+  var kept=[], added=[], removed=[];
+  tramos.forEach(function(t){
+    if(newNames.includes(t.tramo.toLowerCase())) kept.push(t.tramo);
+    else removed.push(t.tramo);
+  });
+  kmzParsed.tramos.forEach(function(t){
+    if(!existing.includes(t.name.toLowerCase())) added.push(t.name);
+  });
+
+  cp.innerHTML=
+    (kept.length?'<div style="font-size:9px;font-weight:700;color:var(--av);margin-bottom:5px">CONSERVADOS ('+kept.length+')</div>'+kept.map(function(n){return '<div style="font-size:10px;color:var(--av);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)">✓ '+escHtmlKmz(n)+'</div>';}).join(''):'')
+    +(added.length?'<div style="font-size:9px;font-weight:700;color:var(--acc);margin:8px 0 5px">NUEVOS ('+added.length+')</div>'+added.map(function(n){return '<div style="font-size:10px;color:var(--acc);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)">+ '+escHtmlKmz(n)+'</div>';}).join(''):'')
+    +(removed.length?'<div style="font-size:9px;font-weight:700;color:var(--cr);margin:8px 0 5px">YA NO ESTAN ('+removed.length+')</div>'+removed.map(function(n){return '<div style="font-size:10px;color:var(--cr);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)">- '+escHtmlKmz(n)+'</div>';}).join(''):'')
+    ||'<div class="empty">Sin comparacion disponible</div>';
+}
+
+async function kmzApply(){
+  var keepStates=document.getElementById('kmz-keep-states').checked;
+
+  // Build state map from existing tramos
+  var stateMap={};
+  tramos.forEach(function(t){ stateMap[t.tramo.toLowerCase()]={estado:t.estado,actor:t.actor,km:t.km,proxima:t.proxima,fp:t.fp,concesion:t.concesion,id:t.id,ruta:t.ruta}; });
+
+  // Build new tramos array from KMZ
+  var newTramos=kmzParsed.tramos.map(function(t,i){
+    var rutaEl=document.getElementById('kmz-ruta-t-'+i);
+    var ruta=rutaEl?rutaEl.value:(t.ruta||'r1');
+    var existing=stateMap[t.name.toLowerCase()];
+    return {
+      id: existing?existing.id:uid(),
+      ruta: ruta,
+      tramo: t.name,
+      actor: existing?existing.actor:'Pendiente',
+      km: existing?existing.km:Math.round(calcKm(t.coords)),
+      estado: (keepStates&&existing)?existing.estado:'En gestión',
+      proxima: existing?existing.proxima:'',
+      fp: existing?existing.fp:'',
+      concesion: existing?existing.concesion:'',
+      coords: t.coords
+    };
+  });
+
+  // Show loading
+  document.getElementById('kmz-panel-2').innerHTML='<div class="thinking"><span></span><span></span><span></span><span style="margin-left:8px">Guardando en base de datos y actualizando mapa...</span></div>';
+
+  try{
+    // Save all new tramos to Supabase
+    await sbUpsert('tramos', newTramos.map(function(t){
+      return {id:t.id,ruta:t.ruta,tramo:t.tramo,actor:t.actor,km:t.km,
+        estado:t.estado,proxima:t.proxima||'',fp:t.fp||'',
+        concesion:t.concesion||'',coords:t.coords,
+        updated_at:new Date().toISOString()};
+    }));
+
+    // Delete tramos that no longer exist
+    var newNames=newTramos.map(function(t){return t.tramo.toLowerCase();});
+    var toDelete=tramos.filter(function(t){return !newNames.includes(t.tramo.toLowerCase());});
+    await Promise.all(toDelete.map(function(t){return sbDelete('tramos',t.id).catch(function(){});}));
+
+    // Update local state
+    tramos=newTramos;
+
+    // Update map
+    if(mapInst){ drawAllLines(); renderMapSide(); }
+    renderAll();
+
+    // Step 3
+    kmzSetStep(3);
+    var kept=newTramos.filter(function(t){return stateMap[t.tramo.toLowerCase()];}).length;
+    var added=newTramos.length-kept;
+    document.getElementById('kmz-done-msg').textContent='KMZ aplicado correctamente';
+    document.getElementById('kmz-done-detail').textContent=
+      newTramos.length+' tramos en el mapa · '+kept+' estados conservados · '+added+' tramos nuevos · '+toDelete.length+' tramos eliminados';
+    toast('KMZ actualizado: '+newTramos.length+' tramos sincronizados');
+
+  }catch(err){
+    toast('Error aplicando KMZ: '+err.message,'err');
+    kmzReset();
+  }
+}
+
+function calcKm(coords){
+  if(!coords||coords.length<2)return 0;
+  var total=0;
+  for(var i=1;i<coords.length;i++){
+    var lat1=coords[i-1][0]*Math.PI/180, lat2=coords[i][0]*Math.PI/180;
+    var dlat=lat2-lat1;
+    var dlng=(coords[i][1]-coords[i-1][1])*Math.PI/180;
+    var a=Math.sin(dlat/2)*Math.sin(dlat/2)+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dlng/2)*Math.sin(dlng/2);
+    total+=6371*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  }
+  return total;
+}
+
+function escHtmlKmz(str){
   return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 

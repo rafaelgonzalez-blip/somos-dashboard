@@ -520,9 +520,13 @@ async function loadFromDB(){
           t.concesion = dt.concesion || t.concesion;
           t.tramo = dt.tramo || t.tramo;
           t.ruta = dt.ruta || t.ruta;
+          t.parent_id = dt.parent_id||null;
+          t.tipo_elemento = dt.tipo_elemento||'tramo';
         } else {
-          // New tramo added via dashboard
-          if(dt.coords) tramos.push(Object.assign({}, dt, {coords: dt.coords}));
+          // New tramo added via dashboard (subtramos included)
+          if(dt.coords) tramos.push(Object.assign({
+            parent_id:null, tipo_elemento:'tramo'
+          }, dt, {coords: dt.coords}));
         }
       });
     } else {
@@ -990,51 +994,42 @@ function renderTramoList(){
     var isOpen=window._openTramos&&window._openTramos[t.id];
     var rColor=(routes[t.ruta]&&routes[t.ruta].color)||'#60A5FA';
     var rNombre=(routes[t.ruta]&&routes[t.ruta].nombre)?routes[t.ruta].nombre.split('–').pop():t.ruta;
-    // Parent row - use DOM to avoid quote issues
-    var row=document.createElement('div');
-    row.className='ti-item'+(selTramo===t.id?' sel':'');
-    row.dataset.id=t.id;
-    row.onclick=function(){selT(this.dataset.id);};
-    var inner='<div style="display:flex;align-items:center;gap:6px">';
-    if(hijos.length){
-      inner+='<span class="toggle-btn" data-tid="'+t.id+'" style="cursor:pointer;color:var(--acc);font-size:11px;width:14px;text-align:center">'+(isOpen?'&#9662;':'&#9658;')+'</span>';
-    } else {
-      inner+='<span style="width:14px"></span>';
-    }
-    inner+='<div style="flex:1"><div class="ti-n">'+t.tramo+'</div>'
+    var sel=selTramo===t.id?' sel':'';
+    html+='<div class="ti-item'+sel+'" data-selid="'+t.id+'">'
+      +'<div style="display:flex;align-items:center;gap:6px">'
+      +(hijos.length?'<span class="toggle-btn" data-tid="'+t.id+'" style="cursor:pointer;color:var(--acc);font-size:11px;width:14px;text-align:center">'+(isOpen?'&#9662;':'&#9658;')+'</span>':'<span style="width:14px"></span>')
+      +'<div style="flex:1"><div class="ti-n">'+t.tramo+'</div>'
       +'<div class="ti-m">'+sb(efectivo)
       +'<span style="background:'+rColor+'22;color:'+rColor+';padding:1px 6px;border-radius:4px;font-size:8px;font-weight:700">'+rNombre+'</span>'
       +(hijos.length?'<span style="font-size:9px;color:var(--muted)">'+hijos.length+' subelementos</span>':'')
-      +'<span>'+t.km+' km</span></div></div></div>';
-    row.innerHTML=inner;
-    html+=row.outerHTML;
-    // Children rows if expanded
+      +'<span>'+t.km+' km</span></div></div></div></div>';
     if(isOpen&&hijos.length){
       hijos.forEach(function(h){
         var tc=h.tipo_elemento==='subtramo'?'#34D399':h.tipo_elemento==='crítico'?'#EF4444':'#94A3B8';
-        var crow=document.createElement('div');
-        crow.className='ti-item'+(selTramo===h.id?' sel':'');
-        crow.dataset.id=h.id;
-        crow.onclick=function(){selT(this.dataset.id);};
-        crow.style.cssText='padding-left:28px;border-left:2px solid var(--border);margin-left:7px';
-        crow.innerHTML='<div style="flex:1"><div class="ti-n" style="font-size:11px">'+h.tramo+'</div>'
+        var hsel=selTramo===h.id?' sel':'';
+        html+='<div class="ti-item'+hsel+'" data-selid="'+h.id+'" style="padding-left:28px;border-left:2px solid var(--border);margin-left:7px">'
+          +'<div style="flex:1"><div class="ti-n" style="font-size:11px">'+h.tramo+'</div>'
           +'<div class="ti-m">'+sb(h.estado)
           +'<span style="background:'+tc+'22;color:'+tc+';padding:1px 6px;border-radius:4px;font-size:8px;font-weight:700">'+h.tipo_elemento+'</span>'
-          +'<span>'+h.km+' km</span></div></div>';
-        html+=crow.outerHTML;
+          +'<span>'+h.km+' km</span></div></div></div>';
       });
     }
   });
   var panel=document.getElementById('tl-panel');
   panel.innerHTML=html||'<div class="empty">Sin tramos</div>';
-  // Re-attach toggle click handlers
-  panel.querySelectorAll('.toggle-btn').forEach(function(btn){
-    btn.onclick=function(e){
+  // Event delegation - one listener on the panel
+  panel.onclick=function(e){
+    var toggleBtn=e.target.closest('.toggle-btn');
+    if(toggleBtn){
       e.stopPropagation();
-      toggleTramoOpen(this.dataset.tid);
-    };
-  });
+      toggleTramoOpen(toggleBtn.dataset.tid);
+      return;
+    }
+    var row=e.target.closest('[data-selid]');
+    if(row) selT(row.dataset.selid);
+  };
 }
+
 function toggleTramoOpen(id){
   if(!window._openTramos)window._openTramos={};
   window._openTramos[id]=!window._openTramos[id];
@@ -1070,7 +1065,7 @@ function selT(id){
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">
         <div>
           <div style="font-size:14px;font-weight:700;color:#fff">${t.tramo}</div>
-          <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${sb(t.estado)}<span class="rpill ${t.ruta}">${routes[t.ruta]?.nombre||t.ruta}</span></div>
+          <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${sb(t.estado)}<span style="background:${(routes[t.ruta]&&routes[t.ruta].color)||'#60A5FA'}22;color:${(routes[t.ruta]&&routes[t.ruta].color)||'#60A5FA'};border:1px solid ${(routes[t.ruta]&&routes[t.ruta].color)||'#60A5FA'}44;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700">${routes[t.ruta]?routes[t.ruta].nombre:t.ruta}</span></div>
         </div>
         <div style="display:flex;gap:5px;flex-wrap:wrap">
           <button class="btn btn-warn btn-sm" onclick="openModal('edit-tramo','${t.id}')">Editar</button>

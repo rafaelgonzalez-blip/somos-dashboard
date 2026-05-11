@@ -1045,6 +1045,26 @@ function selT(id){
   selTramo=id; renderTramoList();
   const t=tramos.find(x=>x.id===id); if(!t)return;
   const tb=bitacora.filter(b=>b.tramo===t.tramo).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+
+  // Pre-compute subelements HTML
+  var subHtml='';
+  var hijosT=getHijos(t.id);
+  if(hijosT.length){
+    subHtml+='<div class="divd"></div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Subelementos ('+hijosT.length+')</div>';
+    hijosT.forEach(function(h){
+      var tc=SC[h.estado]||'#94A3B8';
+      subHtml+='<div class="sub-row" data-hid="'+h.id+'" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer">'
+        +'<div style="width:4px;height:32px;border-radius:2px;background:'+tc+';flex-shrink:0"></div>'
+        +'<div style="flex:1"><div style="font-size:11px;color:#fff">'+h.tramo+'</div>'
+        +'<div style="font-size:9px;color:var(--muted)">'+h.tipo_elemento+' · '+h.km+' km</div></div>'
+        +sb(h.estado)+'</div>';
+    });
+  }
+  var padreHtml='';
+  if(t.parent_id){
+    var padre=tramos.find(function(x){return x.id===t.parent_id;})||{tramo:'—',id:''};
+    padreHtml='<div class="divd"></div><div style="font-size:9px;color:var(--muted)">Tramo padre: <span class="padre-link" data-pid="'+padre.id+'" style="color:var(--acc);cursor:pointer">'+padre.tramo+'</span></div>';
+  }
   document.getElementById("td-panel").innerHTML=`
     <div>
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">
@@ -1071,27 +1091,7 @@ function selT(id){
       </div>
       <div class="divd"></div>
       <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Historial de gestiones (${tb.length})</div>
-      ${(function(){
-        var hijos=getHijos(t.id);
-        if(!hijos.length&&!t.parent_id)return '';
-        var s='<div class="divd"></div>';
-        if(hijos.length){
-          s+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Subelementos ('+hijos.length+')</div>';
-          hijos.forEach(function(h){
-            var tc=SC[h.estado]||'#94A3B8';
-            s+='<div class="sub-row" data-hid="'+h.id+'" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer">'
-              +'<div style="width:4px;height:32px;border-radius:2px;background:'+tc+';flex-shrink:0"></div>'
-              +'<div style="flex:1"><div style="font-size:11px;color:#fff">'+h.tramo+'</div>'
-              +'<div style="font-size:9px;color:var(--muted)">'+h.tipo_elemento+' · '+h.km+' km</div></div>'
-              +sb(h.estado)+'</div>';
-          });
-        }
-        if(t.parent_id){
-          var padre=tramos.find(function(x){return x.id===t.parent_id;})||{tramo:'—',id:''};
-          s+='<div class="divd"></div><div style="font-size:9px;color:var(--muted)">Tramo padre: <span class="padre-link" data-pid="'+padre.id+'" style="color:var(--acc);cursor:pointer">'+padre.tramo+'</span></div>';
-        }
-        return s;
-      })()}
+      ${subHtml}${padreHtml}
       ${tb.map(b=>`
         <div class="bi ${b.tipo}" style="margin-bottom:7px">
           <div class="bi-d">${tt(b.tipo)}<span>${fmt(b.fecha)}</span></div>
@@ -1103,6 +1103,15 @@ function selT(id){
           </div>
         </div>`).join("")||'<div class="empty" style="padding:10px">Sin gestiones registradas</div>'}
     </div>`;
+  // Bind dynamic click handlers
+  setTimeout(function(){
+    document.querySelectorAll('#td-panel .sub-row').forEach(function(el){
+      el.onclick=function(){selT(this.dataset.hid);};
+    });
+    document.querySelectorAll('#td-panel .padre-link').forEach(function(el){
+      el.onclick=function(){selT(this.dataset.pid);};
+    });
+  },0);
 }
 
 // ─── RUTAS ───────────────────────────────────────────────────

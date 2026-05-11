@@ -1357,12 +1357,23 @@ function openModal(type,id,preTramo){
       <div id="coords-cont"></div>
       <button class="btn btn-g btn-sm" onclick="addCoord()" style="align-self:flex-start;margin-bottom:4px">+ Agregar punto</button>
       <div class="fl"><label>Primera acción a realizar</label><input type="text" class="inp" id="nt-p" placeholder="Primera gestión a realizar"></div>
+      <div class="fl"><label>Tipo de elemento</label><select class="inp" id="nt-tipo"><option value="tramo">Tramo principal</option><option value="subtramo">Subtramo</option><option value="caja">Caja de empalme</option><option value="puente">Puente</option><option value="cruce">Cruce</option><option value="crítico">Elemento crítico</option></select></div>
+      <div class="fl" id="nt-parent-wrap" style="display:none"><label>Tramo padre</label><select class="inp" id="nt-parent">${tramos.filter(t=>!t.parent_id).map(t=>`<option value="${t.id}">${t.tramo}</option>`).join('')}</select></div>
       <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
-        <button class="btn btn-p" onclick="saveNuevoTramo('${id}')">Agregar tramo</button>
+        <button class="btn btn-p" onclick="saveNuevoTramo('${id}')">Agregar</button>
       </div>
     </div>`;
     addCoord(); addCoord();
+    setTimeout(function(){
+      var tipoSel=document.getElementById('nt-tipo');
+      var parentWrap=document.getElementById('nt-parent-wrap');
+      if(tipoSel&&parentWrap){
+        tipoSel.onchange=function(){
+          parentWrap.style.display=this.value==='tramo'?'none':'block';
+        };
+      }
+    },50);
   }
 
   else if(type==="edit-tramo"){
@@ -1508,7 +1519,12 @@ function saveNuevoTramo(rutaId){
   const coords=[];
   rows.forEach(r=>{const ins=r.querySelectorAll("input");const lat=parseFloat(ins[0].value),lng=parseFloat(ins[1].value);if(!isNaN(lat)&&!isNaN(lng))coords.push([lat,lng]);});
   if(coords.length<2){const ex=tramos.filter(t=>t.ruta===rutaId);coords.push(...(ex.length?ex[ex.length-1].coords.slice(-2):[[6.2476,-75.5658],[6.5,-75.0]]));}
-  tramos.push({id:uid(),ruta:rutaId,tramo:n,actor:gv("nt-a"),concesion:gv("nt-c"),km:parseFloat(gv("nt-km"))||0,estado:gv("nt-e"),proxima:gv("nt-p"),fp:"",coords});
+  var tipoEl=gv("nt-tipo")||'tramo';
+  var parentId=(tipoEl!=='tramo'&&gv("nt-parent"))?gv("nt-parent"):null;
+  var newId=uid();
+  tramos.push({id:newId,ruta:rutaId,tramo:n,actor:gv("nt-a"),concesion:gv("nt-c"),km:parseFloat(gv("nt-km"))||0,estado:gv("nt-e"),proxima:gv("nt-p"),fp:"",coords,tipo_elemento:tipoEl,parent_id:parentId});
+  if(parentId&&!window._openTramos)window._openTramos={};
+  if(parentId)window._openTramos[parentId]=true;
   closeModal(); if(editingRoute===rutaId)selEditRoute(rutaId); renderAll(); if(mapInst)drawAllLines();
   var nt=tramos[tramos.length-1];if(nt)saveTramoToDB(nt);
   toast("Tramo agregado · Guardado en base de datos");
@@ -1528,14 +1544,25 @@ function doDividir(id){
   const t=tramos.find(x=>x.id===id); if(!t)return;
   const mi=Math.floor(t.coords.length/2);
   const c1=t.coords.slice(0,mi+1), c2=t.coords.slice(mi);
-  const mk=(n,a,km,e,cr,fp,coords)=>({id:uid(),ruta:t.ruta,tramo:n,actor:a,km:parseFloat(km)||Math.round(t.km/2),estado:e,proxima:t.proxima,fp:fp||t.fp,concesion:t.concesion,coords});
-  const sub1=mk(gv("s1-n"),gv("s1-a"),gv("s1-km"),gv("s1-e"),t.concesion,t.fp,c1.length>=2?c1:[t.coords[0],t.coords[Math.floor(t.coords.length/2)]]);
-  const sub2=mk(gv("s2-n"),gv("s2-a"),gv("s2-km"),gv("s2-e"),t.concesion,"",c2.length>=2?c2:[t.coords[Math.floor(t.coords.length/2)],t.coords[t.coords.length-1]]);
-  tramos.splice(tramos.findIndex(x=>x.id===id),1,sub1,sub2);
+  // Create subtramos with parent_id pointing to the original tramo
+  const sub1={id:uid(),ruta:t.ruta,tramo:gv("s1-n"),actor:gv("s1-a"),
+    km:parseFloat(gv("s1-km"))||Math.round(t.km/2),estado:gv("s1-e"),
+    proxima:t.proxima,fp:t.fp,concesion:t.concesion,
+    coords:c1.length>=2?c1:[t.coords[0],t.coords[mi]],
+    parent_id:id, tipo_elemento:'subtramo'};
+  const sub2={id:uid(),ruta:t.ruta,tramo:gv("s2-n"),actor:gv("s2-a"),
+    km:parseFloat(gv("s2-km"))||Math.round(t.km/2),estado:gv("s2-e"),
+    proxima:"",fp:"",concesion:t.concesion,
+    coords:c2.length>=2?c2:[t.coords[mi],t.coords[t.coords.length-1]],
+    parent_id:id, tipo_elemento:'subtramo'};
+  // Add subtramos WITHOUT removing the parent
+  tramos.push(sub1); tramos.push(sub2);
+  // Open the parent in tree view
+  if(!window._openTramos)window._openTramos={};
+  window._openTramos[id]=true;
   closeModal(); renderAll(); if(mapInst)drawAllLines(); if(editingRoute)selEditRoute(editingRoute);
-  var last2=tramos.slice(-2);last2.forEach(function(t){saveTramoToDB(t);});
-  sbDelete("tramos",id).catch(function(){});
-  toast("Tramo dividido · Guardado en base de datos");
+  saveTramoToDB(sub1); saveTramoToDB(sub2);
+  toast("Subtramos creados · El tramo padre se conserva");
 }
 
 function saveAlt(id){

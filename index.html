@@ -938,6 +938,7 @@ function mapFilt(v){
   if(mapInst){drawAllLines();drawPuntos();}
   else if(activeTab==='mapa')setTimeout(function(){if(!mapInst)initMap();else mapInst.invalidateSize();},80);
   renderMapSide();
+  renderRouteFilters(); // update active state
 }
 function focusMapTramo(id){
   sw('mapa');setTimeout(function(){if(!mapInst)initMap();else{mapInst.invalidateSize();focusT(id);}},200);
@@ -1057,8 +1058,7 @@ function qDelTramo(id){
 // ─── FILTROS ─────────────────────────────────────────────────
 function fR(v){
   fRuta=v;
-  document.querySelectorAll("[id^='fr-']").forEach(el=>el.classList.remove("active"));
-  const el=document.getElementById("fr-"+v); if(el)el.classList.add("active");
+  renderRouteFilters(); // rebuilds with correct active state
   renderTramoList();
 }
 function fE(v){
@@ -2433,34 +2433,60 @@ function renderHitos(){
 }
 
 function renderRouteFilters(){
-  // Update Tramos tab route filters
+  // ── Tramos tab filter buttons ──────────────────────────
   var trf=document.getElementById('tramos-route-filters');
   if(trf){
-    var html_trf='<button class="fb '+(fRuta==="all"?"active":"")+'" id="fr-all" onclick="fR(&quot;all&quot;)">Todas</button>';
+    // Remove old dynamic buttons (keep static ones if any)
+    Array.from(trf.querySelectorAll('button')).forEach(function(b){b.remove();});
+    // Add "Todas" button
+    var allBtn=document.createElement('button');
+    allBtn.className='fb'+(fRuta==='all'?' active':'');
+    allBtn.id='fr-all';
+    allBtn.textContent='Todas';
+    allBtn.onclick=function(){fR('all');};
+    trf.appendChild(allBtn);
+    // Add one button per route
     Object.values(routes).forEach(function(r){
-      html_trf+='<button class="fb '+(fRuta===r.id?"active":"")+'" id="fr-'+r.id+'" onclick="fR(&quot;'+r.id+'&quot;)">'+escapeHtml(r.nombre)+'</button>';
+      var btn=document.createElement('button');
+      btn.className='fb'+(fRuta===r.id?' active':'');
+      btn.id='fr-'+r.id;
+      btn.textContent=r.nombre;
+      btn.onclick=function(){fR(r.id);};
+      trf.appendChild(btn);
     });
-    trf.innerHTML=html_trf;
   }
-  // Update Mapa tab route filters
+
+  // ── Mapa tab filter buttons ────────────────────────────
   var mrf=document.getElementById('mapa-route-filters');
   if(mrf){
-    var html_mrf='<button class="fb '+(mapFiltVal==="all"?"active":"")+'" id="mf-all" onclick="mapFilt(&quot;all&quot;)">Todas las rutas</button>';
+    Array.from(mrf.querySelectorAll('button')).forEach(function(b){b.remove();});
+    var allBtnM=document.createElement('button');
+    allBtnM.className='fb'+(mapFiltVal==='all'?' active':'');
+    allBtnM.id='mf-all';
+    allBtnM.textContent='Todas las rutas';
+    allBtnM.onclick=function(){mapFilt('all');};
+    mrf.appendChild(allBtnM);
     Object.values(routes).forEach(function(r){
-      html_mrf+='<button class="fb '+(mapFiltVal===r.id?"active":"")+'" id="mf-'+r.id+'" onclick="mapFilt(&quot;'+r.id+'&quot;)">'+escapeHtml(r.nombre)+'</button>';
+      var btn=document.createElement('button');
+      btn.className='fb'+(mapFiltVal===r.id?' active':'');
+      btn.id='mf-'+r.id;
+      btn.textContent=r.nombre;
+      btn.onclick=function(){mapFilt(r.id);};
+      mrf.appendChild(btn);
     });
-    mrf.innerHTML=html_mrf;
   }
-  // Update tramo selects in modals (if open)
-  ['f-tramo','eb-tramo'].forEach(function(id){
-    var sel=document.getElementById(id);
-    if(!sel)return;
-    var cur=sel.value;
-    sel.innerHTML=tramos.map(function(t){
-      return '<option value="'+t.tramo+'"'+(cur===t.tramo?' selected':'')+'>'+t.tramo+'</option>';
+
+  // ── Tramos tab route select in edit-tramo modal ────────
+  var etR=document.getElementById('et-r');
+  if(etR){
+    var cur=etR.value;
+    etR.innerHTML=Object.values(routes).map(function(r){
+      return '<option value="'+r.id+'"'+(r.id===cur?' selected':'')+'>'+escapeHtml(r.nombre)+'</option>';
     }).join('');
-  });
+  }
 }
+
+
 function escapeHtml(str){
   return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }

@@ -163,35 +163,33 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
   <div id="t-overview" class="tv active">
     <div class="kpi-row" id="kpi-row"></div>
     <div class="two-col">
-      <div class="card"><div class="card-h"><span class="card-t">Medellín–Barranquilla</span><span class="rpill r1">R1</span></div><div class="card-b" id="sr1"></div></div>
-      <div class="card"><div class="card-h"><span class="card-t">Medellín–Bogotá</span><span class="rpill r2">R2</span></div><div class="card-b" id="sr2"></div></div>
+      <div id="route-summary-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px"></div>
     </div>
     <div class="card">
       <div class="card-h"><span class="card-t">Últimas gestiones</span><button class="btn btn-p btn-sm" onclick="openModal('gestion')">+ Nueva gestión</button></div>
       <div class="card-b"><div id="rec-bit" class="bl" style="max-height:200px"></div></div>
     </div>
-  </div>
-
-  <div class="card">
-    <div class="card-h">
-      <span class="card-t">Seguimiento de hitos por tramo</span>
-      <span style="font-size:9px;color:var(--muted)">Alimentado desde bitacora</span>
-    </div>
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:680px">
-        <thead>
-          <tr style="background:var(--card2);border-bottom:1px solid var(--border)">
-            <th style="padding:9px 13px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Tramo</th>
-            <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Ruta</th>
-            <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Radicacion</th>
-            <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Propuesta</th>
-            <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Cierre contrato</th>
-            <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Vencimiento</th>
-            <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Estado</th>
-          </tr>
-        </thead>
-        <tbody id="hitos-tbody"></tbody>
-      </table>
+    <div class="card">
+      <div class="card-h">
+        <span class="card-t">Seguimiento de hitos por tramo</span>
+        <span style="font-size:9px;color:var(--muted)">Alimentado desde bitacora</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:680px">
+          <thead>
+            <tr style="background:var(--card2);border-bottom:1px solid var(--border)">
+              <th style="padding:9px 13px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Tramo</th>
+              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Ruta</th>
+              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Radicacion</th>
+              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Propuesta</th>
+              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Cierre contrato</th>
+              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Vencimiento</th>
+              <th style="padding:9px 13px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="hitos-tbody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -201,9 +199,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
       <div class="card-h">
         <span class="card-t">&#128506; Mapa KMZ &#8212; trazados reales HORIZON</span>
         <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
-          <button class="fb active" id="mf-all" onclick="mapFilt('all')">Todas las rutas</button>
-          <button class="fb" id="mf-r1" onclick="mapFilt('r1')">MDE&#8211;BAQ</button>
-          <button class="fb" id="mf-r2" onclick="mapFilt('r2')">MDE&#8211;BOG</button>
+          <div id="mapa-route-filters" style="display:contents"></div>
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;padding:9px 14px;border-bottom:1px solid #253352;flex-wrap:wrap">
@@ -248,9 +244,8 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
     <div class="card">
       <div class="fi">
         <span style="font-size:9px;color:var(--muted);font-weight:700">RUTA:</span>
-        <button class="fb active" id="fr-all" onclick="fR('all')">Todas</button>
-        <button class="fb" id="fr-r1" onclick="fR('r1')">MDE–BAQ</button>
-        <button class="fb" id="fr-r2" onclick="fR('r2')">MDE–BOG</button>
+        <div id="tramos-route-filters" style="display:contents"></div>
+
         <span id="extra-rf"></span>
         <span style="flex:1"></span>
         <button class="fb active" id="fe-all" onclick="fE('all')">Todos</button>
@@ -301,50 +296,36 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
   <!-- CORREO / EML -->
   <div id="t-gmail" class="tv">
     <div class="api-notice" id="api-notice">
-      <strong>API Key de Anthropic requerida para analisis IA.</strong>
-      Configurala en <strong>&#9881; API Key</strong> (esquina superior derecha).
-      Obtentela en <a href="https://console.anthropic.com" target="_blank" style="color:var(--acc)">console.anthropic.com</a>
+      <strong>API Key de Anthropic requerida para análisis con IA.</strong>
+      Configúrala en el botón <strong>⚙ API Key</strong> (esquina superior derecha). Sin la key el importador funciona igual pero sin análisis automático.
+      Obtén tu key en <a href="https://console.anthropic.com" target="_blank" style="color:var(--acc)">console.anthropic.com</a>
     </div>
 
     <div class="two-col" style="align-items:start">
       <div class="card">
-        <div class="card-h">
-          <span class="card-t">Conectar Gmail</span>
-          <span id="gmail-conn-badge" style="display:none;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700"></span>
-        </div>
+        <div class="card-h"><span class="card-t">Gmail / búsqueda de correos</span></div>
         <div class="card-b">
-          <p style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6">Conecta tu cuenta Gmail para buscar correos reales enviados y recibidos con concesiones, ANI e Invias y agregarlos directamente a la bitacora.</p>
-          <button class="btn btn-success btn-sm" id="btn-gmail-connect" onclick="gmailAuth()">Conectar con Gmail</button>
-          <button class="btn btn-danger btn-sm" id="btn-gmail-disconnect" onclick="gmailDisconnect()" style="display:none;margin-left:8px">Desconectar</button>
-          <div id="gmail-user-info" style="margin-top:10px;font-size:11px;color:var(--muted)"></div>
-          <div class="divd"></div>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:10px">Simula búsqueda de correos enviados a concesiones y respuestas recibidas para agregarlos a la bitácora.</p>
           <div class="fl" style="margin-bottom:10px">
-            <label>Buscar correos relacionados con</label>
-            <input class="inp" id="gmail-q" value="fibra optica viabilidad ANI Invias permiso concesion">
+            <label>Buscar en correos</label>
+            <input class="inp" id="gmail-q" value="fibra óptica viabilidad ANI Invias permiso">
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn btn-p btn-sm" onclick="gmailSearch(false)">Buscar enviados</button>
-            <button class="btn btn-g btn-sm" onclick="gmailSearch(true)">Buscar recibidos</button>
-          </div>
-          <div id="gmail-thinking" style="display:none" class="thinking">
-            <span></span><span></span><span></span>
-            <span style="margin-left:8px;font-size:11px">Buscando en Gmail...</span>
+            <button class="btn btn-p btn-sm" onclick="buscarCorreos(false)">Buscar correos enviados</button>
+            <button class="btn btn-g btn-sm" onclick="buscarCorreos(true)">Buscar respuestas</button>
           </div>
         </div>
       </div>
       <div class="card">
-        <div class="card-h">
-          <span class="card-t">Correos encontrados</span>
-          <span id="gmail-count-badge" style="font-size:9px;color:var(--muted)"></span>
-        </div>
-        <div class="card-b" id="gmail-emails"><div class="empty">Conecta Gmail y realiza una busqueda</div></div>
+        <div class="card-h"><span class="card-t">Correos detectados</span></div>
+        <div class="card-b" id="gmail-emails"><div class="empty">Haz una búsqueda para ver correos</div></div>
       </div>
     </div>
 
     <div class="card">
       <div class="card-h">
-        <span class="card-t">Importar archivos .eml a bitacora</span>
-        <span style="font-size:9px;background:rgba(59,130,246,.15);color:var(--acc);border:1px solid rgba(59,130,246,.3);padding:2px 9px;border-radius:4px;font-weight:700">Analisis IA</span>
+        <span class="card-t">📎 Importar archivos .eml a bitácora</span>
+        <span style="font-size:9px;background:rgba(59,130,246,.15);color:var(--acc);border:1px solid rgba(59,130,246,.3);padding:2px 9px;border-radius:4px;font-weight:700">Análisis IA</span>
       </div>
       <div class="card-b">
         <div class="step-bar">
@@ -352,25 +333,27 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
           <div class="step-pill" id="sp-2">2. Analizar con IA</div>
           <div class="step-pill" id="sp-3">3. Revisar y guardar</div>
         </div>
+
         <div id="eml-zone-panel">
           <div class="drop-zone" id="drop-zone">
             <input type="file" id="eml-input" accept=".eml" multiple style="display:none">
-            <div style="font-size:36px;margin-bottom:10px">&#128231;</div>
-            <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:4px">Arrastra archivos .eml aqui o haz clic para seleccionar</div>
-            <div style="font-size:10px;color:var(--muted)">Multiples archivos</div>
+            <div style="font-size:36px;margin-bottom:10px">📧</div>
+            <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:4px">Arrastra archivos .eml aquí o haz clic para seleccionar</div>
+            <div style="font-size:10px;color:var(--muted)">Múltiples archivos · correos enviados y respuestas recibidas</div>
           </div>
           <div id="eml-file-list" style="margin-top:10px"></div>
           <div id="eml-analyze-row" style="display:none;justify-content:flex-end;gap:8px;margin-top:10px">
             <button class="btn btn-g btn-sm" onclick="clearEML()">Limpiar</button>
-            <button class="btn btn-p btn-sm" onclick="analyzeAllEML()">Analizar con IA</button>
+            <button class="btn btn-p btn-sm" id="btn-analyze-eml" onclick="analyzeAllEML()">✨ Analizar con IA</button>
           </div>
         </div>
+
         <div id="eml-results-panel" style="display:none">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
             <span id="eml-count" style="font-size:11px;color:var(--muted)"></span>
             <div style="display:flex;gap:7px">
-              <button class="btn btn-g btn-sm" onclick="resetEML()">Cargar mas</button>
-              <button class="btn btn-success btn-sm" onclick="confirmAllEML()">Importar todos</button>
+              <button class="btn btn-g btn-sm" onclick="resetEML()">← Cargar más</button>
+              <button class="btn btn-success btn-sm" onclick="confirmAllEML()">✓ Importar todos</button>
             </div>
           </div>
           <div id="eml-results-list"></div>
@@ -380,8 +363,8 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
 
     <div class="card" id="eml-log-card" style="display:none">
       <div class="card-h">
-        <span class="card-t">Gestiones importadas a bitacora</span>
-        <button class="btn btn-g btn-sm" onclick="resetEML()">+ Importar mas</button>
+        <span class="card-t">✓ Gestiones importadas a bitácora</span>
+        <button class="btn btn-g btn-sm" onclick="resetEML()">+ Importar más .eml</button>
       </div>
       <div class="card-b" id="eml-log"></div>
     </div>
@@ -404,44 +387,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
 
 </div><!-- end app -->
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><div id="t-mapa" class="tv">
-    <div class="card" style="overflow:visible">
-      <div class="card-h">
-        <span class="card-t">&#128506; Mapa KMZ &#8212; trazados reales HORIZON</span>
-        <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
-          <button class="fb active" id="mf-all" onclick="mapFilt('all')">Todas las rutas</button>
-          <button class="fb" id="mf-r1" onclick="mapFilt('r1')">MDE&#8211;BAQ</button>
-          <button class="fb" id="mf-r2" onclick="mapFilt('r2')">MDE&#8211;BOG</button>
-        </div>
-      </div>
-      <div style="display:flex;gap:7px;align-items:center;padding:8px 14px;border-bottom:1px solid #253352;flex-wrap:wrap">
-        <span style="font-size:9px;color:#7a95bb;font-weight:700">CAPAS:</span>
-        <label style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;font-size:10px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.1)"><input type="checkbox" id="lay-tramos" checked onchange="toggleLayer('tramos')" style="accent-color:#3B82F6"> Tramos</label>
-        <label style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;font-size:10px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.1)"><input type="checkbox" id="lay-nodos" checked onchange="toggleLayer('nodos')" style="accent-color:#3B82F6"> Nodos/POPs</label>
-        <label style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;font-size:10px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.1)"><input type="checkbox" id="lay-peajes" checked onchange="toggleLayer('peajes')" style="accent-color:#3B82F6"> Peajes/Puentes</label>
-        <label style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;font-size:10px;color:#7a95bb;cursor:pointer;border:1px solid #253352;border-radius:20px"><input type="checkbox" id="lay-obstaculos" onchange="toggleLayer('obstaculos')" style="accent-color:#3B82F6"> Obs&#769;taculos</label>
-      </div>
-      <div style="position:relative;height:480px;border-radius:0 0 10px 10px;overflow:hidden">
-        <div id="the-map" style="position:absolute;top:0;left:0;width:100%;height:100%"></div>
-        <div class="map-legend">
-          <div class="map-legend-t">Sema&#769;foro tramos</div>
-          <div class="leg-r"><div class="leg-l" style="background:#10B981"></div>Avanzado</div>
-          <div class="leg-r"><div class="leg-l" style="background:#F59E0B"></div>En gesti&#243;n</div>
-          <div class="leg-r"><div class="leg-l" style="background:#EF4444"></div>Cr&#237;tico</div>
-          <div style="margin-top:7px;padding-top:7px;border-top:1px solid rgba(255,255,255,.1)">
-          <div class="map-legend-t">Puntos de inter&#233;s</div>
-          <div class="leg-r"><span style="width:9px;height:9px;border-radius:50%;background:#60A5FA;display:inline-block;margin-right:2px"></span>Nodo/POP</div>
-          <div class="leg-r"><span style="width:9px;height:9px;border-radius:50%;background:#EF4444;display:inline-block;margin-right:2px"></span>Peaje</div>
-          <div class="leg-r"><span style="width:9px;height:9px;border-radius:50%;background:#10B981;display:inline-block;margin-right:2px"></span>Puente</div>
-          </div>
-        </div>
-        <div class="map-side" id="map-side" style="max-height:420px">
-          <div class="ms-t">Tramos KMZ</div>
-          <div id="map-tlist"></div>
-        </div>
-      </div>
-    </div>
-  </div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 
 <script>
@@ -459,7 +405,8 @@ function sbHeaders(){
 }
 
 async function sbGet(table, params){
-  var url = SB_URL + '/rest/v1/' + table + (params ? '?' + params : '');
+  var url = SB_URL + '/rest/v1/' + table + '?order=created_at.asc';
+  if(params) url += '&' + params;
   var r = await fetch(url, {headers: sbHeaders()});
   if(!r.ok) throw new Error('sbGet ' + table + ': ' + r.status);
   return r.json();
@@ -492,14 +439,14 @@ async function loadFromDB(){
     showDBStatus('Cargando datos...');
     
     // Load rutas
-    var dbRutas = await sbGet('rutas','order=id.asc');
+    var dbRutas = await sbGet('rutas');
     if(dbRutas && dbRutas.length > 0){
       routes = {};
       dbRutas.forEach(function(r){ routes[r.id] = {id:r.id, nombre:r.nombre, color:r.color}; });
     }
     
     // Load tramos
-    var dbTramos = await sbGet('tramos','order=id.asc');
+    var dbTramos = await sbGet('tramos');
     if(dbTramos && dbTramos.length > 0){
       // Merge DB state with KMZ coords (coords stay from KMZ, state from DB)
       dbTramos.forEach(function(dt){
@@ -524,7 +471,7 @@ async function loadFromDB(){
     }
     
     // Load bitacora
-    var dbBit = await sbGet('bitacora','order=fecha.desc');
+    var dbBit = await sbGet('bitacora', 'order=fecha.desc');
     if(dbBit && dbBit.length > 0){
       bitacora = dbBit.map(function(b){
         return {id:b.id, fecha:b.fecha, tipo:b.tipo, tramo:b.tramo,
@@ -542,8 +489,7 @@ async function loadFromDB(){
     
   } catch(e){
     console.error('loadFromDB:', e);
-    showDBStatus('Error BD - modo local activo', true);
-    dbLoaded=true; renderAll();
+    showDBStatus('Error cargando datos: ' + e.message, true);
   }
 }
 
@@ -1073,27 +1019,15 @@ function openModal(type,id,preTramo){
         <div class="fl"><label>Fecha próxima acción</label><input type="date" class="inp" id="f-fprox"></div>
       </div>
       <div class="fl"><label>Actualizar semáforo del tramo</label><select class="inp" id="f-est"><option value="">— sin cambio —</option><option value="Avanzado">Avanzado</option><option value="En gestión">En gestión</option><option value="Crítico">Crítico</option></select></div>
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);padding:8px 0 6px;border-top:1px solid var(--border);margin-top:4px">Registrar hito de fecha (opcional)</div>
-      <div class="fl" style="margin-bottom:6px">
-        <label>Tipo de hito que representa esta gestion</label>
-        <select class="inp" id="f-hito-tipo" onchange="toggleHitoField()">
-          <option value="">— Esta gestion no marca un hito —</option>
-          <option value="rad">📅 Radicacion de solicitud</option>
-          <option value="prop">📤 Envio de propuesta</option>
-          <option value="cierre">✅ Cierre / firma de contrato</option>
-          <option value="venc">🔔 Vencimiento / fecha limite</option>
-        </select>
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 0 4px;border-top:1px solid var(--border);margin-top:4px">Hitos de fecha (opcional)</div>
+      <div class="frow">
+        <div class="fl"><label>Fecha radicacion</label><input type="date" class="inp" id="f-hito-rad"></div>
+        <div class="fl"><label>Fecha envio propuesta</label><input type="date" class="inp" id="f-hito-prop"></div>
       </div>
-      <div id="f-hito-fecha-wrap" style="display:none">
-        <div class="fl">
-          <label id="f-hito-fecha-label">Fecha del hito</label>
-          <input type="date" class="inp" id="f-hito-fecha" value="">
-        </div>
+      <div class="frow">
+        <div class="fl"><label>Fecha cierre contrato</label><input type="date" class="inp" id="f-hito-cierre"></div>
+        <div class="fl"><label>Proximo vencimiento</label><input type="date" class="inp" id="f-hito-venc"></div>
       </div>
-      <input type="hidden" id="f-hito-rad">
-      <input type="hidden" id="f-hito-prop">
-      <input type="hidden" id="f-hito-cierre">
-      <input type="hidden" id="f-hito-venc">
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
         <button class="btn btn-p" onclick="saveGestion()">Guardar gestión</button>
@@ -1119,24 +1053,14 @@ function openModal(type,id,preTramo){
         <div class="fl"><label>Próxima acción</label><input type="text" class="inp" id="eb-prox" value="${b.proxima||""}"></div>
         <div class="fl"><label>Fecha próxima</label><input type="date" class="inp" id="eb-fp" value="${b.fp||""}"></div>
       </div>
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);padding:8px 0 6px;border-top:1px solid var(--border);margin-top:4px">Hitos de fecha</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div class="fl">
-          <label style="display:flex;align-items:center;gap:5px"><span style="font-size:14px">📅</span> Radicacion</label>
-          <input type="date" class="inp" id="eb-hito-rad" value="${b.hito_rad||''}" placeholder="Sin fecha">
-        </div>
-        <div class="fl">
-          <label style="display:flex;align-items:center;gap:5px"><span style="font-size:14px">📤</span> Envio propuesta</label>
-          <input type="date" class="inp" id="eb-hito-prop" value="${b.hito_prop||''}" placeholder="Sin fecha">
-        </div>
-        <div class="fl">
-          <label style="display:flex;align-items:center;gap:5px"><span style="font-size:14px">✅</span> Cierre contrato</label>
-          <input type="date" class="inp" id="eb-hito-cierre" value="${b.hito_cierre||''}" placeholder="Sin fecha">
-        </div>
-        <div class="fl">
-          <label style="display:flex;align-items:center;gap:5px"><span style="font-size:14px">🔔</span> Vencimiento</label>
-          <input type="date" class="inp" id="eb-hito-venc" value="${b.hito_venc||''}" placeholder="Sin fecha">
-        </div>
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 0 4px;border-top:1px solid var(--border);margin-top:4px">Hitos de fecha</div>
+      <div class="frow">
+        <div class="fl"><label>Radicacion</label><input type="date" class="inp" id="eb-hito-rad" value="${b.hito_rad||''}"></div>
+        <div class="fl"><label>Propuesta</label><input type="date" class="inp" id="eb-hito-prop" value="${b.hito_prop||''}"></div>
+      </div>
+      <div class="frow">
+        <div class="fl"><label>Cierre contrato</label><input type="date" class="inp" id="eb-hito-cierre" value="${b.hito_cierre||''}"></div>
+        <div class="fl"><label>Vencimiento</label><input type="date" class="inp" id="eb-hito-venc" value="${b.hito_venc||''}"></div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
@@ -1286,25 +1210,11 @@ function saveApiKey(){
   toast(apiKey?"API Key guardada correctamente":"API Key eliminada");
 }
 
-function toggleHitoField(){
-  var tipo=document.getElementById('f-hito-tipo').value;
-  var wrap=document.getElementById('f-hito-fecha-wrap');
-  var lbl=document.getElementById('f-hito-fecha-label');
-  if(!tipo){wrap.style.display='none';return;}
-  wrap.style.display='block';
-  var labels={rad:'Fecha de radicacion',prop:'Fecha envio propuesta',cierre:'Fecha cierre / firma contrato',venc:'Fecha limite / vencimiento'};
-  lbl.textContent=labels[tipo]||'Fecha del hito';
-  var fi=document.getElementById('f-hito-fecha');
-  if(!fi.value)fi.value=today();
-}
-
 function saveGestion(){
   const tn=gv("f-tramo"), gestion=gv("f-desc");
   if(!tn||!gestion){toast("Completa el tramo y la descripción","err");return;}
   const ne=gv("f-est");
-  var hitoTipo=gv("f-hito-tipo");var hitoFecha=gv("f-hito-fecha")||"";var hRad="",hProp="",hCierre="",hVenc="";
-  if(hitoTipo==="rad")hRad=hitoFecha;if(hitoTipo==="prop")hProp=hitoFecha;if(hitoTipo==="cierre")hCierre=hitoFecha;if(hitoTipo==="venc")hVenc=hitoFecha;
-    bitacora.unshift({id:uid(),fecha:gv("f-fecha"),tipo:gv("f-tipo"),tramo:tn,actor:gv("f-actor"),gestion,resultado:gv("f-res"),proxima:gv("f-prox"),fp:gv("f-fprox"),hito_rad:hRad,hito_prop:hProp,hito_cierre:hCierre,hito_venc:hVenc});
+  bitacora.unshift({id:uid(),fecha:gv("f-fecha"),tipo:gv("f-tipo"),tramo:tn,actor:gv("f-actor"),gestion,resultado:gv("f-res"),proxima:gv("f-prox"),fp:gv("f-fprox"),hito_rad:gv("f-hito-rad")||"",hito_prop:gv("f-hito-prop")||"",hito_cierre:gv("f-hito-cierre")||"",hito_venc:gv("f-hito-venc")||""});
   const t=tramos.find(x=>x.tramo===tn);
   if(t){if(ne)t.estado=ne;if(gv("f-prox"))t.proxima=gv("f-prox");if(gv("f-fprox"))t.fp=gv("f-fprox");}
   closeModal(); renderAll(); refreshLines(); if(selTramo)selT(selTramo);
@@ -1393,27 +1303,41 @@ function saveAlt(id){
 }
 
 // ─── GMAIL SIMULADO ──────────────────────────────────────────
+async function buscarCorreos(resp){
+  const el=document.getElementById("gmail-emails");
+  el.innerHTML='<div class="thinking"><span></span><span></span><span></span><span style="margin-left:8px;font-size:11px">Buscando correos…</span></div>';
+  await new Promise(r=>setTimeout(r,600));
+  const mails=resp?[
+    {id:"g3",subj:"RE: Solicitud viabilidad – Caucasia/Planeta Rica",from:"subdirector@invias.gov.co",date:"2026-05-05",snip:"Adjuntamos concepto técnico preliminar. Requiere documentación adicional: estudio de suelos y formato FT-2301. Plazo respuesta: 30 días hábiles.",tipo:"response"},
+    {id:"g4",subj:"Acuerdo Ruta del Mar KM 45-90 firmado",from:"permisos@rutadelmar.com.co",date:"2026-05-04",snip:"Confirmamos firma del acuerdo marco para tendido de fibra. Adjunto contrato de uso de infraestructura y cronograma aprobado.",tipo:"response"},
+    {id:"g5",subj:"Negación acceso – Villeta–Bogotá",from:"concesiones@mallavial.com.co",date:"2026-05-02",snip:"La solicitud para el tramo Villeta–Bogotá no puede ser atendida por restricciones del contrato ANI vigente. Se sugiere elevar la solicitud directamente.",tipo:"response"},
+  ]:[
+    {id:"g1",subj:"Solicitud viabilidad fibra – Tramo Puerto Berrío",from:"gestor@somos.com.co",to:"proyectos@devimed.com.co",date:"2026-05-04",snip:"Remitimos solicitud formal de viabilidad para tendido de fibra óptica en el corredor Barbosa–Puerto Berrío. Adjuntamos memoria técnica y trazado GPS.",tipo:"sent"},
+    {id:"g2",subj:"Oficio ANI – Permiso corredor Montería/Barranquilla",from:"gestor@somos.com.co",to:"permisos@ani.gov.co",date:"2026-05-03",snip:"Solicitamos permiso de uso del corredor vial de la Ruta del Mar para tendido de fibra óptica en el tramo Montería–Barranquilla (90 km).",tipo:"sent"},
+  ];
+  el.innerHTML=mails.map(m=>`
+    <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:7px">
+        <div style="font-size:12px;font-weight:600;color:#fff">${m.subj}</div>
+        <span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;flex-shrink:0;background:${m.tipo==="sent"?"rgba(59,130,246,.2)":"rgba(16,185,129,.2)"};color:${m.tipo==="sent"?"var(--acc)":"var(--av)"}">${m.tipo==="sent"?"ENVIADO":"RECIBIDO"}</span>
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-top:3px">${m.from||(m.to?"→ "+m.to:"")} · ${fmt(m.date)}</div>
+      <div style="font-size:10px;color:var(--muted2);margin-top:5px;line-height:1.5">${m.snip}</div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn btn-success btn-sm" onclick='importarGmail(${JSON.stringify(m)})'>+ Bitácora</button>
+        <button class="btn btn-p btn-sm" onclick='analizarGmail(${JSON.stringify(m)})'>✨ Analizar IA</button>
+      </div>
+    </div>`).join("");
+}
+
 function detectTramo(txt){
-  if(!txt)return null;
-  var t=tramos.find(function(tr){
-    var parts=tr.tramo.toLowerCase().split('–');
-    return parts.some(function(p){return txt.toLowerCase().includes(p.trim());});
-  });
-  return t?t.tramo:null;
+  const t=tramos.find(tr=>{const p=tr.tramo.toLowerCase().split("–");return p.some(s=>txt.toLowerCase().includes(s.trim()));});
+  return t?.tramo||null;
 }
 
 function importarGmail(m){
-  var tramoDetectado = detectTramo((m.subj||"")+" "+(m.snip||"")) || "Pendiente asignar";
-  var actor = (m.from||m.to||"").replace(/<[^>]+>/g,"").split("@")[1]||m.from||"";
-  const nb={id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",
-    tramo:tramoDetectado, actor:actor,
-    gestion:"[Gmail] "+m.subj,
-    resultado:m.tipo==="response"?m.snip.slice(0,150):"",
-    proxima:"",fp:"",hito_rad:"",hito_prop:"",hito_cierre:"",hito_venc:""};
-  bitacora.unshift(nb);
-  saveBitacoraEntryToDB(nb);
-  renderAll();
-  toast("Correo importado: tramo="+tramoDetectado);
+  bitacora.unshift({id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",tramo:detectTramo((m.subj||"")+" "+(m.snip||""))||"Pendiente asignar",actor:(m.from||m.to||"").split("@")[1]||"",gestion:"[Gmail] "+m.subj,resultado:m.tipo==="response"?m.snip.slice(0,120):"",proxima:"",fp:""});
+  renderAll(); toast("Correo importado a bitácora");
 }
 
 async function analizarGmail(m){
@@ -1432,11 +1356,9 @@ async function analizarGmail(m){
     const r=JSON.parse(raw.replace(/```json|```/g,"").trim());
     const t=tramos.find(x=>x.tramo===r.tramo);
     if(t&&r.estado_sugerido)t.estado=r.estado_sugerido;
-    const agb={id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",tramo:r.tramo||"Pendiente",actor:r.actor||"",gestion:"[Gmail/IA] "+m.subj+" - "+r.gestion,resultado:r.resultado||"",proxima:r.proxima_accion||"",fp:"",hito_rad:"",hito_prop:"",hito_cierre:"",hito_venc:""};
-    bitacora.unshift(agb);
-    saveBitacoraEntryToDB(agb);
+    bitacora.unshift({id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",tramo:r.tramo||"Pendiente",actor:r.actor||"",gestion:"[Gmail/IA] "+m.subj+" — "+r.gestion,resultado:r.resultado||"",proxima:r.proxima_accion||"",fp:""});
     renderAll(); refreshLines();
-    toast("Analisis IA aplicado y guardado en base de datos");
+    toast("Análisis IA aplicado · Dashboard y mapa actualizados");
     buscarCorreos(m.tipo==="response");
   }catch(e){
     toast("Error al llamar la API: "+e.message,"err");
@@ -1445,11 +1367,24 @@ async function analizarGmail(m){
 }
 
 // ─── EML IMPORTADOR ──────────────────────────────────────────
+
 // ─── GMAIL REAL API ──────────────────────────────────────────
 const GMAIL_CLIENT_ID = '513976139222-k71997gmkqe3o4h3ueuu0gg8clt2pn3k.apps.googleusercontent.com';
 const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 let gmailToken = null;
 let gmailUser = null;
+
+function toggleHitoField(){
+  var tipo=document.getElementById('f-hito-tipo').value;
+  var wrap=document.getElementById('f-hito-fecha-wrap');
+  var lbl=document.getElementById('f-hito-fecha-label');
+  if(!tipo){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  var labels={rad:'Fecha de radicacion',prop:'Fecha envio propuesta',cierre:'Fecha cierre / firma contrato',venc:'Fecha limite / vencimiento'};
+  lbl.textContent=labels[tipo]||'Fecha del hito';
+  var fi=document.getElementById('f-hito-fecha');
+  if(!fi.value)fi.value=today();
+}
 
 function gmailAuth(){
   if(!window.google || !window.google.accounts){
@@ -1588,14 +1523,504 @@ function _gmailImport(idx){
     }
   }
 }
+
 function _gmailAnalizar(mid){ analizarGmail(window._gmailMsgs[mid]); }
 
 function _parseGmailDate(dateStr){
   try{ const d=new Date(dateStr); if(!isNaN(d.getTime()))return d.toISOString().slice(0,10); }catch(e){}
   return today();
 }
+
 function _escHtml(str){
   return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function setupKMZDropZone(){
+  var dz=document.getElementById('kmz-drop-zone');
+  var inp=document.getElementById('kmz-input');
+  if(!dz||!inp||dz._kmzReady)return;
+  dz._kmzReady=true;
+  // label+for handles click natively - only need drag and change
+  dz.ondragover=function(e){e.preventDefault();dz.style.borderColor='var(--acc)';dz.style.background='rgba(59,130,246,.1)';};
+  dz.ondragleave=function(){dz.style.borderColor='';dz.style.background='';};
+  dz.ondrop=function(e){
+    e.preventDefault();dz.style.borderColor='';dz.style.background='';
+    var f=e.dataTransfer.files[0];
+    if(f) processKMZFile(f);
+  };
+  inp.onchange=function(e){
+    if(e.target.files[0]) processKMZFile(e.target.files[0]);
+  };
+}
+
+function processKMZFile(file){
+  var status=document.getElementById('kmz-upload-status');
+  status.textContent='Leyendo archivo...';
+  status.style.color='var(--muted)';
+
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var data=e.target.result;
+    try{
+      // KMZ is a ZIP - use a simple approach to extract KML
+      // Try as plain KML first (if .kml file)
+      if(file.name.toLowerCase().endsWith('.kml')){
+        parseKMLString(new TextDecoder().decode(data));
+      } else {
+        // KMZ = ZIP, need to extract doc.kml
+        extractKMZAndParse(data);
+      }
+    }catch(err){
+      status.textContent='Error leyendo archivo: '+err.message;
+      status.style.color='var(--cr)';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function extractKMZAndParse(arrayBuffer){
+  var status=document.getElementById('kmz-upload-status');
+  // Load JSZip dynamically
+  if(typeof JSZip==='undefined'){
+    var script=document.createElement('script');
+    script.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    script.onload=function(){ doExtractKMZ(arrayBuffer); };
+    script.onerror=function(){ status.textContent='Error cargando libreria ZIP. Intenta con un archivo .kml'; status.style.color='var(--cr)'; };
+    document.head.appendChild(script);
+  } else {
+    doExtractKMZ(arrayBuffer);
+  }
+}
+
+function doExtractKMZ(arrayBuffer){
+  var status=document.getElementById('kmz-upload-status');
+  JSZip.loadAsync(arrayBuffer).then(function(zip){
+    // Find the KML file inside
+    var kmlFile=null;
+    zip.forEach(function(path,file){
+      if(path.toLowerCase().endsWith('.kml') && !kmlFile) kmlFile=file;
+    });
+    if(!kmlFile){
+      status.textContent='No se encontro archivo KML dentro del KMZ';
+      status.style.color='var(--cr)';
+      return;
+    }
+    return kmlFile.async('string').then(function(kmlStr){
+      parseKMLString(kmlStr);
+    });
+  }).catch(function(err){
+    status.textContent='Error abriendo KMZ: '+err.message;
+    status.style.color='var(--cr)';
+  });
+}
+
+function parseKMLString(kmlStr){
+  var status=document.getElementById('kmz-upload-status');
+  status.textContent='Analizando estructura...';
+
+  var parser=new DOMParser();
+  var doc=parser.parseFromString(kmlStr,'text/xml');
+
+  // Strip namespace for easier querying
+  var cleaned=kmlStr.replace(/xmlns[^=]*="[^"]*"/g,'').replace(/<kml:/g,'<').replace(/<\/kml:/g,'</');
+  doc=parser.parseFromString(cleaned,'text/xml');
+
+  var tramos=[];
+  var puntos=[];
+  var capas=new Set();
+
+  // Get all Placemark elements regardless of nesting
+  var placemarks=doc.querySelectorAll('Placemark');
+
+  placemarks.forEach(function(pm){
+    var name=(pm.querySelector('name')||{textContent:''}).textContent.trim()||'Sin nombre';
+    // Find parent folder name
+    var folderName='';
+    var parent=pm.parentElement;
+    while(parent){
+      if(parent.tagName==='Folder'||parent.tagName==='Document'){
+        var fn=(parent.querySelector(':scope > name')||{textContent:''}).textContent.trim();
+        if(fn){ folderName=fn; capas.add(fn); break; }
+      }
+      parent=parent.parentElement;
+    }
+
+    // LineString = tramo
+    var ls=pm.querySelector('LineString');
+    if(ls){
+      var coordsTxt=(ls.querySelector('coordinates')||{textContent:''}).textContent.trim();
+      var coords=parseCoords(coordsTxt);
+      if(coords.length>=2){
+        tramos.push({
+          name: name,
+          folder: folderName,
+          coords: coords,
+          // Try to detect ruta from folder name
+          ruta: detectRutaFromFolder(folderName+' '+name)
+        });
+      }
+    }
+
+    // Point = POI
+    var pt=pm.querySelector('Point');
+    if(pt){
+      var cTxt=(pt.querySelector('coordinates')||{textContent:''}).textContent.trim();
+      var parts=cTxt.split(',');
+      if(parts.length>=2){
+        var lat=parseFloat(parts[1]);
+        var lng=parseFloat(parts[0]);
+        if(!isNaN(lat)&&!isNaN(lng)&&lat>=1&&lat<=12&&lng>=-80&&lng<=-65){
+          puntos.push({
+            nombre: name,
+            tipo: folderName||'Marcador',
+            lat: lat,
+            lng: lng,
+            ruta: detectRutaFromFolder(folderName+' '+name)
+          });
+        }
+      }
+    }
+  });
+
+  kmzParsed={tramos:tramos, puntos:puntos, capas:Array.from(capas)};
+
+  if(tramos.length===0&&puntos.length===0){
+    status.textContent='No se detectaron tramos ni puntos. Verifica que el KMZ tenga geometrias.';
+    status.style.color='var(--cr)';
+    return;
+  }
+
+  status.textContent='Detectados: '+tramos.length+' tramos y '+puntos.length+' puntos en '+capas.size+' capas.';
+  status.style.color='var(--av)';
+
+  showKMZPreview();
+  kmzSetStep(2);
+}
+
+function parseCoords(txt){
+  var coords=[];
+  txt.trim().split(/\s+/).forEach(function(c){
+    var p=c.split(',');
+    if(p.length>=2){
+      var lng=parseFloat(p[0]);
+      var lat=parseFloat(p[1]);
+      if(!isNaN(lat)&&!isNaN(lng)&&lat>=1&&lat<=12&&lng>=-80&&lng<=-65)
+        coords.push([parseFloat(lat.toFixed(6)),parseFloat(lng.toFixed(6))]);
+    }
+  });
+  // Simplify to max 100 points per tramo
+  if(coords.length>100){
+    var step=Math.floor(coords.length/100);
+    var simple=[coords[0]];
+    for(var i=step;i<coords.length-1;i+=step) simple.push(coords[i]);
+    simple.push(coords[coords.length-1]);
+    return simple;
+  }
+  return coords;
+}
+
+function detectRutaFromFolder(txt){
+  if(!txt) return Object.keys(routes)[0]||'r1';
+  var t=txt.toLowerCase();
+  // Try to match against configured route names
+  var match=Object.values(routes).find(function(r){
+    var rname=r.nombre.toLowerCase();
+    // Check if any word from the route name appears in the folder text
+    var words=rname.split(/[\s\-–—\/]+/).filter(function(w){return w.length>3;});
+    return words.some(function(w){return t.includes(w);});
+  });
+  if(match) return match.id;
+  // Fallback: hardcoded keywords
+  if(t.includes('barranquilla')||t.includes('baq')) return 'r1';
+  if(t.includes('bogot')||t.includes('bog')) return 'r2';
+  // Return selected route in assign dropdown or first route
+  var sel=document.getElementById('kmz-ruta-assign');
+  return (sel&&sel.value&&sel.value!=='__new__'&&sel.value!=='')?sel.value:(Object.keys(routes)[0]||'r1');
+}
+
+function showKMZPreview(){
+  populateKmzRutaAssign();
+  // Update counters
+  document.getElementById('kmz-count-tramos').textContent=kmzParsed.tramos.length;
+  document.getElementById('kmz-count-puntos').textContent=kmzParsed.puntos.length;
+  document.getElementById('kmz-count-capas').textContent=kmzParsed.capas.length;
+  // Show puntos breakdown by type in the capas count
+  var tipoCount={};
+  kmzParsed.puntos.forEach(function(p){ tipoCount[p.tipo]=(tipoCount[p.tipo]||0)+1; });
+  var tipoStr=Object.entries(tipoCount).map(function(kv){return kv[0]+': '+kv[1];}).join(', ');
+  var puntosEl=document.getElementById('kmz-count-puntos');
+  if(puntosEl&&tipoStr) puntosEl.title=tipoStr;
+
+  // Tramos list
+  var tp=document.getElementById('kmz-tramos-preview');
+  tp.innerHTML=kmzParsed.tramos.map(function(t,i){
+    var rutaColor=t.ruta==='r1'?'#60A5FA':'#A78BFA';
+    return '<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin-bottom:5px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="font-size:11px;color:#fff;font-weight:500">'+escHtmlKmz(t.name)+'</span>'
+      +'<span style="font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:'+rutaColor+'22;color:'+rutaColor+'">'+t.ruta.toUpperCase()+'</span>'
+      +'</div>'
+      +'<div style="font-size:9px;color:var(--muted);margin-top:2px">'+escHtmlKmz(t.folder||'Raiz')+' &middot; '+t.coords.length+' puntos</div>'
+      +'<select class="inp" id="kmz-ruta-t-'+i+'" style="margin-top:5px;font-size:10px;padding:3px 7px;height:auto" onchange="kmzHandleTramoRutaChange('+i+', this.value)">'
+      +buildRutaOptions(t.ruta)
+      +'<option value="__new__">+ Crear nueva ruta...</option>'
+      +'</select>'
+      +'</div>';
+  }).join('')||'<div class="empty">Sin tramos</div>';
+
+  // Comparison with existing tramos
+  var cp=document.getElementById('kmz-compare-preview');
+  var existing=tramos.map(function(t){return t.tramo.toLowerCase();});
+  var newNames=kmzParsed.tramos.map(function(t){return t.name.toLowerCase();});
+
+  var kept=[], added=[], removed=[];
+  tramos.forEach(function(t){
+    if(newNames.includes(t.tramo.toLowerCase())) kept.push(t.tramo);
+    else removed.push(t.tramo);
+  });
+  kmzParsed.tramos.forEach(function(t){
+    if(!existing.includes(t.name.toLowerCase())) added.push(t.name);
+  });
+
+  cp.innerHTML=
+    (kept.length?'<div style="font-size:9px;font-weight:700;color:var(--av);margin-bottom:5px">CONSERVADOS ('+kept.length+')</div>'+kept.map(function(n){return '<div style="font-size:10px;color:var(--av);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)">✓ '+escHtmlKmz(n)+'</div>';}).join(''):'')
+    +(added.length?'<div style="font-size:9px;font-weight:700;color:var(--acc);margin:8px 0 5px">NUEVOS ('+added.length+')</div>'+added.map(function(n){return '<div style="font-size:10px;color:var(--acc);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)">+ '+escHtmlKmz(n)+'</div>';}).join(''):'')
+    +(removed.length?'<div style="font-size:9px;font-weight:700;color:var(--cr);margin:8px 0 5px">YA NO ESTAN ('+removed.length+')</div>'+removed.map(function(n){return '<div style="font-size:10px;color:var(--cr);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)">- '+escHtmlKmz(n)+'</div>';}).join(''):'')
+    ||'<div class="empty">Sin comparacion disponible</div>';
+}
+
+async function kmzApply(){
+  var keepStates=document.getElementById('kmz-keep-states').checked;
+
+  // Build state map from existing tramos
+  var stateMap={};
+  tramos.forEach(function(t){ stateMap[t.tramo.toLowerCase()]={estado:t.estado,actor:t.actor,km:t.km,proxima:t.proxima,fp:t.fp,concesion:t.concesion,id:t.id,ruta:t.ruta}; });
+
+  // Build new tramos array from KMZ
+  var newTramos=kmzParsed.tramos.map(function(t,i){
+    var rutaEl=document.getElementById('kmz-ruta-t-'+i);
+    var ruta=rutaEl?rutaEl.value:(t.ruta||'r1');
+    if(ruta==='__new__'||!ruta||!routes[ruta]) ruta=Object.keys(routes)[0]||'r1';
+    var existing=stateMap[t.name.toLowerCase()];
+    return {
+      id: existing?existing.id:uid(),
+      ruta: ruta,
+      tramo: t.name,
+      actor: existing?existing.actor:'Pendiente',
+      km: existing?existing.km:Math.round(calcKm(t.coords)),
+      estado: (keepStates&&existing)?existing.estado:'En gestión',
+      proxima: existing?existing.proxima:'',
+      fp: existing?existing.fp:'',
+      concesion: existing?existing.concesion:'',
+      coords: t.coords
+    };
+  });
+
+  // Show loading
+  document.getElementById('kmz-panel-2').innerHTML='<div class="thinking"><span></span><span></span><span></span><span style="margin-left:8px">Guardando en base de datos y actualizando mapa...</span></div>';
+
+  try{
+    // Save all new tramos to Supabase
+    await sbUpsert('tramos', newTramos.map(function(t){
+      return {id:t.id,ruta:t.ruta,tramo:t.tramo,actor:t.actor,km:t.km,
+        estado:t.estado,proxima:t.proxima||'',fp:t.fp||'',
+        concesion:t.concesion||'',coords:t.coords,
+        updated_at:new Date().toISOString()};
+    }));
+
+    // Delete tramos that no longer exist
+    var newNames=newTramos.map(function(t){return t.tramo.toLowerCase();});
+    var toDelete=tramos.filter(function(t){return !newNames.includes(t.tramo.toLowerCase());});
+    await Promise.all(toDelete.map(function(t){return sbDelete('tramos',t.id).catch(function(){});}));
+
+    // Update local state - tramos
+    tramos=newTramos;
+
+    // Save puntos to Supabase if any detected
+    var newPuntos=kmzParsed.puntos.map(function(p){
+      return {
+        id: uid(),
+        nombre: p.nombre||'Sin nombre',
+        tipo: p.tipo||'Marcador',
+        lat: p.lat,
+        lng: p.lng,
+        ruta: p.ruta||'r1',
+        label: p.tipo||'Marcador',
+        color: '#94A3B8'
+      };
+    });
+
+    if(newPuntos.length>0){
+      // Try to save puntos - table may not exist yet, handle gracefully
+      try{
+        await sbUpsert('puntos', newPuntos);
+      }catch(e){
+        console.warn('Tabla puntos no existe aun - usando puntos en memoria solamente');
+      }
+      // Update in-memory KMZ_PUNTOS (reassign the global)
+      window._kmzPuntosOverride = newPuntos;
+    }
+
+    // Update map - tramos + puntos
+    if(mapInst){
+      drawAllLines();
+      // Redraw puntos with new data
+      var puntosData = window._kmzPuntosOverride || KMZ_PUNTOS;
+      Object.values(markerGroups).forEach(function(g){if(g)g.clearLayers();});
+      puntosData.forEach(function(p){
+        if(!p.lat||!p.lng||isNaN(p.lat)||isNaN(p.lng))return;
+        if(p.lat<1||p.lat>12||p.lng<-80||p.lng>-65)return;
+        var color=(p.tipo==='PEAJES')?'#EF4444':(p.tipo==='PUENTES')?'#10B981':(p.tipo==='POSIBLES OBSTACULOS')?'#F59E0B':'#60A5FA';
+        var gkey=(p.tipo==='PEAJES'||p.tipo==='PUENTES')?'peajes':(p.tipo==='POSIBLES OBSTACULOS')?'obstaculos':'nodos';
+        var grp=markerGroups[gkey];if(!grp)return;
+        try{
+          var mk=L.circleMarker([p.lat,p.lng],{radius:4,fillColor:color,color:'#fff',weight:1,fillOpacity:0.9,opacity:0.9});
+          mk.bindPopup('<b>'+(p.nombre||'Sin nombre')+'</b><br><small>'+(p.tipo||'')+'</small>');
+          grp.addLayer(mk);
+        }catch(e){}
+      });
+      renderMapSide();
+    }
+    renderAll();
+
+    // Step 3
+    kmzSetStep(3);
+    var kept=newTramos.filter(function(t){return stateMap[t.tramo.toLowerCase()];}).length;
+    var added=newTramos.length-kept;
+    document.getElementById('kmz-done-msg').textContent='KMZ aplicado correctamente';
+    document.getElementById('kmz-done-detail').textContent=
+      newTramos.length+' tramos en el mapa · '
+      +kept+' estados conservados · '
+      +added+' tramos nuevos · '
+      +toDelete.length+' tramos eliminados · '
+      +newPuntos.length+' puntos de interes actualizados';
+    toast('KMZ actualizado: '+newTramos.length+' tramos + '+newPuntos.length+' puntos');
+
+  }catch(err){
+    console.error('kmzApply error:',err);
+    toast('Error aplicando KMZ: '+err.message,'err');
+    kmzReset();
+  }
+}
+
+function kmzReset(){
+  kmzParsed={tramos:[],puntos:[],capas:[]};
+  document.getElementById('kmz-upload-status').textContent='';
+  document.getElementById('kmz-input').value='';
+  kmzSetStep(1);
+}
+
+function kmzSetStep(n){
+  [1,2,3].forEach(function(i){
+    var el=document.getElementById('kstep-'+i);
+    if(!el)return;
+    el.className='step-pill'+(i<n?' done':i===n?' active':'');
+  });
+  [1,2,3].forEach(function(i){
+    var p=document.getElementById('kmz-panel-'+i);
+    if(p) p.style.display=(i===n?'block':'none');
+  });
+}
+
+function calcKm(coords){
+  if(!coords||coords.length<2)return 0;
+  var total=0;
+  for(var i=1;i<coords.length;i++){
+    var lat1=coords[i-1][0]*Math.PI/180, lat2=coords[i][0]*Math.PI/180;
+    var dlat=lat2-lat1;
+    var dlng=(coords[i][1]-coords[i-1][1])*Math.PI/180;
+    var a=Math.sin(dlat/2)*Math.sin(dlat/2)+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dlng/2)*Math.sin(dlng/2);
+    total+=6371*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  }
+  return total;
+}
+
+function escHtmlKmz(str){
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function escapeHtml(str){
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function buildRutaOptions(selectedRuta){
+  // Build options from current routes object
+  var opts=Object.values(routes).map(function(r){
+    var sel=(r.id===selectedRuta)?' selected':'';
+    return '<option value="'+r.id+'"'+sel+'>'+escHtmlKmz(r.nombre)+'</option>';
+  }).join('');
+  return opts;
+}
+
+function populateKmzRutaAssign(){
+  var sel=document.getElementById('kmz-ruta-assign');
+  if(!sel)return;
+  sel.innerHTML='<option value="">— Asignar ruta a nuevos tramos —</option>'
+    +Object.values(routes).map(function(r){
+      return '<option value="'+r.id+'">'+escHtmlKmz(r.nombre)+'</option>';
+    }).join('')
+    +'<option value="__new__">+ Crear nueva ruta...</option>';
+}
+
+function kmzRutaAssignChange(val){
+  if(val==='__new__'){
+    kmzPromptNewRuta(function(newId){
+      populateKmzRutaAssign();
+      var sel=document.getElementById('kmz-ruta-assign');
+      if(sel) sel.value=newId;
+      // Rebuild ALL tramo selects with new route included
+      kmzParsed.tramos.forEach(function(t,i){
+        var ts=document.getElementById('kmz-ruta-t-'+i);
+        if(ts){
+          var cur=ts.value==='__new__'?newId:ts.value;
+          ts.innerHTML=buildRutaOptions(cur)+'<option value="__new__">+ Crear nueva ruta...</option>';
+          ts.value=cur;
+        }
+      });
+    });
+    var sel=document.getElementById('kmz-ruta-assign');
+    if(sel) sel.value='';
+  } else if(val){
+    // Assign this ruta to ALL tramos (both new and existing)
+    kmzParsed.tramos.forEach(function(t,i){
+      var ts=document.getElementById('kmz-ruta-t-'+i);
+      if(ts) ts.value=val;
+    });
+    toast('Ruta asignada a todos los tramos');
+  }
+}
+
+function kmzHandleTramoRutaChange(idx, val){
+  if(val!=='__new__')return;
+  var sel=document.getElementById('kmz-ruta-t-'+idx);
+  kmzPromptNewRuta(function(newId){
+    // Rebuild all selects to include new route
+    kmzParsed.tramos.forEach(function(t,i){
+      var ts=document.getElementById('kmz-ruta-t-'+i);
+      if(ts){
+        var curVal=ts.value;
+        ts.innerHTML=buildRutaOptions(curVal==='__new__'?newId:curVal)
+          +'<option value="__new__">+ Crear nueva ruta...</option>';
+        ts.value=(curVal==='__new__')?newId:curVal;
+      }
+    });
+    populateKmzRutaAssign();
+  });
+  if(sel) sel.value='';
+}
+
+function kmzPromptNewRuta(callback){
+  var nombre=window.prompt('Nombre de la nueva ruta (ej: Medellín–Cali):');
+  if(!nombre||!nombre.trim()){toast('Nombre requerido','err');return;}
+  nombre=nombre.trim();
+  var colors=['#34D399','#F59E0B','#EF4444','#A78BFA','#FB923C','#38BDF8'];
+  var newId='r'+(Object.keys(routes).length+1);
+  var color=colors[Object.keys(routes).length%colors.length];
+  routes[newId]={id:newId,nombre:nombre,color:color};
+  saveRutaToDB(routes[newId]);
+  renderRouteFilters();
+  toast('Ruta "'+nombre+'" creada · Guardada en base de datos');
+  if(callback) callback(newId);
 }
 
 function setupDropZone(){
@@ -1779,10 +2204,8 @@ function getEMLData(i){
 function confirmEML(i){
   if(emlResults[i].confirmed)return;
   const d=getEMLData(i);
-  const nb={id:uid(),fecha:d.fecha,tipo:d.tipo,tramo:d.tramo,actor:d.actor,gestion:"[.eml] "+d.gestion,resultado:d.resultado,proxima:d.proxima,fp:"",hito_rad:"",hito_prop:"",hito_cierre:"",hito_venc:""};
-  bitacora.unshift(nb);
-  saveBitacoraEntryToDB(nb);
-  if(d.estado){const t=tramos.find(x=>x.tramo===d.tramo);if(t){t.estado=d.estado;saveTramoToDB(t);}}
+  bitacora.unshift({id:uid(),fecha:d.fecha,tipo:d.tipo,tramo:d.tramo,actor:d.actor,gestion:"[.eml] "+d.gestion,resultado:d.resultado,proxima:d.proxima,fp:""});
+  if(d.estado){const t=tramos.find(x=>x.tramo===d.tramo);if(t)t.estado=d.estado;}
   emlResults[i].confirmed=true; emlImported.push(d);
   const item=document.getElementById("er-"+i);if(item)item.classList.add("confirmed");
   const btn=document.getElementById("eb-"+i);if(btn){btn.textContent="✓ Importado";btn.disabled=true;}
@@ -1855,44 +2278,82 @@ function renderHitos(){
       var tag=ov?" [!]":near?" [~]":"";
       return "<td style='padding:8px 13px;text-align:center'><span style='background:"+bg+";color:"+c+";padding:3px 9px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap'>"+fmt(d)+tag+"</span></td>";
     }
-    rows+="<tr style='border-bottom:1px solid rgba(255,255,255,.04)'>"
-      +"<td style='padding:8px 13px;color:#fff;font-weight:500;white-space:nowrap'>"+t.tramo+"</td>"
-      +"<td style='padding:8px 13px;text-align:center'><span style='background:"+rc+"22;color:"+rc+";padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700'>"+rn+"</span></td>"
-      +cell(h.rad)+cell(h.prop)+cell(h.cierre)+cell(h.venc)
-      +"<td style='padding:8px 13px;text-align:center'><span style='background:"+sc+"22;color:"+sc+";padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700'>"+t.estado+"</span></td>"
-      +"</tr>";
+    rows+="<tr style='border-bottom:1px solid rgba(255,255,255,.04)'>"      +"<td style='padding:8px 13px;color:#fff;font-weight:500;white-space:nowrap'>"+t.tramo+"</td>"      +"<td style='padding:8px 13px;text-align:center'><span style='background:"+rc+"22;color:"+rc+";padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700'>"+rn+"</span></td>"      +cell(h.rad)+cell(h.prop)+cell(h.cierre)+cell(h.venc)      +"<td style='padding:8px 13px;text-align:center'><span style='background:"+sc+"22;color:"+sc+";padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700'>"+t.estado+"</span></td>"      +"</tr>";
   });
   tbody.innerHTML=rows||"<tr><td colspan='7' style='padding:28px;text-align:center;color:var(--muted2);font-size:11px'>Sin hitos registrados. Agrégalos al crear una gestión.</td></tr>";
 }
 
+function renderRouteSummaryCards(){
+  var container=document.getElementById('route-summary-cards');
+  if(!container)return;
+  while(container.firstChild)container.removeChild(container.firstChild);
+  Object.values(routes).forEach(function(r){
+    var color=r.color||'#60A5FA';
+    var card=document.createElement('div');
+    card.className='card';
+    var cardH=document.createElement('div');
+    cardH.className='card-h';
+    var t=document.createElement('span');
+    t.className='card-t';
+    t.textContent=r.nombre;
+    var b=document.createElement('span');
+    b.style.cssText='background:'+color+'22;color:'+color+';border:1px solid '+color+'44;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700';
+    b.textContent=r.id.toUpperCase();
+    cardH.appendChild(t); cardH.appendChild(b);
+    var cardB=document.createElement('div');
+    cardB.className='card-b'; cardB.id='sr-'+r.id;
+    card.appendChild(cardH); card.appendChild(cardB);
+    container.appendChild(card);
+    routeSummary('sr-'+r.id,r.id);
+  });
+}
+
+function renderRouteFilters(){
+  var trf=document.getElementById('tramos-route-filters');
+  if(trf){
+    while(trf.firstChild)trf.removeChild(trf.firstChild);
+    ['all'].concat(Object.keys(routes)).forEach(function(rid){
+      var btn=document.createElement('button');
+      btn.className='fb'+(fRuta===rid?' active':'');
+      btn.id='fr-'+rid;
+      btn.textContent=rid==='all'?'Todas':(routes[rid]?routes[rid].nombre:rid);
+      btn.onclick=(function(id){return function(){fR(id);};})(rid);
+      trf.appendChild(btn);
+    });
+  }
+  var mrf=document.getElementById('mapa-route-filters');
+  if(mrf){
+    while(mrf.firstChild)mrf.removeChild(mrf.firstChild);
+    ['all'].concat(Object.keys(routes)).forEach(function(rid){
+      var btn=document.createElement('button');
+      btn.className='fb'+(mapFiltVal===rid?' active':'');
+      btn.id='mf-'+rid;
+      btn.textContent=rid==='all'?'Todas las rutas':(routes[rid]?routes[rid].nombre:rid);
+      btn.onclick=(function(id){return function(){mapFilt(id);};})(rid);
+      mrf.appendChild(btn);
+    });
+  }
+}
+
 function renderAll(){
   kpis();
-  const keys=Object.keys(routes);
-  routeSummary("sr1",keys[0]||"r1");
-  routeSummary("sr2",keys[1]||"r2");
+  renderRouteSummaryCards();
   recBit();
   renderHitos();
+  renderRouteFilters();
   if(activeTab==="tramos")renderTramoList();
   if(activeTab==="bitacora")renderBitList();
   if(activeTab==="rutas"){renderRutasList();if(editingRoute)selEditRoute(editingRoute);}
 }
 
 // ─── INIT ────────────────────────────────────────────────────
-try{
-  document.getElementById("hdr-dt").textContent="Actualizado: "+fmt(today());
-  var apiNotice=document.getElementById("api-notice");
-  if(apiNotice&&apiKey)apiNotice.style.display="none";
-  renderAll();
-  setTimeout(setupDropZone,100);
-  loadFromDB();
-}catch(initErr){
-  console.error('INIT ERROR:',initErr);
-  document.body.innerHTML='<div style="padding:40px;font-family:monospace;background:#0A1628;color:#EF4444;font-size:14px">'
-    +'<h2>Error de inicializacion</h2>'
-    +'<pre>'+initErr.message+'\n'+initErr.stack+'</pre>'
-    +'<p style="color:#7a95bb;margin-top:20px">Abre DevTools (F12) → Console para ver el error completo.</p>'
-    +'</div>';
-}
+document.getElementById("hdr-dt").textContent="Actualizado: "+fmt(today());
+var apiNotice=document.getElementById("api-notice");
+if(apiNotice&&apiKey)apiNotice.style.display="none";
+renderAll();
+setTimeout(setupDropZone,100);
+// Load data from Supabase
+loadFromDB();
 
 </script>
 </body>

@@ -202,18 +202,10 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
       </div>
       <div style="display:flex;gap:8px;align-items:center;padding:9px 14px;border-bottom:1px solid #253352;flex-wrap:wrap">
         <span style="font-size:9px;color:#7a95bb;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Capas:</span>
-        <label onclick="toggleLayer('tramos')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 11px;font-size:11px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.12);user-select:none">
+        <label otoggleLayer('tramos')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 11px;font-size:11px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.12);user-select:none">
           <input type="checkbox" id="lay-tramos" checked style="accent-color:#3B82F6;cursor:pointer"> Tramos
         </label>
-        <label onclick="toggleLayer('nodos')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 11px;font-size:11px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.12);user-select:none">
-          <input type="checkbox" id="lay-nodos" checked style="accent-color:#3B82F6;cursor:pointer"> Nodos/POPs
-        </label>
-        <label onclick="toggleLayer('peajes')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 11px;font-size:11px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.12);user-select:none">
-          <input type="checkbox" id="lay-peajes" checked style="accent-color:#3B82F6;cursor:pointer"> Peajes/Puentes
-        </label>
-        <label onclick="toggleLayer('obstaculos')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 11px;font-size:11px;color:#7a95bb;cursor:pointer;border:1px solid #253352;border-radius:20px;user-select:none">
-          <input type="checkbox" id="lay-obstaculos" style="accent-color:#3B82F6;cursor:pointer"> Obst&#225;culos
-        </label>
+        <span id="dynamic-layers" style="display:contents"></span>
       </div>
       <div style="position:relative;height:480px;border-radius:0 0 10px 10px;overflow:hidden">
         <div id="the-map" style="position:absolute;top:0;left:0;width:100%;height:100%"></div>
@@ -246,10 +238,8 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
 
         <span id="extra-rf"></span>
         <span style="flex:1"></span>
-        <button class="fb active" id="fe-all" onclick="fE('all')">Todos</button>
-        <button class="fb" id="fe-av" onclick="fE('Avanzado')">Avanzado</button>
-        <button class="fb" id="fe-eg" onclick="fE('En gestión')">En gestión</button>
-        <button class="fb" id="fe-cr" onclick="fE('Crítico')">Crítico</button>
+        <span id="estado-filters"></span>
+        <button class="btn btn-g btn-sm" onclick="openEstadosModal()" style="font-size:9px;padding:3px 9px">⚙ Estados</button>
       </div>
       <div style="display:grid;grid-template-columns:240px 1fr;height:420px">
         <div style="border-right:1px solid var(--border);padding:10px;overflow-y:auto" id="tl-panel"></div>
@@ -564,7 +554,7 @@ const KMZ_PUNTOS=[{"nombre":"INICIO C13","tipo":"MARCADORES","lat":6.449437,"lng
 // Data
 
 // ─── DATA ───────────────────────────────────────────────────
-const SC={Avanzado:"#10B981","En gestión":"#F59E0B","Crítico":"#EF4444"};
+let SC={Avanzado:"#10B981","En gestión":"#F59E0B","Crítico":"#EF4444"};
 
 let tramos=KMZ_TRAMOS.map(function(t){return Object.assign({},t);});
 let routes={r1:{id:'r1',nombre:'Medellín–Barranquilla',color:'#60A5FA'},r2:{id:'r2',nombre:'Medellín–Bogotá',color:'#A78BFA'}};
@@ -577,7 +567,7 @@ let bitacora=[
 ];
 
 let apiKey = localStorage.getItem('somos_api_key') || '';
-let markerGroups={nodos:null,peajes:null,obstaculos:null};
+let markerGroups={}; // dynamic - populated from KMZ layers
 
 let activeTab="overview", fRuta="all", fEst="all", fBit="all";
 let selTramo=null, mapFiltVal="all", editingRoute=null;
@@ -589,7 +579,11 @@ let emlFiles=[], emlResults=[], emlImported=[];
 const fmt=d=>d?d.split("-").reverse().join("/"):"-";
 const today=()=>new Date().toISOString().slice(0,10);
 const uid=()=>"id"+Date.now()+Math.random().toString(36).slice(2,7);
-const sb=e=>{const c=e==="Avanzado"?"av":e==="En gestión"?"eg":"cr";return`<span class="sb ${c}">${e}</span>`;};
+function sb(e){
+  var color=SC[e]||'#94A3B8';
+  return '<span style="background:'+color+'22;color:'+color+';border:1px solid '+color+'44;'
+    +'padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700;white-space:nowrap">'+e+'</span>';
+}
 const tt=t=>{const l={call:"📞 Llamada",email:"📧 Correo",meeting:"🤝 Reunión",response:"📩 Respuesta"};return`<span class="ttag ${t}">${l[t]||t}</span>`;};
 const gv=id=>{const el=document.getElementById(id);return el?el.value:"";}
 
@@ -601,18 +595,17 @@ function toast(msg,type){
 
 // ─── KPIs ────────────────────────────────────────────────────
 function kpis(){
-  const av=tramos.filter(t=>t.estado==="Avanzado");
-  const eg=tramos.filter(t=>t.estado==="En gestión");
-  const cr=tramos.filter(t=>t.estado==="Crítico");
-  const km=a=>a.reduce((s,t)=>s+t.km,0);
-  document.getElementById("kpi-row").innerHTML=`
-    <div class="kpi acc"><div class="kpi-l">Tramos</div><div class="kpi-v">${tramos.length}</div><div class="kpi-s">${km(tramos)} km totales</div></div>
-    <div class="kpi av"><div class="kpi-l">Avanzados</div><div class="kpi-v">${av.length}</div><div class="kpi-s">${km(av)} km</div></div>
-    <div class="kpi eg"><div class="kpi-l">En gestión</div><div class="kpi-v">${eg.length}</div><div class="kpi-s">${km(eg)} km</div></div>
-    <div class="kpi cr"><div class="kpi-l">Críticos</div><div class="kpi-v">${cr.length}</div><div class="kpi-s">${km(cr)} km</div></div>
-    <div class="kpi acc"><div class="kpi-l">% Activa</div><div class="kpi-v">${tramos.length?((av.length+eg.length)/tramos.length*100).toFixed(0):0}%</div><div class="kpi-s">avanz + gestión</div></div>
-    <div class="kpi"><div class="kpi-l">Bitácora</div><div class="kpi-v">${bitacora.length}</div><div class="kpi-s">gestiones registradas</div></div>
-  `;
+  var km=function(a){return a.reduce(function(s,t){return s+t.km;},0);};
+  var kpiHtml='<div class="kpi acc"><div class="kpi-l">Tramos</div><div class="kpi-v">'+tramos.length+'</div><div class="kpi-s">'+km(tramos)+' km totales</div></div>';
+  Object.keys(SC).forEach(function(estado){
+    var color=SC[estado];
+    var group=tramos.filter(function(t){return t.estado===estado;});
+    kpiHtml+='<div class="kpi" style="border-color:'+color+'44"><div class="kpi-l" style="color:'+color+'">'+estado+'</div>'
+      +'<div class="kpi-v" style="color:'+color+'">'+group.length+'</div>'
+      +'<div class="kpi-s">'+km(group)+' km</div></div>';
+  });
+  kpiHtml+='<div class="kpi"><div class="kpi-l">Bitácora</div><div class="kpi-v">'+bitacora.length+'</div><div class="kpi-s">gestiones registradas</div></div>';
+  document.getElementById('kpi-row').innerHTML=kpiHtml;
 }
 
 function routeSummary(elId,rid){
@@ -682,11 +675,18 @@ function initMap(){
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
     attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:18,subdomains:'abcd'
   }).addTo(mapInst);
-  markerGroups.nodos=L.layerGroup().addTo(mapInst);
-  markerGroups.peajes=L.layerGroup().addTo(mapInst);
-  markerGroups.obstaculos=L.layerGroup().addTo(mapInst);
+  // Initialize default layer groups from KMZ_PUNTOS types
+  var defaultTypes={};
+  KMZ_PUNTOS.forEach(function(p){ if(p.tipo)defaultTypes[p.tipo]=true; });
+  Object.keys(defaultTypes).forEach(function(tipo){
+    markerGroups[tipo]=L.layerGroup().addTo(mapInst);
+  });
+  if(!Object.keys(markerGroups).length){
+    markerGroups['Marcador']=L.layerGroup().addTo(mapInst);
+  }
   drawAllLines();
   renderMapSide();
+  renderLayerControls();
   setTimeout(function(){
     drawPuntos();
     try{
@@ -707,9 +707,7 @@ function initMap(){
 }
 function lineColor(t){
   if(mapFiltVal!=='all'&&t.ruta!==mapFiltVal)return null;
-  if(t.estado==='Avanzado')return '#10B981';
-  if(t.estado==='En gestión')return '#F59E0B';
-  return '#EF4444';
+  return SC[t.estado]||'#94A3B8';
 }
 function buildPopup(t){
   var c=t.estado==='Avanzado'?'#10B981':t.estado==='En gestión'?'#F59E0B':'#EF4444';
@@ -751,8 +749,12 @@ function drawPuntos(){
       if(mapFiltVal!=='all'&&p.ruta!==mapFiltVal)return;
       if(!p.lat||!p.lng||isNaN(p.lat)||isNaN(p.lng))return;
       if(p.lat<1||p.lat>12||p.lng<-80||p.lng>-65)return;
-      var color=(p.tipo==='PEAJES')?'#EF4444':(p.tipo==='PUENTES')?'#10B981':(p.tipo==='POSIBLES OBSTACULOS')?'#F59E0B':'#60A5FA';
-      var gkey=(p.tipo==='PEAJES'||p.tipo==='PUENTES')?'peajes':(p.tipo==='POSIBLES OBSTACULOS')?'obstaculos':'nodos';
+      var color=getLayerColor(p.tipo);
+      var gkey=p.tipo||'Marcador';
+      if(!markerGroups[gkey]&&mapInst){
+        markerGroups[gkey]=L.layerGroup().addTo(mapInst);
+        renderLayerControls();
+      }
       var grp=markerGroups[gkey];
       if(!grp||!mapInst)return;
       try{
@@ -763,12 +765,50 @@ function drawPuntos(){
     })(KMZ_PUNTOS[i]);
   }
 }
+function getLayerColor(tipo){
+  if(!tipo)return '#60A5FA';
+  var t=tipo.toUpperCase();
+  if(t.includes('PEAJE'))return '#EF4444';
+  if(t.includes('PUENTE'))return '#10B981';
+  if(t.includes('OBSTAC'))return '#F59E0B';
+  if(t.includes('NODO'))return '#60A5FA';
+  if(t.includes('MUNICIPI'))return '#A78BFA';
+  if(t.includes('MARCA'))return '#F59E0B';
+  // Generate color from string hash
+  var hash=0;
+  for(var i=0;i<tipo.length;i++)hash=tipo.charCodeAt(i)+((hash<<5)-hash);
+  var colors=['#60A5FA','#34D399','#F59E0B','#EF4444','#A78BFA','#FB923C','#38BDF8'];
+  return colors[Math.abs(hash)%colors.length];
+}
+
+function renderLayerControls(){
+  var container=document.getElementById('dynamic-layers');
+  if(!container)return;
+  container.innerHTML='';
+  // Always add tramos toggle first
+  // Then add one button per markerGroup
+  Object.keys(markerGroups).forEach(function(tipo){
+    var color=getLayerColor(tipo);
+    var id='lay-dyn-'+tipo.replace(/\s+/g,'_');
+    var chk=document.getElementById(id);
+    var checked=chk?chk.checked:true;
+    var btn=document.createElement('label');
+    btn.onclick=function(){toggleLayer(tipo);};
+    btn.style.cssText='display:inline-flex;align-items:center;gap:5px;padding:4px 11px;font-size:11px;'
+      +'color:'+color+';cursor:pointer;border:1px solid '+color+';border-radius:20px;'
+      +'background:'+color+'22;user-select:none;margin:2px';
+    btn.innerHTML='<input type="checkbox" id="'+id+'" checked style="accent-color:'+color+';cursor:pointer"> '
+      +tipo.charAt(0)+tipo.slice(1).toLowerCase();
+    container.appendChild(btn);
+  });
+}
+
 function toggleLayer(name){
   if(!mapInst)return;
-  var chk=document.getElementById('lay-'+name);
+  var id=name==='tramos'?'lay-tramos':('lay-dyn-'+name.replace(/\s+/g,'_'));
+  var chk=document.getElementById(id);
   var visible=chk&&chk.checked;
   if(name==='tramos'){
-    // Show/hide polyline tramos
     var ids=Object.keys(mapLines);
     for(var i=0;i<ids.length;i++){
       try{
@@ -958,10 +998,33 @@ function fR(v){
   const el=document.getElementById("fr-"+v); if(el)el.classList.add("active");
   renderTramoList();
 }
+function buildEstadoFilters(){
+  var cont=document.getElementById('estado-filters');
+  if(!cont)return;
+  cont.innerHTML='';
+  // All button
+  var allBtn=document.createElement('button');
+  allBtn.className='fb'+(fEst==='all'?' active':'');
+  allBtn.id='fe-all';
+  allBtn.textContent='Todos';
+  allBtn.onclick=function(){fE('all');};
+  cont.appendChild(allBtn);
+  // One button per estado
+  Object.keys(SC).forEach(function(estado){
+    var color=SC[estado];
+    var btn=document.createElement('button');
+    btn.className='fb'+(fEst===estado?' active':'');
+    btn.id='fe-'+estado.replace(/\s+/g,'_');
+    btn.textContent=estado;
+    btn.style.cssText='border-color:'+color+';color:'+color+';background:'+color+'15';
+    btn.onclick=(function(e){return function(){fE(e);};})(estado);
+    cont.appendChild(btn);
+  });
+}
+
 function fE(v){
   fEst=v;
-  const map={all:"all",Avanzado:"av","En gestión":"eg","Crítico":"cr"};
-  Object.entries(map).forEach(([k,x])=>{const el=document.getElementById("fe-"+x);if(el)el.classList.toggle("active",k===v);});
+  buildEstadoFilters();
   renderTramoList();
 }
 function fB(v){
@@ -1868,8 +1931,12 @@ async function kmzApply(){
       window._kmzPuntosOverride = newPuntos;
     }
 
-    // Update map - tramos + puntos
+    // Update map - tramos + puntos - rebuild layers from new KMZ
     if(mapInst){
+      // Clear all existing marker groups
+      Object.values(markerGroups).forEach(function(g){if(g){try{mapInst.removeLayer(g);}catch(e){}}});
+      markerGroups={};
+      // Rebuild from new puntos
       drawAllLines();
       // Redraw puntos with new data
       var puntosData = window._kmzPuntosOverride || KMZ_PUNTOS;
@@ -2345,6 +2412,100 @@ function renderRouteFilters(){
     });
   }
 }
+
+// ─── ESTADOS MANAGEMENT ──────────────────────────────────────
+function openEstadosModal(){
+  var mt=document.getElementById('modal-title');
+  var mb=document.getElementById('modal-body');
+  document.getElementById('modal-overlay').classList.add('open');
+  mt.textContent='Gestionar estados';
+  renderEstadosModal(mb);
+}
+
+function renderEstadosModal(mb){
+  var div=document.createElement('div');
+  div.className='ff';
+  var entries=Object.entries(SC);
+  entries.forEach(function(kv,i){
+    var estado=kv[0], color=kv[1];
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)';
+    var nameInp=document.createElement('input');
+    nameInp.type='text'; nameInp.className='inp';
+    nameInp.id='es-name-'+i; nameInp.value=estado;
+    nameInp.style.cssText='flex:1;font-size:12px';
+    var colorInp=document.createElement('input');
+    colorInp.type='color';
+    colorInp.id='es-color-'+i; colorInp.value=color;
+    colorInp.style.cssText='width:40px;height:32px;padding:2px;border:1px solid var(--border);border-radius:6px;background:var(--card);cursor:pointer';
+    var delBtn=document.createElement('button');
+    delBtn.className='btn btn-danger btn-sm';
+    delBtn.textContent='×';
+    delBtn.onclick=(function(e){return function(){deleteEstado(e);};})(estado);
+    row.appendChild(nameInp);
+    row.appendChild(colorInp);
+    row.appendChild(delBtn);
+    div.appendChild(row);
+  });
+  // New estado section
+  var newSection=document.createElement('div');
+  newSection.style.cssText='margin-top:10px;padding-top:10px;border-top:1px solid var(--border)';
+  newSection.innerHTML='<div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Nuevo estado</div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<input type="text" class="inp" id="es-new-name" placeholder="Nombre del estado" style="flex:1">'
+    +'<input type="color" id="es-new-color" value="#60A5FA" style="width:40px;height:36px;padding:2px;border:1px solid var(--border);border-radius:6px;background:var(--card);cursor:pointer">'
+    +'<button class="btn btn-p btn-sm" onclick="addEstado()">+ Agregar</button>'
+    +'</div>';
+  div.appendChild(newSection);
+  // Buttons
+  var btns=document.createElement('div');
+  btns.style.cssText='display:flex;justify-content:flex-end;gap:8px;margin-top:14px';
+  btns.innerHTML='<button class="btn btn-g" onclick="closeModal()">Cancelar</button>'
+    +'<button class="btn btn-p" onclick="saveEstados()">Guardar cambios</button>';
+  div.appendChild(btns);
+  mb.innerHTML='';
+  mb.appendChild(div);
+}
+
+function addEstado(){
+  var name=document.getElementById('es-new-name').value.trim();
+  var color=document.getElementById('es-new-color').value;
+  if(!name){toast('Ingresa el nombre del estado','err');return;}
+  if(SC[name]){toast('Ese estado ya existe','err');return;}
+  SC[name]=color;
+  var mb=document.getElementById('modal-body');
+  renderEstadosModal(mb);
+  toast('Estado "'+name+'" agregado');
+}
+
+function deleteEstado(name){
+  if(Object.keys(SC).length<=1){toast('Debe haber al menos un estado','err');return;}
+  var inUse=tramos.filter(function(t){return t.estado===name;}).length;
+  if(inUse>0&&!confirm('El estado "'+name+'" está en uso por '+inUse+' tramos. ¿Eliminar de todas formas?'))return;
+  delete SC[name];
+  var mb=document.getElementById('modal-body');
+  renderEstadosModal(mb);
+  toast('Estado eliminado');
+}
+
+function saveEstados(){
+  // Read current rows
+  var newSC={};
+  var entries=Object.entries(SC);
+  entries.forEach(function(kv,i){
+    var nameEl=document.getElementById('es-name-'+i);
+    var colorEl=document.getElementById('es-color-'+i);
+    if(nameEl&&colorEl&&nameEl.value.trim()){
+      newSC[nameEl.value.trim()]=colorEl.value;
+    }
+  });
+  SC=newSC;
+  closeModal();
+  renderAll();
+  buildEstadoFilters();
+  toast('Estados actualizados correctamente');
+}
+
 
 function renderAll(){
   kpis();

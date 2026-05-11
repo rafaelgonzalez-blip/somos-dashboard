@@ -353,9 +353,8 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
             <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Asignar ruta</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <label style="font-size:11px;color:var(--muted)">Asignar todos los tramos nuevos a:</label>
-              <select class="inp" id="kmz-ruta-assign" style="width:auto;flex:1;min-width:180px">
-                <option value="r1">Medellin–Barranquilla (R1)</option>
-                <option value="r2">Medellin–Bogota (R2)</option>
+              <select class="inp" id="kmz-ruta-assign" style="width:auto;flex:1;min-width:180px" onchange="kmzRutaAssignChange(this.value)">
+                <option value="">— Asignar ruta a nuevos tramos —</option>
               </select>
               <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px">
                 <input type="checkbox" id="kmz-keep-states" checked style="accent-color:var(--acc)">
@@ -489,6 +488,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+// ─── SUPABASE ─
 // ─── SUPABASE ─────────────────────────────────────────────
 const SB_URL = 'https://ayjkwlykkqhkehkihzel.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5amt3bHlra3Foa2Voa2loemVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyODAwMjksImV4cCI6MjA5Mzg1NjAyOX0.QFKfxqEhIZUm_qhRkcu3IoJV3Uk15aeJ7-EncHHbQg0';
@@ -1886,7 +1886,93 @@ function detectRutaFromFolder(txt){
   return document.getElementById('kmz-ruta-assign')?document.getElementById('kmz-ruta-assign').value:'r1';
 }
 
+function buildRutaOptions(selectedRuta){
+  // Build options from current routes object
+  var opts=Object.values(routes).map(function(r){
+    var sel=(r.id===selectedRuta)?' selected':'';
+    return '<option value="'+r.id+'"'+sel+'>'+escHtmlKmz(r.nombre)+'</option>';
+  }).join('');
+  return opts;
+}
+
+function populateKmzRutaAssign(){
+  var sel=document.getElementById('kmz-ruta-assign');
+  if(!sel)return;
+  sel.innerHTML='<option value="">— Asignar ruta a nuevos tramos —</option>'
+    +Object.values(routes).map(function(r){
+      return '<option value="'+r.id+'">'+escHtmlKmz(r.nombre)+'</option>';
+    }).join('')
+    +'<option value="__new__">+ Crear nueva ruta...</option>';
+}
+
+function kmzRutaAssignChange(val){
+  if(val==='__new__'){
+    kmzPromptNewRuta(function(newId){
+      // After creating, re-populate and select the new route
+      populateKmzRutaAssign();
+      var sel=document.getElementById('kmz-ruta-assign');
+      if(sel) sel.value=newId;
+      // Also update all tramo selects that have __new__
+      kmzParsed.tramos.forEach(function(t,i){
+        var ts=document.getElementById('kmz-ruta-t-'+i);
+        if(ts&&ts.value==='__new__'){
+          // Rebuild its options
+          ts.innerHTML=buildRutaOptions(newId)+'<option value="__new__">+ Crear nueva ruta...</option>';
+          ts.value=newId;
+        }
+      });
+    });
+    // Reset select while waiting
+    var sel=document.getElementById('kmz-ruta-assign');
+    if(sel) sel.value='';
+  } else if(val){
+    // Assign this ruta to all new tramos (not existing ones)
+    var existing=tramos.map(function(t){return t.tramo.toLowerCase();});
+    kmzParsed.tramos.forEach(function(t,i){
+      if(!existing.includes(t.name.toLowerCase())){
+        var ts=document.getElementById('kmz-ruta-t-'+i);
+        if(ts) ts.value=val;
+      }
+    });
+  }
+}
+
+function kmzHandleTramoRutaChange(idx, val){
+  if(val!=='__new__')return;
+  var sel=document.getElementById('kmz-ruta-t-'+idx);
+  kmzPromptNewRuta(function(newId){
+    // Rebuild all selects to include new route
+    kmzParsed.tramos.forEach(function(t,i){
+      var ts=document.getElementById('kmz-ruta-t-'+i);
+      if(ts){
+        var curVal=ts.value;
+        ts.innerHTML=buildRutaOptions(curVal==='__new__'?newId:curVal)
+          +'<option value="__new__">+ Crear nueva ruta...</option>';
+        ts.value=(curVal==='__new__')?newId:curVal;
+      }
+    });
+    populateKmzRutaAssign();
+  });
+  if(sel) sel.value='';
+}
+
+function kmzPromptNewRuta(callback){
+  var nombre=window.prompt('Nombre de la nueva ruta (ej: Medellín–Cali):');
+  if(!nombre||!nombre.trim()){toast('Nombre requerido','err');return;}
+  nombre=nombre.trim();
+  var colors=['#34D399','#F59E0B','#EF4444','#A78BFA','#FB923C','#38BDF8'];
+  var newId='r'+(Object.keys(routes).length+1);
+  var color=colors[Object.keys(routes).length%colors.length];
+  routes[newId]={id:newId,nombre:nombre,color:color};
+  // Save to Supabase
+  saveRutaToDB(routes[newId]);
+  toast('Ruta "'+nombre+'" creada');
+  if(callback) callback(newId);
+}
+
+
 function showKMZPreview(){
+  populateKmzRutaAssign();
   // Update counters
   document.getElementById('kmz-count-tramos').textContent=kmzParsed.tramos.length;
   document.getElementById('kmz-count-puntos').textContent=kmzParsed.puntos.length;
@@ -1908,9 +1994,9 @@ function showKMZPreview(){
       +'<span style="font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:'+rutaColor+'22;color:'+rutaColor+'">'+t.ruta.toUpperCase()+'</span>'
       +'</div>'
       +'<div style="font-size:9px;color:var(--muted);margin-top:2px">'+escHtmlKmz(t.folder||'Raiz')+' &middot; '+t.coords.length+' puntos</div>'
-      +'<select class="inp" id="kmz-ruta-t-'+i+'" style="margin-top:5px;font-size:10px;padding:3px 7px;height:auto">'
-      +'<option value="r1"'+(t.ruta==='r1'?' selected':'')+'>MDE–BAQ (R1)</option>'
-      +'<option value="r2"'+(t.ruta==='r2'?' selected':'')+'>MDE–BOG (R2)</option>'
+      +'<select class="inp" id="kmz-ruta-t-'+i+'" style="margin-top:5px;font-size:10px;padding:3px 7px;height:auto" onchange="kmzHandleTramoRutaChange('+i+', this.value)">'
+      +buildRutaOptions(t.ruta)
+      +'<option value="__new__">+ Crear nueva ruta...</option>'
       +'</select>'
       +'</div>';
   }).join('')||'<div class="empty">Sin tramos</div>';
@@ -1947,6 +2033,7 @@ async function kmzApply(){
   var newTramos=kmzParsed.tramos.map(function(t,i){
     var rutaEl=document.getElementById('kmz-ruta-t-'+i);
     var ruta=rutaEl?rutaEl.value:(t.ruta||'r1');
+    if(ruta==='__new__'||!ruta||!routes[ruta]) ruta=Object.keys(routes)[0]||'r1';
     var existing=stateMap[t.name.toLowerCase()];
     return {
       id: existing?existing.id:uid(),
@@ -2362,7 +2449,6 @@ try{
     +'<p style="color:#7a95bb;margin-top:20px">Abre DevTools (F12) → Console para ver el error completo.</p>'
     +'</div>';
 }
-
 </script>
 </body>
 </html>

@@ -2804,7 +2804,7 @@ function deleteEstado(name){
   toast('Estado eliminado');
 }
 
-function saveEstados(){
+async function saveEstados(){
   var newSC={};
   var oldKeys=Object.keys(SC);
   var entries=Object.entries(SC);
@@ -2821,19 +2821,23 @@ function saveEstados(){
   });
   SC=newSC;
   // Migrate tramos and bitacora to new state names
+  var tramosToSave=[];
   if(Object.keys(renames).length){
     tramos.forEach(function(t){
       if(renames[t.estado]){
         t.estado=renames[t.estado];
-        saveTramoToDB(t);
+        tramosToSave.push(saveTramoToDB(t));
       }
     });
+    var bitToSave=[];
     bitacora.forEach(function(b){
       if(b.estado_sugerido&&renames[b.estado_sugerido]){
         b.estado_sugerido=renames[b.estado_sugerido];
-        saveBitacoraEntryToDB(b);
+        bitToSave.push(saveBitacoraEntryToDB(b));
       }
     });
+    // Wait for all saves to complete before closing
+    try{ await Promise.all(tramosToSave.concat(bitToSave)); }catch(e){}
   }
   // Persist SC
   try{localStorage.setItem('somos_sc', JSON.stringify(SC));}catch(e){}
@@ -2841,7 +2845,7 @@ function saveEstados(){
   renderAll();
   if(mapInst){ drawAllLines(); drawPuntos(); renderMapSide(); }
   buildEstadoFilters();
-  toast('Estados actualizados · Guardados correctamente');
+  toast('Estados actualizados · '+tramosToSave.length+' tramos guardados en BD');
 }
 
 

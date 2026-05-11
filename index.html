@@ -162,8 +162,9 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
   <!-- OVERVIEW -->
   <div id="t-overview" class="tv active">
     <div class="kpi-row" id="kpi-row"></div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
-      <div id="route-summary-cards" style="display:contents"></div>
+    <div class="two-col">
+      <div class="card"><div class="card-h"><span class="card-t">Medellín–Barranquilla</span><span class="rpill r1">R1</span></div><div class="card-b" id="sr1"></div></div>
+      <div class="card"><div class="card-h"><span class="card-t">Medellín–Bogotá</span><span class="rpill r2">R2</span></div><div class="card-b" id="sr2"></div></div>
     </div>
     <div class="card">
       <div class="card-h"><span class="card-t">Últimas gestiones</span><button class="btn btn-p btn-sm" onclick="openModal('gestion')">+ Nueva gestión</button></div>
@@ -200,11 +201,9 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
       <div class="card-h">
         <span class="card-t">&#128506; Mapa KMZ &#8212; trazados reales HORIZON</span>
         <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
-          <span id="mapa-route-filters" style="display:contents">
           <button class="fb active" id="mf-all" onclick="mapFilt('all')">Todas las rutas</button>
           <button class="fb" id="mf-r1" onclick="mapFilt('r1')">MDE&#8211;BAQ</button>
           <button class="fb" id="mf-r2" onclick="mapFilt('r2')">MDE&#8211;BOG</button>
-          </span>
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;padding:9px 14px;border-bottom:1px solid #253352;flex-wrap:wrap">
@@ -249,11 +248,9 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
     <div class="card">
       <div class="fi">
         <span style="font-size:9px;color:var(--muted);font-weight:700">RUTA:</span>
-        <span id="tramos-route-filters" style="display:contents">
         <button class="fb active" id="fr-all" onclick="fR('all')">Todas</button>
         <button class="fb" id="fr-r1" onclick="fR('r1')">MDE–BAQ</button>
         <button class="fb" id="fr-r2" onclick="fR('r2')">MDE–BOG</button>
-        </span>
         <span id="extra-rf"></span>
         <span style="flex:1"></span>
         <button class="fb active" id="fe-all" onclick="fE('all')">Todos</button>
@@ -297,88 +294,6 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
       <div class="card">
         <div class="card-h"><span class="card-t" id="editor-title">Editar tramos de ruta</span><div id="editor-actions"></div></div>
         <div class="card-b" id="tramo-editor-body"><div class="empty">Selecciona una ruta para editar sus tramos</div></div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:14px">
-      <div class="card-h">
-        <span class="card-t">Actualizar KMZ</span>
-        <span style="font-size:9px;background:rgba(59,130,246,.15);color:var(--acc);border:1px solid rgba(59,130,246,.3);padding:2px 9px;border-radius:4px;font-weight:700">Importador flexible</span>
-      </div>
-      <div class="card-b">
-        <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">
-          Sube un KMZ actualizado para sincronizar tramos y puntos del mapa. El sistema detecta
-          <strong style="color:#fff">LineStrings como tramos</strong> y <strong style="color:#fff">Points como POIs</strong>
-          sin depender de la estructura de carpetas. Los estados de gestion existentes se conservan.
-        </p>
-
-        <div class="step-bar" id="kmz-steps">
-          <div class="step-pill active" id="kstep-1">1. Subir KMZ</div>
-          <div class="step-pill" id="kstep-2">2. Previsualizar</div>
-          <div class="step-pill" id="kstep-3">3. Confirmar</div>
-        </div>
-
-        <!-- Step 1: Upload -->
-        <div id="kmz-panel-1">
-          <input type="file" id="kmz-input" accept=".kmz,.kml" style="display:none">
-          <label for="kmz-input" class="drop-zone" id="kmz-drop-zone" style="margin-bottom:10px;display:block;cursor:pointer">
-            <div style="font-size:36px;margin-bottom:8px">&#128506;</div>
-            <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:4px">Haz clic aqui para seleccionar un archivo .kmz o .kml</div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">o arrastra el archivo sobre esta area</div>
-            <div style="font-size:10px;color:var(--muted2)">Estructura flexible &#8212; detecta tramos y puntos automaticamente</div>
-          </label>
-          <div id="kmz-upload-status" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
-        </div>
-
-        <!-- Step 2: Preview -->
-        <div id="kmz-panel-2" style="display:none">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
-            <div class="kpi av"><div class="kpi-l">Tramos detectados</div><div class="kpi-v" id="kmz-count-tramos">0</div></div>
-            <div class="kpi acc"><div class="kpi-l">Puntos de interes</div><div class="kpi-v" id="kmz-count-puntos">0</div></div>
-            <div class="kpi eg"><div class="kpi-l">Carpetas/capas</div><div class="kpi-v" id="kmz-count-capas">0</div></div>
-          </div>
-
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-            <!-- Tramos preview -->
-            <div>
-              <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Tramos detectados</div>
-              <div id="kmz-tramos-preview" style="max-height:300px;overflow-y:auto" class="sc"></div>
-            </div>
-            <!-- Comparison with existing -->
-            <div>
-              <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Comparacion con tramos actuales</div>
-              <div id="kmz-compare-preview" style="max-height:300px;overflow-y:auto" class="sc"></div>
-            </div>
-          </div>
-
-          <!-- Route assignment -->
-          <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Asignar ruta</div>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-              <label style="font-size:11px;color:var(--muted)">Asignar todos los tramos nuevos a:</label>
-              <select class="inp" id="kmz-ruta-assign" style="width:auto;flex:1;min-width:180px" onchange="kmzRutaAssignChange(this.value)">
-                <option value="">— Asignar ruta a nuevos tramos —</option>
-              </select>
-              <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px">
-                <input type="checkbox" id="kmz-keep-states" checked style="accent-color:var(--acc)">
-                Conservar estados existentes
-              </label>
-            </div>
-          </div>
-
-          <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button class="btn btn-g btn-sm" onclick="kmzReset()">Cancelar</button>
-            <button class="btn btn-p" onclick="kmzApply()">Aplicar y sincronizar mapa</button>
-          </div>
-        </div>
-
-        <!-- Step 3: Done -->
-        <div id="kmz-panel-3" style="display:none;text-align:center;padding:24px">
-          <div style="font-size:36px;margin-bottom:10px">✅</div>
-          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:6px" id="kmz-done-msg">KMZ aplicado</div>
-          <div style="font-size:11px;color:var(--muted)" id="kmz-done-detail"></div>
-          <button class="btn btn-g btn-sm" style="margin-top:14px" onclick="kmzReset()">Subir otro KMZ</button>
-        </div>
       </div>
     </div>
   </div>
@@ -484,16 +399,55 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
     <div id="modal-body"></div>
   </div>
 </div>
-<div class="toast-el" id="toast"></div>
-</div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
 
-// ─── SUPABASE ─
+<div class="toast-el" id="toast"></div>
+
+</div><!-- end app -->
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><div id="t-mapa" class="tv">
+    <div class="card" style="overflow:visible">
+      <div class="card-h">
+        <span class="card-t">&#128506; Mapa KMZ &#8212; trazados reales HORIZON</span>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
+          <button class="fb active" id="mf-all" onclick="mapFilt('all')">Todas las rutas</button>
+          <button class="fb" id="mf-r1" onclick="mapFilt('r1')">MDE&#8211;BAQ</button>
+          <button class="fb" id="mf-r2" onclick="mapFilt('r2')">MDE&#8211;BOG</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:7px;align-items:center;padding:8px 14px;border-bottom:1px solid #253352;flex-wrap:wrap">
+        <span style="font-size:9px;color:#7a95bb;font-weight:700">CAPAS:</span>
+        <label style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;font-size:10px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.1)"><input type="checkbox" id="lay-tramos" checked onchange="toggleLayer('tramos')" style="accent-color:#3B82F6"> Tramos</label>
+        <label style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;font-size:10px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.1)"><input type="checkbox" id="lay-nodos" checked onchange="toggleLayer('nodos')" style="accent-color:#3B82F6"> Nodos/POPs</label>
+        <label style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;font-size:10px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.1)"><input type="checkbox" id="lay-peajes" checked onchange="toggleLayer('peajes')" style="accent-color:#3B82F6"> Peajes/Puentes</label>
+        <label style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;font-size:10px;color:#7a95bb;cursor:pointer;border:1px solid #253352;border-radius:20px"><input type="checkbox" id="lay-obstaculos" onchange="toggleLayer('obstaculos')" style="accent-color:#3B82F6"> Obs&#769;taculos</label>
+      </div>
+      <div style="position:relative;height:480px;border-radius:0 0 10px 10px;overflow:hidden">
+        <div id="the-map" style="position:absolute;top:0;left:0;width:100%;height:100%"></div>
+        <div class="map-legend">
+          <div class="map-legend-t">Sema&#769;foro tramos</div>
+          <div class="leg-r"><div class="leg-l" style="background:#10B981"></div>Avanzado</div>
+          <div class="leg-r"><div class="leg-l" style="background:#F59E0B"></div>En gesti&#243;n</div>
+          <div class="leg-r"><div class="leg-l" style="background:#EF4444"></div>Cr&#237;tico</div>
+          <div style="margin-top:7px;padding-top:7px;border-top:1px solid rgba(255,255,255,.1)">
+          <div class="map-legend-t">Puntos de inter&#233;s</div>
+          <div class="leg-r"><span style="width:9px;height:9px;border-radius:50%;background:#60A5FA;display:inline-block;margin-right:2px"></span>Nodo/POP</div>
+          <div class="leg-r"><span style="width:9px;height:9px;border-radius:50%;background:#EF4444;display:inline-block;margin-right:2px"></span>Peaje</div>
+          <div class="leg-r"><span style="width:9px;height:9px;border-radius:50%;background:#10B981;display:inline-block;margin-right:2px"></span>Puente</div>
+          </div>
+        </div>
+        <div class="map-side" id="map-side" style="max-height:420px">
+          <div class="ms-t">Tramos KMZ</div>
+          <div id="map-tlist"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+<script>
 // ─── SUPABASE ─────────────────────────────────────────────
 const SB_URL = 'https://ayjkwlykkqhkehkihzel.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5amt3bHlra3Foa2Voa2loemVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyODAwMjksImV4cCI6MjA5Mzg1NjAyOX0.QFKfxqEhIZUm_qhRkcu3IoJV3Uk15aeJ7-EncHHbQg0';
-
 
 function sbHeaders(){
   return {
@@ -544,21 +498,25 @@ async function loadFromDB(){
       dbRutas.forEach(function(r){ routes[r.id] = {id:r.id, nombre:r.nombre, color:r.color}; });
     }
     
-    // Load tramos - DB is source of truth, KMZ provides coords fallback
+    // Load tramos
     var dbTramos = await sbGet('tramos','order=id.asc');
     if(dbTramos && dbTramos.length > 0){
-      // Build KMZ coords lookup by id
-      var kmzCoords = {};
-      KMZ_TRAMOS.forEach(function(k){ kmzCoords[k.id] = k.coords; });
-      // Replace tramos array with DB version, using KMZ coords when DB has none
-      tramos = dbTramos.map(function(dt){
-        var coords = (dt.coords && dt.coords.length > 0) ? dt.coords : (kmzCoords[dt.id] || []);
-        return {
-          id: dt.id, ruta: dt.ruta, tramo: dt.tramo,
-          actor: dt.actor||'', km: dt.km||0, estado: dt.estado||'En gestión',
-          proxima: dt.proxima||'', fp: dt.fp||'', concesion: dt.concesion||'',
-          coords: coords
-        };
+      // Merge DB state with KMZ coords (coords stay from KMZ, state from DB)
+      dbTramos.forEach(function(dt){
+        var t = tramos.find(function(x){return x.id===dt.id;});
+        if(t){
+          t.estado = dt.estado || t.estado;
+          t.actor = dt.actor || t.actor;
+          t.km = dt.km || t.km;
+          t.proxima = dt.proxima || t.proxima;
+          t.fp = dt.fp || t.fp;
+          t.concesion = dt.concesion || t.concesion;
+          t.tramo = dt.tramo || t.tramo;
+          t.ruta = dt.ruta || t.ruta;
+        } else {
+          // New tramo added via dashboard
+          if(dt.coords) tramos.push(Object.assign({}, dt, {coords: dt.coords}));
+        }
       });
     } else {
       // First load — seed tramos to DB
@@ -577,22 +535,10 @@ async function loadFromDB(){
       });
     }
     
-    // Try to load puntos from Supabase if table exists
-    try{
-      var dbPuntos = await sbGet('puntos','order=nombre.asc');
-      if(dbPuntos && dbPuntos.length > 0){
-        window._kmzPuntosOverride = dbPuntos;
-      }
-    }catch(e){
-      // puntos table doesn't exist yet - use KMZ defaults
-      console.log('Using KMZ default puntos');
-    }
-
     dbLoaded = true;
     showDBStatus('');
     renderAll();
-    renderRouteFilters();
-    if(mapInst){ drawAllLines(); drawPuntos(); renderMapSide(); }
+    if(mapInst) refreshLines();
     
   } catch(e){
     console.error('loadFromDB:', e);
@@ -848,8 +794,7 @@ function drawPuntos(){
   if(!mapInst)return;
   var keys=Object.keys(markerGroups);
   for(var i=0;i<keys.length;i++){if(markerGroups[keys[i]])markerGroups[keys[i]].clearLayers();}
-  var puntosSource=window._kmzPuntosOverride||KMZ_PUNTOS;
-  for(var i=0;i<puntosSource.length;i++){
+  for(var i=0;i<KMZ_PUNTOS.length;i++){
     (function(p){
       if(mapFiltVal!=='all'&&p.ruta!==mapFiltVal)return;
       if(!p.lat||!p.lng||isNaN(p.lat)||isNaN(p.lng))return;
@@ -938,7 +883,6 @@ function mapFilt(v){
   if(mapInst){drawAllLines();drawPuntos();}
   else if(activeTab==='mapa')setTimeout(function(){if(!mapInst)initMap();else mapInst.invalidateSize();},80);
   renderMapSide();
-  renderRouteFilters(); // update active state
 }
 function focusMapTramo(id){
   sw('mapa');setTimeout(function(){if(!mapInst)initMap();else{mapInst.invalidateSize();focusT(id);}},200);
@@ -1058,7 +1002,8 @@ function qDelTramo(id){
 // ─── FILTROS ─────────────────────────────────────────────────
 function fR(v){
   fRuta=v;
-  renderRouteFilters(); // rebuilds with correct active state
+  document.querySelectorAll("[id^='fr-']").forEach(el=>el.classList.remove("active"));
+  const el=document.getElementById("fr-"+v); if(el)el.classList.add("active");
   renderTramoList();
 }
 function fE(v){
@@ -1084,7 +1029,7 @@ function sw(name){
   if(name==="mapa")setTimeout(function(){if(!mapInst)initMap();else{mapInst.invalidateSize();drawAllLines();drawPuntos();}},100);
   if(name==="tramos")renderTramoList();
   if(name==="bitacora")renderBitList();
-  if(name==="rutas"){renderRutasList();setTimeout(setupKMZDropZone,50);}
+  if(name==="rutas"){renderRutasList();}
 }
 
 // ─── MODAL ───────────────────────────────────────────────────
@@ -1242,7 +1187,7 @@ function openModal(type,id,preTramo){
         <div class="fl"><label>Kilómetros</label><input type="number" class="inp" id="nt-km" value="0" min="0"></div>
         <div class="fl"><label>Estado inicial</label><select class="inp" id="nt-e"><option value="En gestión">En gestión</option><option value="Avanzado">Avanzado</option><option value="Crítico">Crítico</option></select></div>
       </div>
-      <div class="sec-tag">Coordenadas del trazado (opcional — si no ingresas, se usa el trazado del tramo anterior como placeholder)</div>
+      <div class="sec-tag">Coordenadas del trazado (lat, lng por punto)</div>
       <div id="coords-cont"></div>
       <button class="btn btn-g btn-sm" onclick="addCoord()" style="align-self:flex-start;margin-bottom:4px">+ Agregar punto</button>
       <div class="fl"><label>Primera acción a realizar</label><input type="text" class="inp" id="nt-p" placeholder="Primera gestión a realizar"></div>
@@ -1386,14 +1331,13 @@ function saveNuevaRuta(){
   const n=gv("nr-n").trim(), rid=gv("nr-id").trim()||"r"+uid(), c=gv("nr-c");
   if(!n){toast("Ingresa el nombre de la ruta","err");return;}
   routes[rid]={id:rid,nombre:n,color:c||"#34D399"};
-  saveRutaToDB(routes[rid]);
-  closeModal(); renderRutasList(); renderAll(); renderRouteFilters();
-  toast("Ruta creada: "+n+" · Guardada en base de datos");
+  closeModal(); renderRutasList(); renderAll();
+  toast("Ruta creada: "+n);
 }
 
 function saveEditRuta(rid){
   routes[rid].nombre=gv("er-n"); routes[rid].color=gv("er-c");
-  closeModal(); renderRutasList(); renderAll(); renderRouteFilters(); if(mapInst)drawAllLines();
+  closeModal(); renderRutasList(); renderAll(); if(mapInst)drawAllLines();
   saveRutaToDB(routes[rid]);
   toast("Ruta actualizada · Guardada en base de datos");
 }
@@ -1410,31 +1354,11 @@ function saveNuevoTramo(rutaId){
   const rows=document.getElementById("coords-cont").querySelectorAll(".coord-row");
   const coords=[];
   rows.forEach(r=>{const ins=r.querySelectorAll("input");const lat=parseFloat(ins[0].value),lng=parseFloat(ins[1].value);if(!isNaN(lat)&&!isNaN(lng))coords.push([lat,lng]);});
-  if(coords.length<2){
-    var ex=tramos.filter(function(t){return t.ruta===rutaId;});
-    if(ex.length){
-      // Use last few points of previous tramo as placeholder
-      var lastCoords=ex[ex.length-1].coords;
-      var sample=lastCoords.slice(Math.max(0,lastCoords.length-5));
-      coords.push.apply(coords,sample);
-    } else {
-      coords.push([6.2476,-75.5658],[6.5,-75.0]);
-    }
-  }
-  var newId=uid();
-  tramos.push({id:newId,ruta:rutaId,tramo:n,actor:gv("nt-a"),concesion:gv("nt-c"),km:parseFloat(gv("nt-km"))||0,estado:gv("nt-e"),proxima:gv("nt-p"),fp:"",coords});
-  closeModal();
-  if(editingRoute===rutaId)selEditRoute(rutaId);
-  renderAll();
-  if(mapInst){drawAllLines();renderMapSide();}
-  var nt=tramos[tramos.length-1];
-  if(nt)saveTramoToDB(nt);
-  // Focus map on new tramo if it has real coords
-  if(nt&&nt.coords.length>=2&&mapInst){
-    var mid=Math.floor(nt.coords.length/2);
-    mapInst.setView([nt.coords[mid][0],nt.coords[mid][1]],10,{animate:true});
-  }
-  toast("Tramo "+n+" agregado · Visible en mapa · Guardado en base de datos");
+  if(coords.length<2){const ex=tramos.filter(t=>t.ruta===rutaId);coords.push(...(ex.length?ex[ex.length-1].coords.slice(-2):[[6.2476,-75.5658],[6.5,-75.0]]));}
+  tramos.push({id:uid(),ruta:rutaId,tramo:n,actor:gv("nt-a"),concesion:gv("nt-c"),km:parseFloat(gv("nt-km"))||0,estado:gv("nt-e"),proxima:gv("nt-p"),fp:"",coords});
+  closeModal(); if(editingRoute===rutaId)selEditRoute(rutaId); renderAll(); if(mapInst)drawAllLines();
+  var nt=tramos[tramos.length-1];if(nt)saveTramoToDB(nt);
+  toast("Tramo agregado · Guardado en base de datos");
 }
 
 function saveEditTramo(id){
@@ -1444,7 +1368,6 @@ function saveEditTramo(id){
   t.km=parseFloat(gv("et-km"))||t.km; t.fp=gv("et-fp"); t.proxima=gv("et-p");
   closeModal(); renderAll(); refreshLines(); if(selTramo)selT(selTramo); if(editingRoute)selEditRoute(editingRoute);
   var et=tramos.find(function(x){return x.id===id;});if(et)saveTramoToDB(et);
-  if(mapInst)renderMapSide();
   toast("Tramo actualizado · Guardado en base de datos");
 }
 
@@ -1466,8 +1389,7 @@ function saveAlt(id){
   const t=tramos.find(x=>x.id===id); if(!t)return;
   tramos.push({id:uid(),ruta:gv("alt-r"),tramo:gv("alt-n"),actor:gv("alt-a"),km:parseFloat(gv("alt-km"))||t.km,estado:"En gestión",proxima:"Evaluar viabilidad ruta alternativa",fp:"",concesion:"",coords:t.coords.map((c,i)=>[c[0]+(i%2===0?.08:-.05),c[1]+(i%2===0?-.05:.07)])});
   closeModal(); renderAll(); if(mapInst)drawAllLines(); if(editingRoute)selEditRoute(editingRoute);
-  var newAlt=tramos[tramos.length-1]; saveTramoToDB(newAlt);
-  toast("Ruta alternativa creada y guardada en base de datos");
+  toast("Ruta alternativa creada y visible en el mapa");
 }
 
 // ─── GMAIL SIMULADO ──────────────────────────────────────────
@@ -1673,495 +1595,6 @@ function _parseGmailDate(dateStr){
   return today();
 }
 function _escHtml(str){
-  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-
-// ─── KMZ IMPORTER ────────────────────────────────────────────
-var kmzParsed = {tramos:[], puntos:[], capas:[]};
-
-function kmzSetStep(n){
-  [1,2,3].forEach(function(i){
-    var el=document.getElementById('kstep-'+i);
-    if(!el)return;
-    el.className='step-pill'+(i<n?' done':i===n?' active':'');
-  });
-  [1,2,3].forEach(function(i){
-    var p=document.getElementById('kmz-panel-'+i);
-    if(p) p.style.display=(i===n?'block':'none');
-  });
-}
-
-function kmzReset(){
-  kmzParsed={tramos:[],puntos:[],capas:[]};
-  document.getElementById('kmz-upload-status').textContent='';
-  document.getElementById('kmz-input').value='';
-  kmzSetStep(1);
-}
-
-function setupKMZDropZone(){
-  var dz=document.getElementById('kmz-drop-zone');
-  var inp=document.getElementById('kmz-input');
-  if(!dz||!inp||dz._kmzReady)return;
-  dz._kmzReady=true;
-  // label+for handles click natively - only need drag and change
-  dz.ondragover=function(e){e.preventDefault();dz.style.borderColor='var(--acc)';dz.style.background='rgba(59,130,246,.1)';};
-  dz.ondragleave=function(){dz.style.borderColor='';dz.style.background='';};
-  dz.ondrop=function(e){
-    e.preventDefault();dz.style.borderColor='';dz.style.background='';
-    var f=e.dataTransfer.files[0];
-    if(f) processKMZFile(f);
-  };
-  inp.onchange=function(e){
-    if(e.target.files[0]) processKMZFile(e.target.files[0]);
-  };
-}
-
-function processKMZFile(file){
-  var status=document.getElementById('kmz-upload-status');
-  status.textContent='Leyendo archivo...';
-  status.style.color='var(--muted)';
-
-  var reader=new FileReader();
-  reader.onload=function(e){
-    var data=e.target.result;
-    try{
-      // KMZ is a ZIP - use a simple approach to extract KML
-      // Try as plain KML first (if .kml file)
-      if(file.name.toLowerCase().endsWith('.kml')){
-        parseKMLString(new TextDecoder().decode(data));
-      } else {
-        // KMZ = ZIP, need to extract doc.kml
-        extractKMZAndParse(data);
-      }
-    }catch(err){
-      status.textContent='Error leyendo archivo: '+err.message;
-      status.style.color='var(--cr)';
-    }
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-function extractKMZAndParse(arrayBuffer){
-  var status=document.getElementById('kmz-upload-status');
-  // Load JSZip dynamically
-  if(typeof JSZip==='undefined'){
-    var script=document.createElement('script');
-    script.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-    script.onload=function(){ doExtractKMZ(arrayBuffer); };
-    script.onerror=function(){ status.textContent='Error cargando libreria ZIP. Intenta con un archivo .kml'; status.style.color='var(--cr)'; };
-    document.head.appendChild(script);
-  } else {
-    doExtractKMZ(arrayBuffer);
-  }
-}
-
-function doExtractKMZ(arrayBuffer){
-  var status=document.getElementById('kmz-upload-status');
-  JSZip.loadAsync(arrayBuffer).then(function(zip){
-    // Find the KML file inside
-    var kmlFile=null;
-    zip.forEach(function(path,file){
-      if(path.toLowerCase().endsWith('.kml') && !kmlFile) kmlFile=file;
-    });
-    if(!kmlFile){
-      status.textContent='No se encontro archivo KML dentro del KMZ';
-      status.style.color='var(--cr)';
-      return;
-    }
-    return kmlFile.async('string').then(function(kmlStr){
-      parseKMLString(kmlStr);
-    });
-  }).catch(function(err){
-    status.textContent='Error abriendo KMZ: '+err.message;
-    status.style.color='var(--cr)';
-  });
-}
-
-function parseKMLString(kmlStr){
-  var status=document.getElementById('kmz-upload-status');
-  status.textContent='Analizando estructura...';
-
-  var parser=new DOMParser();
-  var doc=parser.parseFromString(kmlStr,'text/xml');
-
-  // Strip namespace for easier querying
-  var cleaned=kmlStr.replace(/xmlns[^=]*="[^"]*"/g,'').replace(/<kml:/g,'<').replace(/<\/kml:/g,'</');
-  doc=parser.parseFromString(cleaned,'text/xml');
-
-  var tramos=[];
-  var puntos=[];
-  var capas=new Set();
-
-  // Get all Placemark elements regardless of nesting
-  var placemarks=doc.querySelectorAll('Placemark');
-
-  placemarks.forEach(function(pm){
-    var name=(pm.querySelector('name')||{textContent:''}).textContent.trim()||'Sin nombre';
-    // Find parent folder name
-    var folderName='';
-    var parent=pm.parentElement;
-    while(parent){
-      if(parent.tagName==='Folder'||parent.tagName==='Document'){
-        var fn=(parent.querySelector(':scope > name')||{textContent:''}).textContent.trim();
-        if(fn){ folderName=fn; capas.add(fn); break; }
-      }
-      parent=parent.parentElement;
-    }
-
-    // LineString = tramo
-    var ls=pm.querySelector('LineString');
-    if(ls){
-      var coordsTxt=(ls.querySelector('coordinates')||{textContent:''}).textContent.trim();
-      var coords=parseCoords(coordsTxt);
-      if(coords.length>=2){
-        tramos.push({
-          name: name,
-          folder: folderName,
-          coords: coords,
-          // Try to detect ruta from folder name
-          ruta: detectRutaFromFolder(folderName+' '+name)
-        });
-      }
-    }
-
-    // Point = POI
-    var pt=pm.querySelector('Point');
-    if(pt){
-      var cTxt=(pt.querySelector('coordinates')||{textContent:''}).textContent.trim();
-      var parts=cTxt.split(',');
-      if(parts.length>=2){
-        var lat=parseFloat(parts[1]);
-        var lng=parseFloat(parts[0]);
-        if(!isNaN(lat)&&!isNaN(lng)&&lat>=1&&lat<=12&&lng>=-80&&lng<=-65){
-          puntos.push({
-            nombre: name,
-            tipo: folderName||'Marcador',
-            lat: lat,
-            lng: lng,
-            ruta: detectRutaFromFolder(folderName+' '+name)
-          });
-        }
-      }
-    }
-  });
-
-  kmzParsed={tramos:tramos, puntos:puntos, capas:Array.from(capas)};
-
-  if(tramos.length===0&&puntos.length===0){
-    status.textContent='No se detectaron tramos ni puntos. Verifica que el KMZ tenga geometrias.';
-    status.style.color='var(--cr)';
-    return;
-  }
-
-  status.textContent='Detectados: '+tramos.length+' tramos y '+puntos.length+' puntos en '+capas.size+' capas.';
-  status.style.color='var(--av)';
-
-  showKMZPreview();
-  kmzSetStep(2);
-}
-
-function parseCoords(txt){
-  var coords=[];
-  txt.trim().split(/\s+/).forEach(function(c){
-    var p=c.split(',');
-    if(p.length>=2){
-      var lng=parseFloat(p[0]);
-      var lat=parseFloat(p[1]);
-      if(!isNaN(lat)&&!isNaN(lng)&&lat>=1&&lat<=12&&lng>=-80&&lng<=-65)
-        coords.push([parseFloat(lat.toFixed(6)),parseFloat(lng.toFixed(6))]);
-    }
-  });
-  // Simplify to max 100 points per tramo
-  if(coords.length>100){
-    var step=Math.floor(coords.length/100);
-    var simple=[coords[0]];
-    for(var i=step;i<coords.length-1;i+=step) simple.push(coords[i]);
-    simple.push(coords[coords.length-1]);
-    return simple;
-  }
-  return coords;
-}
-
-function detectRutaFromFolder(txt){
-  if(!txt) return Object.keys(routes)[0]||'r1';
-  var t=txt.toLowerCase();
-  // Try to match against configured route names
-  var match=Object.values(routes).find(function(r){
-    var rname=r.nombre.toLowerCase();
-    // Check if any word from the route name appears in the folder text
-    var words=rname.split(/[\s\-–—\/]+/).filter(function(w){return w.length>3;});
-    return words.some(function(w){return t.includes(w);});
-  });
-  if(match) return match.id;
-  // Fallback: hardcoded keywords
-  if(t.includes('barranquilla')||t.includes('baq')) return 'r1';
-  if(t.includes('bogot')||t.includes('bog')) return 'r2';
-  // Return selected route in assign dropdown or first route
-  var sel=document.getElementById('kmz-ruta-assign');
-  return (sel&&sel.value&&sel.value!=='__new__'&&sel.value!=='')?sel.value:(Object.keys(routes)[0]||'r1');
-}
-
-function buildRutaOptions(selectedRuta){
-  // Build options from current routes object
-  var opts=Object.values(routes).map(function(r){
-    var sel=(r.id===selectedRuta)?' selected':'';
-    return '<option value="'+r.id+'"'+sel+'>'+escHtmlKmz(r.nombre)+'</option>';
-  }).join('');
-  return opts;
-}
-
-function populateKmzRutaAssign(){
-  var sel=document.getElementById('kmz-ruta-assign');
-  if(!sel)return;
-  sel.innerHTML='<option value="">— Asignar ruta a nuevos tramos —</option>'
-    +Object.values(routes).map(function(r){
-      return '<option value="'+r.id+'">'+escHtmlKmz(r.nombre)+'</option>';
-    }).join('')
-    +'<option value="__new__">+ Crear nueva ruta...</option>';
-}
-
-function kmzRutaAssignChange(val){
-  if(val==='__new__'){
-    kmzPromptNewRuta(function(newId){
-      populateKmzRutaAssign();
-      var sel=document.getElementById('kmz-ruta-assign');
-      if(sel) sel.value=newId;
-      // Rebuild ALL tramo selects with new route included
-      kmzParsed.tramos.forEach(function(t,i){
-        var ts=document.getElementById('kmz-ruta-t-'+i);
-        if(ts){
-          var cur=ts.value==='__new__'?newId:ts.value;
-          ts.innerHTML=buildRutaOptions(cur)+'<option value="__new__">+ Crear nueva ruta...</option>';
-          ts.value=cur;
-        }
-      });
-    });
-    var sel=document.getElementById('kmz-ruta-assign');
-    if(sel) sel.value='';
-  } else if(val){
-    // Assign this ruta to ALL tramos (both new and existing)
-    kmzParsed.tramos.forEach(function(t,i){
-      var ts=document.getElementById('kmz-ruta-t-'+i);
-      if(ts) ts.value=val;
-    });
-    toast('Ruta asignada a todos los tramos');
-  }
-}
-
-function kmzHandleTramoRutaChange(idx, val){
-  if(val!=='__new__')return;
-  var sel=document.getElementById('kmz-ruta-t-'+idx);
-  kmzPromptNewRuta(function(newId){
-    // Rebuild all selects to include new route
-    kmzParsed.tramos.forEach(function(t,i){
-      var ts=document.getElementById('kmz-ruta-t-'+i);
-      if(ts){
-        var curVal=ts.value;
-        ts.innerHTML=buildRutaOptions(curVal==='__new__'?newId:curVal)
-          +'<option value="__new__">+ Crear nueva ruta...</option>';
-        ts.value=(curVal==='__new__')?newId:curVal;
-      }
-    });
-    populateKmzRutaAssign();
-  });
-  if(sel) sel.value='';
-}
-
-function kmzPromptNewRuta(callback){
-  var nombre=window.prompt('Nombre de la nueva ruta (ej: Medellín–Cali):');
-  if(!nombre||!nombre.trim()){toast('Nombre requerido','err');return;}
-  nombre=nombre.trim();
-  var colors=['#34D399','#F59E0B','#EF4444','#A78BFA','#FB923C','#38BDF8'];
-  var newId='r'+(Object.keys(routes).length+1);
-  var color=colors[Object.keys(routes).length%colors.length];
-  routes[newId]={id:newId,nombre:nombre,color:color};
-  saveRutaToDB(routes[newId]);
-  renderRouteFilters();
-  toast('Ruta "'+nombre+'" creada · Guardada en base de datos');
-  if(callback) callback(newId);
-}
-
-
-function showKMZPreview(){
-  populateKmzRutaAssign();
-  // Update counters
-  document.getElementById('kmz-count-tramos').textContent=kmzParsed.tramos.length;
-  document.getElementById('kmz-count-puntos').textContent=kmzParsed.puntos.length;
-  document.getElementById('kmz-count-capas').textContent=kmzParsed.capas.length;
-  // Show puntos breakdown by type in the capas count
-  var tipoCount={};
-  kmzParsed.puntos.forEach(function(p){ tipoCount[p.tipo]=(tipoCount[p.tipo]||0)+1; });
-  var tipoStr=Object.entries(tipoCount).map(function(kv){return kv[0]+': '+kv[1];}).join(', ');
-  var puntosEl=document.getElementById('kmz-count-puntos');
-  if(puntosEl&&tipoStr) puntosEl.title=tipoStr;
-
-  // Tramos list
-  var tp=document.getElementById('kmz-tramos-preview');
-  tp.innerHTML=kmzParsed.tramos.map(function(t,i){
-    var rutaColor=t.ruta==='r1'?'#60A5FA':'#A78BFA';
-    return '<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin-bottom:5px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center">'
-      +'<span style="font-size:11px;color:#fff;font-weight:500">'+escHtmlKmz(t.name)+'</span>'
-      +'<span style="font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:'+rutaColor+'22;color:'+rutaColor+'">'+t.ruta.toUpperCase()+'</span>'
-      +'</div>'
-      +'<div style="font-size:9px;color:var(--muted);margin-top:2px">'+escHtmlKmz(t.folder||'Raiz')+' &middot; '+t.coords.length+' puntos</div>'
-      +'<select class="inp" id="kmz-ruta-t-'+i+'" style="margin-top:5px;font-size:10px;padding:3px 7px;height:auto" onchange="kmzHandleTramoRutaChange('+i+', this.value)">'
-      +buildRutaOptions(t.ruta)
-      +'<option value="__new__">+ Crear nueva ruta...</option>'
-      +'</select>'
-      +'</div>';
-  }).join('')||'<div class="empty">Sin tramos</div>';
-
-  // Comparison with existing tramos
-  var cp=document.getElementById('kmz-compare-preview');
-  var existing=tramos.map(function(t){return t.tramo.toLowerCase();});
-  var newNames=kmzParsed.tramos.map(function(t){return t.name.toLowerCase();});
-
-  var kept=[], added=[], removed=[];
-  tramos.forEach(function(t){
-    if(newNames.includes(t.tramo.toLowerCase())) kept.push(t.tramo);
-    else removed.push(t.tramo);
-  });
-  kmzParsed.tramos.forEach(function(t){
-    if(!existing.includes(t.name.toLowerCase())) added.push(t.name);
-  });
-
-  cp.innerHTML=
-    (kept.length?'<div style="font-size:9px;font-weight:700;color:var(--av);margin-bottom:5px">CONSERVADOS ('+kept.length+')</div>'+kept.map(function(n){return '<div style="font-size:10px;color:var(--av);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)">✓ '+escHtmlKmz(n)+'</div>';}).join(''):'')
-    +(added.length?'<div style="font-size:9px;font-weight:700;color:var(--acc);margin:8px 0 5px">NUEVOS ('+added.length+')</div>'+added.map(function(n){return '<div style="font-size:10px;color:var(--acc);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)">+ '+escHtmlKmz(n)+'</div>';}).join(''):'')
-    +(removed.length?'<div style="font-size:9px;font-weight:700;color:var(--cr);margin:8px 0 5px">YA NO ESTAN ('+removed.length+')</div>'+removed.map(function(n){return '<div style="font-size:10px;color:var(--cr);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)">- '+escHtmlKmz(n)+'</div>';}).join(''):'')
-    ||'<div class="empty">Sin comparacion disponible</div>';
-}
-
-async function kmzApply(){
-  var keepStates=document.getElementById('kmz-keep-states').checked;
-
-  // Build state map from existing tramos
-  var stateMap={};
-  tramos.forEach(function(t){ stateMap[t.tramo.toLowerCase()]={estado:t.estado,actor:t.actor,km:t.km,proxima:t.proxima,fp:t.fp,concesion:t.concesion,id:t.id,ruta:t.ruta}; });
-
-  // Build new tramos array from KMZ
-  var newTramos=kmzParsed.tramos.map(function(t,i){
-    var rutaEl=document.getElementById('kmz-ruta-t-'+i);
-    var ruta=rutaEl?rutaEl.value:(t.ruta||'r1');
-    if(ruta==='__new__'||!ruta||!routes[ruta]) ruta=Object.keys(routes)[0]||'r1';
-    var existing=stateMap[t.name.toLowerCase()];
-    return {
-      id: existing?existing.id:uid(),
-      ruta: ruta,
-      tramo: t.name,
-      actor: existing?existing.actor:'Pendiente',
-      km: existing?existing.km:Math.round(calcKm(t.coords)),
-      estado: (keepStates&&existing)?existing.estado:'En gestión',
-      proxima: existing?existing.proxima:'',
-      fp: existing?existing.fp:'',
-      concesion: existing?existing.concesion:'',
-      coords: t.coords
-    };
-  });
-
-  // Show loading
-  document.getElementById('kmz-panel-2').innerHTML='<div class="thinking"><span></span><span></span><span></span><span style="margin-left:8px">Guardando en base de datos y actualizando mapa...</span></div>';
-
-  try{
-    // Save all new tramos to Supabase
-    await sbUpsert('tramos', newTramos.map(function(t){
-      return {id:t.id,ruta:t.ruta,tramo:t.tramo,actor:t.actor,km:t.km,
-        estado:t.estado,proxima:t.proxima||'',fp:t.fp||'',
-        concesion:t.concesion||'',coords:t.coords,
-        updated_at:new Date().toISOString()};
-    }));
-
-    // Delete tramos that no longer exist
-    var newNames=newTramos.map(function(t){return t.tramo.toLowerCase();});
-    var toDelete=tramos.filter(function(t){return !newNames.includes(t.tramo.toLowerCase());});
-    await Promise.all(toDelete.map(function(t){return sbDelete('tramos',t.id).catch(function(){});}));
-
-    // Update local state - tramos
-    tramos=newTramos;
-
-    // Save puntos to Supabase if any detected
-    var newPuntos=kmzParsed.puntos.map(function(p){
-      return {
-        id: uid(),
-        nombre: p.nombre||'Sin nombre',
-        tipo: p.tipo||'Marcador',
-        lat: p.lat,
-        lng: p.lng,
-        ruta: p.ruta||'r1',
-        label: p.tipo||'Marcador',
-        color: '#94A3B8'
-      };
-    });
-
-    if(newPuntos.length>0){
-      // Try to save puntos - table may not exist yet, handle gracefully
-      try{
-        await sbUpsert('puntos', newPuntos);
-      }catch(e){
-        console.warn('Tabla puntos no existe aun - usando puntos en memoria solamente');
-      }
-      // Update in-memory KMZ_PUNTOS (reassign the global)
-      window._kmzPuntosOverride = newPuntos;
-    }
-
-    // Update map - tramos + puntos
-    if(mapInst){
-      drawAllLines();
-      // Redraw puntos with new data
-      var puntosData = window._kmzPuntosOverride || KMZ_PUNTOS;
-      Object.values(markerGroups).forEach(function(g){if(g)g.clearLayers();});
-      puntosData.forEach(function(p){
-        if(!p.lat||!p.lng||isNaN(p.lat)||isNaN(p.lng))return;
-        if(p.lat<1||p.lat>12||p.lng<-80||p.lng>-65)return;
-        var color=(p.tipo==='PEAJES')?'#EF4444':(p.tipo==='PUENTES')?'#10B981':(p.tipo==='POSIBLES OBSTACULOS')?'#F59E0B':'#60A5FA';
-        var gkey=(p.tipo==='PEAJES'||p.tipo==='PUENTES')?'peajes':(p.tipo==='POSIBLES OBSTACULOS')?'obstaculos':'nodos';
-        var grp=markerGroups[gkey];if(!grp)return;
-        try{
-          var mk=L.circleMarker([p.lat,p.lng],{radius:4,fillColor:color,color:'#fff',weight:1,fillOpacity:0.9,opacity:0.9});
-          mk.bindPopup('<b>'+(p.nombre||'Sin nombre')+'</b><br><small>'+(p.tipo||'')+'</small>');
-          grp.addLayer(mk);
-        }catch(e){}
-      });
-      renderMapSide();
-    }
-    renderAll();
-
-    // Step 3
-    kmzSetStep(3);
-    var kept=newTramos.filter(function(t){return stateMap[t.tramo.toLowerCase()];}).length;
-    var added=newTramos.length-kept;
-    document.getElementById('kmz-done-msg').textContent='KMZ aplicado correctamente';
-    document.getElementById('kmz-done-detail').textContent=
-      newTramos.length+' tramos en el mapa · '
-      +kept+' estados conservados · '
-      +added+' tramos nuevos · '
-      +toDelete.length+' tramos eliminados · '
-      +newPuntos.length+' puntos de interes actualizados';
-    toast('KMZ actualizado: '+newTramos.length+' tramos + '+newPuntos.length+' puntos');
-
-  }catch(err){
-    console.error('kmzApply error:',err);
-    toast('Error aplicando KMZ: '+err.message,'err');
-    kmzReset();
-  }
-}
-
-function calcKm(coords){
-  if(!coords||coords.length<2)return 0;
-  var total=0;
-  for(var i=1;i<coords.length;i++){
-    var lat1=coords[i-1][0]*Math.PI/180, lat2=coords[i][0]*Math.PI/180;
-    var dlat=lat2-lat1;
-    var dlng=(coords[i][1]-coords[i-1][1])*Math.PI/180;
-    var a=Math.sin(dlat/2)*Math.sin(dlat/2)+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dlng/2)*Math.sin(dlng/2);
-    total+=6371*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-  }
-  return total;
-}
-
-function escHtmlKmz(str){
   return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
@@ -2432,99 +1865,16 @@ function renderHitos(){
   tbody.innerHTML=rows||"<tr><td colspan='7' style='padding:28px;text-align:center;color:var(--muted2);font-size:11px'>Sin hitos registrados. Agrégalos al crear una gestión.</td></tr>";
 }
 
-function renderRouteFilters(){
-  // ── Tramos tab filter buttons ──────────────────────────
-  var trf=document.getElementById('tramos-route-filters');
-  if(trf){
-    // Remove old dynamic buttons (keep static ones if any)
-    Array.from(trf.querySelectorAll('button')).forEach(function(b){b.remove();});
-    // Add "Todas" button
-    var allBtn=document.createElement('button');
-    allBtn.className='fb'+(fRuta==='all'?' active':'');
-    allBtn.id='fr-all';
-    allBtn.textContent='Todas';
-    allBtn.onclick=function(){fR('all');};
-    trf.appendChild(allBtn);
-    // Add one button per route
-    Object.values(routes).forEach(function(r){
-      var btn=document.createElement('button');
-      btn.className='fb'+(fRuta===r.id?' active':'');
-      btn.id='fr-'+r.id;
-      btn.textContent=r.nombre;
-      btn.onclick=function(){fR(r.id);};
-      trf.appendChild(btn);
-    });
-  }
-
-  // ── Mapa tab filter buttons ────────────────────────────
-  var mrf=document.getElementById('mapa-route-filters');
-  if(mrf){
-    Array.from(mrf.querySelectorAll('button')).forEach(function(b){b.remove();});
-    var allBtnM=document.createElement('button');
-    allBtnM.className='fb'+(mapFiltVal==='all'?' active':'');
-    allBtnM.id='mf-all';
-    allBtnM.textContent='Todas las rutas';
-    allBtnM.onclick=function(){mapFilt('all');};
-    mrf.appendChild(allBtnM);
-    Object.values(routes).forEach(function(r){
-      var btn=document.createElement('button');
-      btn.className='fb'+(mapFiltVal===r.id?' active':'');
-      btn.id='mf-'+r.id;
-      btn.textContent=r.nombre;
-      btn.onclick=function(){mapFilt(r.id);};
-      mrf.appendChild(btn);
-    });
-  }
-
-  // ── Tramos tab route select in edit-tramo modal ────────
-  var etR=document.getElementById('et-r');
-  if(etR){
-    var cur=etR.value;
-    etR.innerHTML=Object.values(routes).map(function(r){
-      return '<option value="'+r.id+'"'+(r.id===cur?' selected':'')+'>'+escapeHtml(r.nombre)+'</option>';
-    }).join('');
-  }
-}
-
-
-function escapeHtml(str){
-  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-
 function renderAll(){
   kpis();
-  renderRouteSummaryCards();
+  const keys=Object.keys(routes);
+  routeSummary("sr1",keys[0]||"r1");
+  routeSummary("sr2",keys[1]||"r2");
   recBit();
   renderHitos();
-  renderRouteFilters();
   if(activeTab==="tramos")renderTramoList();
   if(activeTab==="bitacora")renderBitList();
   if(activeTab==="rutas"){renderRutasList();if(editingRoute)selEditRoute(editingRoute);}
-}
-
-function renderRouteSummaryCards(){
-  var container=document.getElementById('route-summary-cards');
-  if(!container)return;
-  var rkeys=Object.keys(routes);
-  // Build a card per route
-  var cardsHtml='';
-  rkeys.forEach(function(rid){
-    var r=routes[rid];
-    var color=r.color||'#60A5FA';
-    cardsHtml+='<div class="card">'
-      +'<div class="card-h">'
-      +'<span class="card-t">'+escapeHtml(r.nombre)+'</span>'
-      +'<span class="rpill" style="background:'+color+'22;color:'+color+';border:1px solid '+color+'44">'+rid.toUpperCase()+'</span>'
-      +'</div>'
-      +'<div class="card-b" id="sr-'+rid+'"></div>'
-      +'</div>';
-  });
-  container.innerHTML=cardsHtml;
-  // Now populate each card
-  rkeys.forEach(function(rid){
-    routeSummary('sr-'+rid, rid);
-  });
 }
 
 // ─── INIT ────────────────────────────────────────────────────
@@ -2534,7 +1884,6 @@ try{
   if(apiNotice&&apiKey)apiNotice.style.display="none";
   renderAll();
   setTimeout(setupDropZone,100);
-  setTimeout(setupKMZDropZone,150);
   loadFromDB();
 }catch(initErr){
   console.error('INIT ERROR:',initErr);
@@ -2544,6 +1893,7 @@ try{
     +'<p style="color:#7a95bb;margin-top:20px">Abre DevTools (F12) → Console para ver el error completo.</p>'
     +'</div>';
 }
+
 </script>
 </body>
 </html>

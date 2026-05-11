@@ -787,7 +787,7 @@ function lineColor(t){
   return SC[t.estado]||'#94A3B8';
 }
 function buildPopup(t){
-  var c=t.estado==='Avanzado'?'#10B981':t.estado==='En gestión'?'#F59E0B':'#EF4444';
+  var c=SC[t.estado]||'#94A3B8';
   var lb=null;
   for(var i=0;i<bitacora.length;i++){if(bitacora[i].tramo===t.tramo&&(!lb||bitacora[i].fecha>lb.fecha))lb=bitacora[i];}
   var h='<div style="font-family:Arial,sans-serif;min-width:190px">'
@@ -930,10 +930,10 @@ function renderMapSide(){
   for(var i=0;i<tramos.length;i++){if(mapFiltVal==='all'||tramos[i].ruta===mapFiltVal)vis.push(tramos[i]);}
   var h='';
   for(var i=0;i<vis.length;i++){
-    var t=vis[i];var sc=t.estado==='Avanzado'?'av':t.estado==='En gesti\u00f3n'?'eg':'cr';
+    var t=vis[i];var sc=t.estado; // use estado directly - sb() handles colors
     h+='<div class="ms-item" onclick="focusT(\''+t.id+'\')">'
       +'<div class="ms-nm">'+t.tramo+'</div>'
-      +'<div class="ms-meta"><span class="sb '+sc+'">'+t.estado+'</span> '+t.km+'km</div></div>';
+      +'<div class="ms-meta">'+sb(t.estado)+' '+t.km+'km</div></div>';
   }
   document.getElementById('map-tlist').innerHTML=h;
 }
@@ -1274,7 +1274,7 @@ function openModal(type,id,preTramo){
         <div class="fl"><label>Próxima acción</label><input type="text" class="inp" id="f-prox" placeholder="Seguimiento, reunión, envío…"></div>
         <div class="fl"><label>Fecha próxima acción</label><input type="date" class="inp" id="f-fprox"></div>
       </div>
-      <div class="fl"><label>Actualizar semáforo del tramo</label><select class="inp" id="f-est"><option value="">— sin cambio —</option><option value="Avanzado">Avanzado</option><option value="En gestión">En gestión</option><option value="Crítico">Crítico</option></select></div>
+      <div class="fl"><label>Actualizar semáforo del tramo</label><select class="inp" id="f-est"><option value="">— sin cambio —</option>${Object.keys(SC).map(function(e){return '<option value="'+e+'">'+e+'</option>';}).join('')}</select></div>
       <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 0 4px;border-top:1px solid var(--border);margin-top:4px">Hitos de fecha (opcional)</div>
       <div class="frow">
         <div class="fl"><label>Fecha radicacion</label><input type="date" class="inp" id="f-hito-rad"></div>
@@ -1365,7 +1365,7 @@ function openModal(type,id,preTramo){
       </div>
       <div class="frow">
         <div class="fl"><label>Kilómetros</label><input type="number" class="inp" id="nt-km" value="0" min="0"></div>
-        <div class="fl"><label>Estado inicial</label><select class="inp" id="nt-e"><option value="En gestión">En gestión</option><option value="Avanzado">Avanzado</option><option value="Crítico">Crítico</option></select></div>
+        <div class="fl"><label>Estado inicial</label><select class="inp" id="nt-e">${Object.keys(SC).map(function(e){return '<option value="'+e+'">'+e+'</option>';}).join('')}</select></div>
       </div>
       <div class="sec-tag">Coordenadas del trazado (lat, lng por punto)</div>
       <div id="coords-cont"></div>
@@ -1398,7 +1398,7 @@ function openModal(type,id,preTramo){
       <div class="fl"><label>Nombre del tramo</label><input type="text" class="inp" id="et-n" value="${t.tramo}"></div>
       <div class="frow">
         <div class="fl"><label>Ruta</label><select class="inp" id="et-r">${rOpts}</select></div>
-        <div class="fl"><label>Estado (semáforo)</label><select class="inp" id="et-e"><option value="Avanzado"${t.estado==="Avanzado"?" selected":""}>Avanzado</option><option value="En gestión"${t.estado==="En gestión"?" selected":""}>En gestión</option><option value="Crítico"${t.estado==="Crítico"?" selected":""}>Crítico</option></select></div>
+        <div class="fl"><label>Estado (semáforo)</label><select class="inp" id="et-e">${Object.keys(SC).map(function(e){return '<option value="'+e+'"'+(t.estado===e?' selected':'')+'>'+e+'</option>';}).join('')}</select></div>
       </div>
       <div class="frow">
         <div class="fl"><label>Actor</label><input type="text" class="inp" id="et-a" value="${t.actor}"></div>
@@ -1429,7 +1429,7 @@ function openModal(type,id,preTramo){
       </div>
       <div class="frow">
         <div class="fl"><label>Actor</label><input type="text" class="inp" id="s1-a" value="${t.actor}"></div>
-        <div class="fl"><label>Estado</label><select class="inp" id="s1-e"><option value="En gestión">En gestión</option><option value="Avanzado">Avanzado</option><option value="Crítico">Crítico</option></select></div>
+        <div class="fl"><label>Estado</label><select class="inp" id="s1-e">${Object.keys(SC).map(function(e){return '<option value="'+e+'">'+e+'</option>';}).join('')}</select></div>
       </div>
       <div class="sec-tag">Subtramo 2</div>
       <div class="frow">
@@ -1438,7 +1438,7 @@ function openModal(type,id,preTramo){
       </div>
       <div class="frow">
         <div class="fl"><label>Actor</label><input type="text" class="inp" id="s2-a" value="${t.actor}"></div>
-        <div class="fl"><label>Estado</label><select class="inp" id="s2-e"><option value="En gestión">En gestión</option><option value="Avanzado">Avanzado</option><option value="Crítico">Crítico</option></select></div>
+        <div class="fl"><label>Estado</label><select class="inp" id="s2-e">${Object.keys(SC).map(function(e){return '<option value="'+e+'">'+e+'</option>';}).join('')}</select></div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:8px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
@@ -2561,7 +2561,7 @@ function renderEMLResults(){
           <div class="fl"><label>Resultado obtenido</label><textarea class="inp" id="ee-rs-${i}">${a.resultado||""}</textarea></div>
           <div class="frow">
             <div class="fl"><label>Próxima acción</label><input class="inp" id="ee-px-${i}" value="${a.proxima_accion||""}"></div>
-            <div class="fl"><label>Actualizar semáforo</label><select class="inp" id="ee-es-${i}"><option value="">— sin cambio —</option><option value="Avanzado"${a.estado_sugerido==="Avanzado"?" selected":""}>Avanzado</option><option value="En gestión"${a.estado_sugerido==="En gestión"?" selected":""}>En gestión</option><option value="Crítico"${a.estado_sugerido==="Crítico"?" selected":""}>Crítico</option></select></div>
+            <div class="fl"><label>Actualizar semáforo</label><select class="inp" id="ee-es-${i}"><option value="">— sin cambio —</option>${Object.keys(SC).map(function(e){return '<option value="'+e+'"'+(a.estado_sugerido===e?' selected':'')+'>'+e+'</option>';}).join('')}</select></div>
           </div>
         </div>
       </div>

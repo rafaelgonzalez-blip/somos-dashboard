@@ -1091,7 +1091,7 @@ function selT(id){
         <span style="color:var(--muted)">Fecha próxima</span><span style="color:#fff">${fmt(t.fp)}</span>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-        <button class="btn btn-warn btn-sm" onclick="openModal('dividir-tramo','${t.id}')">Dividir en subtramos</button>
+        <button class="btn btn-warn btn-sm" onclick="openModal('nuevo-tramo','${t.ruta}','${t.id}')">+ Subtramo</button>
         <button class="btn btn-g btn-sm" onclick="openModal('alt-ruta','${t.id}')">Ruta alternativa</button>
       </div>
       <div class="divd"></div>
@@ -1151,7 +1151,7 @@ function selEditRoute(rid){
       <div style="display:flex;gap:4px;flex-wrap:wrap">
         ${sb(t.estado)}
         <button class="btn btn-warn btn-sm" onclick="openModal('edit-tramo','${t.id}')">Editar</button>
-        <button class="btn btn-warn btn-sm" onclick="openModal('dividir-tramo','${t.id}')">Dividir</button>
+        <button class="btn btn-warn btn-sm" onclick="openModal('nuevo-tramo','${t.ruta}','${t.id}')">+ Sub</button>
         <button class="btn btn-danger btn-sm" onclick="qDelTramo('${t.id}')">×</button>
       </div>
     </div>`).join("")||'<div class="empty">Sin tramos en esta ruta</div>'}</div>`;
@@ -1356,7 +1356,8 @@ function openModal(type,id,preTramo){
   }
 
   else if(type==="nuevo-tramo"){
-    mt.textContent="Agregar tramo a: "+(routes[id]?.nombre||id);
+    var isSubModal=!!preTramo; // preTramo used as parentId here
+    mt.textContent=isSubModal?"Agregar subtramo":"Agregar tramo a: "+(routes[id]?.nombre||id);
     mb.innerHTML=`<div class="ff">
       <div class="fl"><label>Nombre del tramo</label><input type="text" class="inp" id="nt-n" placeholder="Ciudad A – Ciudad B"></div>
       <div class="frow">
@@ -1371,8 +1372,8 @@ function openModal(type,id,preTramo){
       <div id="coords-cont"></div>
       <button class="btn btn-g btn-sm" onclick="addCoord()" style="align-self:flex-start;margin-bottom:4px">+ Agregar punto</button>
       <div class="fl"><label>Primera acción a realizar</label><input type="text" class="inp" id="nt-p" placeholder="Primera gestión a realizar"></div>
-      <div class="fl"><label>Tipo de elemento</label><select class="inp" id="nt-tipo"><option value="tramo">Tramo principal</option><option value="subtramo">Subtramo</option><option value="caja">Caja de empalme</option><option value="puente">Puente</option><option value="cruce">Cruce</option><option value="crítico">Elemento crítico</option></select></div>
-      <div class="fl" id="nt-parent-wrap" style="display:none"><label>Tramo padre</label><select class="inp" id="nt-parent">${tramos.filter(t=>!t.parent_id).map(t=>`<option value="${t.id}">${t.tramo}</option>`).join('')}</select></div>
+      <div class="fl"><label>Tipo de elemento</label><select class="inp" id="nt-tipo"><option value="${isSubModal?'subtramo':'tramo'}">${isSubModal?'Subtramo':'Tramo principal'}</option>${isSubModal?'':'<option value="subtramo">Subtramo</option>'}<option value="caja">Caja de empalme</option><option value="puente">Puente</option><option value="cruce">Cruce</option><option value="crítico">Elemento crítico</option></select></div>
+      <div class="fl" id="nt-parent-wrap" style="display:${isSubModal?'block':'none'}"><label>Tramo padre</label><select class="inp" id="nt-parent">${tramos.filter(t=>!t.parent_id).map(t=>`<option value="${t.id}"${preTramo===t.id?' selected':''}>${t.tramo}</option>`).join('')}</select></div>
       <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
         <button class="btn btn-p" onclick="saveNuevoTramo('${id}')">Agregar</button>

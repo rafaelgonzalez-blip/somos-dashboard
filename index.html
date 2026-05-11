@@ -279,6 +279,71 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
         <div class="card-b" id="tramo-editor-body"><div class="empty">Selecciona una ruta para editar sus tramos</div></div>
       </div>
     </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="card-h">
+        <span class="card-t">Actualizar KMZ</span>
+        <span style="font-size:9px;background:rgba(59,130,246,.15);color:var(--acc);border:1px solid rgba(59,130,246,.3);padding:2px 9px;border-radius:4px;font-weight:700">Importador flexible</span>
+      </div>
+      <div class="card-b">
+        <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">Sube un KMZ actualizado para sincronizar tramos y puntos del mapa. Detecta LineStrings como tramos y Points como POIs sin depender de la estructura de carpetas. Los estados existentes se conservan.</p>
+        <div class="step-bar" id="kmz-steps">
+          <div class="step-pill active" id="kstep-1">1. Subir KMZ</div>
+          <div class="step-pill" id="kstep-2">2. Previsualizar</div>
+          <div class="step-pill" id="kstep-3">3. Confirmar</div>
+        </div>
+        <div id="kmz-panel-1">
+          <input type="file" id="kmz-input" accept=".kmz,.kml" style="display:none">
+          <label for="kmz-input" class="drop-zone" id="kmz-drop-zone" style="margin-bottom:10px;display:block;cursor:pointer">
+            <div style="font-size:36px;margin-bottom:8px">&#128506;</div>
+            <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:4px">Haz clic aqui para seleccionar un archivo .kmz o .kml</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">o arrastra el archivo sobre esta area</div>
+            <div style="font-size:10px;color:var(--muted2)">Estructura flexible &#8212; detecta tramos y puntos automaticamente</div>
+          </label>
+          <div id="kmz-upload-status" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
+        </div>
+        <div id="kmz-panel-2" style="display:none">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+            <div class="kpi av"><div class="kpi-l">Tramos detectados</div><div class="kpi-v" id="kmz-count-tramos">0</div></div>
+            <div class="kpi acc"><div class="kpi-l">Puntos de interes</div><div class="kpi-v" id="kmz-count-puntos">0</div></div>
+            <div class="kpi eg"><div class="kpi-l">Capas detectadas</div><div class="kpi-v" id="kmz-count-capas">0</div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+            <div>
+              <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Tramos detectados</div>
+              <div id="kmz-tramos-preview" style="max-height:300px;overflow-y:auto" class="sc"></div>
+            </div>
+            <div>
+              <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Comparacion con tramos actuales</div>
+              <div id="kmz-compare-preview" style="max-height:300px;overflow-y:auto" class="sc"></div>
+            </div>
+          </div>
+          <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Asignar ruta</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <label style="font-size:11px;color:var(--muted)">Asignar todos los tramos nuevos a:</label>
+              <select class="inp" id="kmz-ruta-assign" style="width:auto;flex:1;min-width:180px" onchange="kmzRutaAssignChange(this.value)">
+                <option value="">&#8212; Seleccionar ruta &#8212;</option>
+              </select>
+              <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px">
+                <input type="checkbox" id="kmz-keep-states" checked style="accent-color:var(--acc)">
+                Conservar estados existentes
+              </label>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-g btn-sm" onclick="kmzReset()">Cancelar</button>
+            <button class="btn btn-p" onclick="kmzApply()">Aplicar y sincronizar mapa</button>
+          </div>
+        </div>
+        <div id="kmz-panel-3" style="display:none;text-align:center;padding:24px">
+          <div style="font-size:36px;margin-bottom:10px">&#10003;</div>
+          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:6px" id="kmz-done-msg">KMZ aplicado</div>
+          <div style="font-size:11px;color:var(--muted)" id="kmz-done-detail"></div>
+          <button class="btn btn-g btn-sm" style="margin-top:14px" onclick="kmzReset()">Subir otro KMZ</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- CORREO / EML -->
@@ -1045,7 +1110,7 @@ function sw(name){
   if(name==="mapa")setTimeout(function(){if(!mapInst)initMap();else{mapInst.invalidateSize();drawAllLines();drawPuntos();}},100);
   if(name==="tramos"){renderTramoList();buildEstadoFilters();}
   if(name==="bitacora")renderBitList();
-  if(name==="rutas"){renderRutasList();}
+  if(name==="rutas"){renderRutasList();setTimeout(setupKMZDropZone,50);}
 }
 
 // ─── MODAL ───────────────────────────────────────────────────

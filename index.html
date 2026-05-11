@@ -498,25 +498,21 @@ async function loadFromDB(){
       dbRutas.forEach(function(r){ routes[r.id] = {id:r.id, nombre:r.nombre, color:r.color}; });
     }
     
-    // Load tramos
+    // Load tramos - DB is source of truth, KMZ provides coords fallback
     var dbTramos = await sbGet('tramos','order=id.asc');
     if(dbTramos && dbTramos.length > 0){
-      // Merge DB state with KMZ coords (coords stay from KMZ, state from DB)
-      dbTramos.forEach(function(dt){
-        var t = tramos.find(function(x){return x.id===dt.id;});
-        if(t){
-          t.estado = dt.estado || t.estado;
-          t.actor = dt.actor || t.actor;
-          t.km = dt.km || t.km;
-          t.proxima = dt.proxima || t.proxima;
-          t.fp = dt.fp || t.fp;
-          t.concesion = dt.concesion || t.concesion;
-          t.tramo = dt.tramo || t.tramo;
-          t.ruta = dt.ruta || t.ruta;
-        } else {
-          // New tramo added via dashboard
-          if(dt.coords) tramos.push(Object.assign({}, dt, {coords: dt.coords}));
-        }
+      // Build KMZ coords lookup by id
+      var kmzCoords = {};
+      KMZ_TRAMOS.forEach(function(k){ kmzCoords[k.id] = k.coords; });
+      // Replace tramos array with DB version, using KMZ coords when DB has none
+      tramos = dbTramos.map(function(dt){
+        var coords = (dt.coords && dt.coords.length > 0) ? dt.coords : (kmzCoords[dt.id] || []);
+        return {
+          id: dt.id, ruta: dt.ruta, tramo: dt.tramo,
+          actor: dt.actor||'', km: dt.km||0, estado: dt.estado||'En gestión',
+          proxima: dt.proxima||'', fp: dt.fp||'', concesion: dt.concesion||'',
+          coords: coords
+        };
       });
     } else {
       // First load — seed tramos to DB
@@ -538,7 +534,7 @@ async function loadFromDB(){
     dbLoaded = true;
     showDBStatus('');
     renderAll();
-    if(mapInst) refreshLines();
+    if(mapInst){ drawAllLines(); drawPuntos(); renderMapSide(); }
     
   } catch(e){
     console.error('loadFromDB:', e);
@@ -1389,7 +1385,8 @@ function saveAlt(id){
   const t=tramos.find(x=>x.id===id); if(!t)return;
   tramos.push({id:uid(),ruta:gv("alt-r"),tramo:gv("alt-n"),actor:gv("alt-a"),km:parseFloat(gv("alt-km"))||t.km,estado:"En gestión",proxima:"Evaluar viabilidad ruta alternativa",fp:"",concesion:"",coords:t.coords.map((c,i)=>[c[0]+(i%2===0?.08:-.05),c[1]+(i%2===0?-.05:.07)])});
   closeModal(); renderAll(); if(mapInst)drawAllLines(); if(editingRoute)selEditRoute(editingRoute);
-  toast("Ruta alternativa creada y visible en el mapa");
+  var newAlt=tramos[tramos.length-1]; saveTramoToDB(newAlt);
+  toast("Ruta alternativa creada y guardada en base de datos");
 }
 
 // ─── GMAIL SIMULADO ──────────────────────────────────────────

@@ -575,6 +575,17 @@ async function loadFromDB(){
       });
     }
     
+    // Try to load puntos from Supabase if table exists
+    try{
+      var dbPuntos = await sbGet('puntos','order=nombre.asc');
+      if(dbPuntos && dbPuntos.length > 0){
+        window._kmzPuntosOverride = dbPuntos;
+      }
+    }catch(e){
+      // puntos table doesn't exist yet - use KMZ defaults
+      console.log('Using KMZ default puntos');
+    }
+
     dbLoaded = true;
     showDBStatus('');
     renderAll();
@@ -834,7 +845,8 @@ function drawPuntos(){
   if(!mapInst)return;
   var keys=Object.keys(markerGroups);
   for(var i=0;i<keys.length;i++){if(markerGroups[keys[i]])markerGroups[keys[i]].clearLayers();}
-  for(var i=0;i<KMZ_PUNTOS.length;i++){
+  var puntosSource=window._kmzPuntosOverride||KMZ_PUNTOS;
+  for(var i=0;i<puntosSource.length;i++){
     (function(p){
       if(mapFiltVal!=='all'&&p.ruta!==mapFiltVal)return;
       if(!p.lat||!p.lng||isNaN(p.lat)||isNaN(p.lng))return;
@@ -1227,7 +1239,7 @@ function openModal(type,id,preTramo){
         <div class="fl"><label>Kilómetros</label><input type="number" class="inp" id="nt-km" value="0" min="0"></div>
         <div class="fl"><label>Estado inicial</label><select class="inp" id="nt-e"><option value="En gestión">En gestión</option><option value="Avanzado">Avanzado</option><option value="Crítico">Crítico</option></select></div>
       </div>
-      <div class="sec-tag">Coordenadas del trazado (lat, lng por punto)</div>
+      <div class="sec-tag">Coordenadas del trazado (opcional — si no ingresas, se usa el trazado del tramo anterior como placeholder)</div>
       <div id="coords-cont"></div>
       <button class="btn btn-g btn-sm" onclick="addCoord()" style="align-self:flex-start;margin-bottom:4px">+ Agregar punto</button>
       <div class="fl"><label>Primera acción a realizar</label><input type="text" class="inp" id="nt-p" placeholder="Primera gestión a realizar"></div>
@@ -1394,11 +1406,31 @@ function saveNuevoTramo(rutaId){
   const rows=document.getElementById("coords-cont").querySelectorAll(".coord-row");
   const coords=[];
   rows.forEach(r=>{const ins=r.querySelectorAll("input");const lat=parseFloat(ins[0].value),lng=parseFloat(ins[1].value);if(!isNaN(lat)&&!isNaN(lng))coords.push([lat,lng]);});
-  if(coords.length<2){const ex=tramos.filter(t=>t.ruta===rutaId);coords.push(...(ex.length?ex[ex.length-1].coords.slice(-2):[[6.2476,-75.5658],[6.5,-75.0]]));}
-  tramos.push({id:uid(),ruta:rutaId,tramo:n,actor:gv("nt-a"),concesion:gv("nt-c"),km:parseFloat(gv("nt-km"))||0,estado:gv("nt-e"),proxima:gv("nt-p"),fp:"",coords});
-  closeModal(); if(editingRoute===rutaId)selEditRoute(rutaId); renderAll(); if(mapInst)drawAllLines();
-  var nt=tramos[tramos.length-1];if(nt)saveTramoToDB(nt);
-  toast("Tramo agregado · Guardado en base de datos");
+  if(coords.length<2){
+    var ex=tramos.filter(function(t){return t.ruta===rutaId;});
+    if(ex.length){
+      // Use last few points of previous tramo as placeholder
+      var lastCoords=ex[ex.length-1].coords;
+      var sample=lastCoords.slice(Math.max(0,lastCoords.length-5));
+      coords.push.apply(coords,sample);
+    } else {
+      coords.push([6.2476,-75.5658],[6.5,-75.0]);
+    }
+  }
+  var newId=uid();
+  tramos.push({id:newId,ruta:rutaId,tramo:n,actor:gv("nt-a"),concesion:gv("nt-c"),km:parseFloat(gv("nt-km"))||0,estado:gv("nt-e"),proxima:gv("nt-p"),fp:"",coords});
+  closeModal();
+  if(editingRoute===rutaId)selEditRoute(rutaId);
+  renderAll();
+  if(mapInst){drawAllLines();renderMapSide();}
+  var nt=tramos[tramos.length-1];
+  if(nt)saveTramoToDB(nt);
+  // Focus map on new tramo if it has real coords
+  if(nt&&nt.coords.length>=2&&mapInst){
+    var mid=Math.floor(nt.coords.length/2);
+    mapInst.setView([nt.coords[mid][0],nt.coords[mid][1]],10,{animate:true});
+  }
+  toast("Tramo "+n+" agregado · Visible en mapa · Guardado en base de datos");
 }
 
 function saveEditTramo(id){
@@ -1408,6 +1440,7 @@ function saveEditTramo(id){
   t.km=parseFloat(gv("et-km"))||t.km; t.fp=gv("et-fp"); t.proxima=gv("et-p");
   closeModal(); renderAll(); refreshLines(); if(selTramo)selT(selTramo); if(editingRoute)selEditRoute(editingRoute);
   var et=tramos.find(function(x){return x.id===id;});if(et)saveTramoToDB(et);
+  if(mapInst)renderMapSide();
   toast("Tramo actualizado · Guardado en base de datos");
 }
 
@@ -1858,6 +1891,12 @@ function showKMZPreview(){
   document.getElementById('kmz-count-tramos').textContent=kmzParsed.tramos.length;
   document.getElementById('kmz-count-puntos').textContent=kmzParsed.puntos.length;
   document.getElementById('kmz-count-capas').textContent=kmzParsed.capas.length;
+  // Show puntos breakdown by type in the capas count
+  var tipoCount={};
+  kmzParsed.puntos.forEach(function(p){ tipoCount[p.tipo]=(tipoCount[p.tipo]||0)+1; });
+  var tipoStr=Object.entries(tipoCount).map(function(kv){return kv[0]+': '+kv[1];}).join(', ');
+  var puntosEl=document.getElementById('kmz-count-puntos');
+  if(puntosEl&&tipoStr) puntosEl.title=tipoStr;
 
   // Tramos list
   var tp=document.getElementById('kmz-tramos-preview');
@@ -1940,11 +1979,54 @@ async function kmzApply(){
     var toDelete=tramos.filter(function(t){return !newNames.includes(t.tramo.toLowerCase());});
     await Promise.all(toDelete.map(function(t){return sbDelete('tramos',t.id).catch(function(){});}));
 
-    // Update local state
+    // Update local state - tramos
     tramos=newTramos;
 
-    // Update map
-    if(mapInst){ drawAllLines(); renderMapSide(); }
+    // Save puntos to Supabase if any detected
+    var newPuntos=kmzParsed.puntos.map(function(p){
+      return {
+        id: uid(),
+        nombre: p.nombre||'Sin nombre',
+        tipo: p.tipo||'Marcador',
+        lat: p.lat,
+        lng: p.lng,
+        ruta: p.ruta||'r1',
+        label: p.tipo||'Marcador',
+        color: '#94A3B8'
+      };
+    });
+
+    if(newPuntos.length>0){
+      // Try to save puntos - table may not exist yet, handle gracefully
+      try{
+        await sbUpsert('puntos', newPuntos);
+      }catch(e){
+        console.warn('Tabla puntos no existe aun - usando puntos en memoria solamente');
+      }
+      // Update in-memory KMZ_PUNTOS (reassign the global)
+      window._kmzPuntosOverride = newPuntos;
+    }
+
+    // Update map - tramos + puntos
+    if(mapInst){
+      drawAllLines();
+      // Redraw puntos with new data
+      var puntosData = window._kmzPuntosOverride || KMZ_PUNTOS;
+      Object.values(markerGroups).forEach(function(g){if(g)g.clearLayers();});
+      puntosData.forEach(function(p){
+        if(!p.lat||!p.lng||isNaN(p.lat)||isNaN(p.lng))return;
+        if(p.lat<1||p.lat>12||p.lng<-80||p.lng>-65)return;
+        var color=(p.tipo==='PEAJES')?'#EF4444':(p.tipo==='PUENTES')?'#10B981':(p.tipo==='POSIBLES OBSTACULOS')?'#F59E0B':'#60A5FA';
+        var gkey=(p.tipo==='PEAJES'||p.tipo==='PUENTES')?'peajes':(p.tipo==='POSIBLES OBSTACULOS')?'obstaculos':'nodos';
+        var grp=markerGroups[gkey];if(!grp)return;
+        try{
+          var mk=L.circleMarker([p.lat,p.lng],{radius:4,fillColor:color,color:'#fff',weight:1,fillOpacity:0.9,opacity:0.9});
+          mk.bindPopup('<b>'+(p.nombre||'Sin nombre')+'</b><br><small>'+(p.tipo||'')+'</small>');
+          grp.addLayer(mk);
+        }catch(e){}
+      });
+      renderMapSide();
+    }
     renderAll();
 
     // Step 3
@@ -1953,10 +2035,15 @@ async function kmzApply(){
     var added=newTramos.length-kept;
     document.getElementById('kmz-done-msg').textContent='KMZ aplicado correctamente';
     document.getElementById('kmz-done-detail').textContent=
-      newTramos.length+' tramos en el mapa · '+kept+' estados conservados · '+added+' tramos nuevos · '+toDelete.length+' tramos eliminados';
-    toast('KMZ actualizado: '+newTramos.length+' tramos sincronizados');
+      newTramos.length+' tramos en el mapa · '
+      +kept+' estados conservados · '
+      +added+' tramos nuevos · '
+      +toDelete.length+' tramos eliminados · '
+      +newPuntos.length+' puntos de interes actualizados';
+    toast('KMZ actualizado: '+newTramos.length+' tramos + '+newPuntos.length+' puntos');
 
   }catch(err){
+    console.error('kmzApply error:',err);
     toast('Error aplicando KMZ: '+err.message,'err');
     kmzReset();
   }

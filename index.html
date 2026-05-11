@@ -520,7 +520,7 @@ async function loadFromDB(){
       dbTramos.forEach(function(dt){
         var t = tramos.find(function(x){return x.id===dt.id;});
         if(t){
-          t.estado = dt.estado || t.estado;
+          t.estado = normalizeEstado(dt.estado || t.estado);
           t.actor = dt.actor || t.actor;
           t.km = dt.km || t.km;
           t.proxima = dt.proxima || t.proxima;
@@ -532,9 +532,11 @@ async function loadFromDB(){
           t.tipo_elemento = dt.tipo_elemento||'tramo';
         } else {
           // New tramo added via dashboard (subtramos included)
-          if(dt.coords) tramos.push(Object.assign({
-            parent_id:null, tipo_elemento:'tramo'
-          }, dt, {coords: dt.coords}));
+          if(dt.coords){
+            var nt=Object.assign({parent_id:null,tipo_elemento:'tramo'},dt,{coords:dt.coords});
+            nt.estado=normalizeEstado(nt.estado);
+            tramos.push(nt);
+          }
         }
       });
     } else {
@@ -567,11 +569,24 @@ async function loadFromDB(){
   }
 }
 
+// Map old estado names to current SC names - computed lazily
+function normalizeEstado(e){
+  if(!e) return Object.keys(SC)[0]||e;
+  if(SC[e]) return e; // already a valid SC key
+  // Build compat map on the fly from SC key order
+  var scKeys=Object.keys(SC);
+  var compat={'Avanzado':scKeys[0]||e,'En gestión':scKeys[1]||e,'Crítico':scKeys[2]||e};
+  if(compat[e]) return compat[e];
+  return scKeys[0]||e; // fallback to first SC key
+}
+var _ESTADO_COMPAT={};
+
+
 async function seedTramosToDB(){
   // First time: save all KMZ tramos to DB
   var rows = tramos.map(function(t){
     return {id:t.id, ruta:t.ruta, tramo:t.tramo, actor:t.actor,
-            km:t.km, estado:t.estado, proxima:t.proxima, fp:t.fp,
+            km:t.km, estado:normalizeEstado(t.estado), proxima:t.proxima, fp:t.fp,
             concesion:t.concesion, coords:t.coords};
   });
   await sbUpsert('tramos', rows);
@@ -2855,6 +2870,7 @@ async function saveEstados(){
   }
   // Persist SC
   try{localStorage.setItem('somos_sc', JSON.stringify(SC));}catch(e){}
+
   closeModal();
   renderAll();
   if(mapInst){ drawAllLines(); drawPuntos(); renderMapSide(); }

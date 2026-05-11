@@ -1231,7 +1231,7 @@ function sw(name){
   if(name==="mapa")setTimeout(function(){if(!mapInst)initMap();else{mapInst.invalidateSize();drawAllLines();drawPuntos();}},100);
   if(name==="tramos"){renderTramoList();buildEstadoFilters();}
   if(name==="bitacora")renderBitList();
-  if(name==="rutas"){renderRutasList();setTimeout(setupKMZDropZone,50);}
+  if(name==="rutas"){renderRutasList();if(editingRoute)selEditRoute(editingRoute);setTimeout(setupKMZDropZone,50);}
 }
 
 // ─── MODAL ───────────────────────────────────────────────────

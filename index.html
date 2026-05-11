@@ -201,9 +201,11 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
       <div class="card-h">
         <span class="card-t">&#128506; Mapa KMZ &#8212; trazados reales HORIZON</span>
         <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
+          <span id="mapa-route-filters" style="display:contents">
           <button class="fb active" id="mf-all" onclick="mapFilt('all')">Todas las rutas</button>
           <button class="fb" id="mf-r1" onclick="mapFilt('r1')">MDE&#8211;BAQ</button>
           <button class="fb" id="mf-r2" onclick="mapFilt('r2')">MDE&#8211;BOG</button>
+          </span>
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;padding:9px 14px;border-bottom:1px solid #253352;flex-wrap:wrap">
@@ -248,9 +250,11 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
     <div class="card">
       <div class="fi">
         <span style="font-size:9px;color:var(--muted);font-weight:700">RUTA:</span>
+        <span id="tramos-route-filters" style="display:contents">
         <button class="fb active" id="fr-all" onclick="fR('all')">Todas</button>
         <button class="fb" id="fr-r1" onclick="fR('r1')">MDE–BAQ</button>
         <button class="fb" id="fr-r2" onclick="fR('r2')">MDE–BOG</button>
+        </span>
         <span id="extra-rf"></span>
         <span style="flex:1"></span>
         <button class="fb active" id="fe-all" onclick="fE('all')">Todos</button>
@@ -481,13 +485,11 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
     <div id="modal-body"></div>
   </div>
 </div>
-
 <div class="toast-el" id="toast"></div>
-
-</div><!-- end app -->
-
+</div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+
 // ─── SUPABASE ─
 // ─── SUPABASE ─────────────────────────────────────────────
 const SB_URL = 'https://ayjkwlykkqhkehkihzel.supabase.co';
@@ -589,6 +591,7 @@ async function loadFromDB(){
     dbLoaded = true;
     showDBStatus('');
     renderAll();
+    renderRouteFilters();
     if(mapInst){ drawAllLines(); drawPuntos(); renderMapSide(); }
     
   } catch(e){
@@ -1383,13 +1386,14 @@ function saveNuevaRuta(){
   const n=gv("nr-n").trim(), rid=gv("nr-id").trim()||"r"+uid(), c=gv("nr-c");
   if(!n){toast("Ingresa el nombre de la ruta","err");return;}
   routes[rid]={id:rid,nombre:n,color:c||"#34D399"};
-  closeModal(); renderRutasList(); renderAll();
-  toast("Ruta creada: "+n);
+  saveRutaToDB(routes[rid]);
+  closeModal(); renderRutasList(); renderAll(); renderRouteFilters();
+  toast("Ruta creada: "+n+" · Guardada en base de datos");
 }
 
 function saveEditRuta(rid){
   routes[rid].nombre=gv("er-n"); routes[rid].color=gv("er-c");
-  closeModal(); renderRutasList(); renderAll(); if(mapInst)drawAllLines();
+  closeModal(); renderRutasList(); renderAll(); renderRouteFilters(); if(mapInst)drawAllLines();
   saveRutaToDB(routes[rid]);
   toast("Ruta actualizada · Guardada en base de datos");
 }
@@ -1972,9 +1976,9 @@ function kmzPromptNewRuta(callback){
   var newId='r'+(Object.keys(routes).length+1);
   var color=colors[Object.keys(routes).length%colors.length];
   routes[newId]={id:newId,nombre:nombre,color:color};
-  // Save to Supabase
   saveRutaToDB(routes[newId]);
-  toast('Ruta "'+nombre+'" creada');
+  renderRouteFilters();
+  toast('Ruta "'+nombre+'" creada · Guardada en base de datos');
   if(callback) callback(newId);
 }
 
@@ -2428,6 +2432,40 @@ function renderHitos(){
   tbody.innerHTML=rows||"<tr><td colspan='7' style='padding:28px;text-align:center;color:var(--muted2);font-size:11px'>Sin hitos registrados. Agrégalos al crear una gestión.</td></tr>";
 }
 
+function renderRouteFilters(){
+  // Update Tramos tab route filters
+  var trf=document.getElementById('tramos-route-filters');
+  if(trf){
+    var html_trf='<button class="fb '+(fRuta==="all"?"active":"")+'" id="fr-all" onclick="fR(&quot;all&quot;)">Todas</button>';
+    Object.values(routes).forEach(function(r){
+      html_trf+='<button class="fb '+(fRuta===r.id?"active":"")+'" id="fr-'+r.id+'" onclick="fR(&quot;'+r.id+'&quot;)">'+escapeHtml(r.nombre)+'</button>';
+    });
+    trf.innerHTML=html_trf;
+  }
+  // Update Mapa tab route filters
+  var mrf=document.getElementById('mapa-route-filters');
+  if(mrf){
+    var html_mrf='<button class="fb '+(mapFiltVal==="all"?"active":"")+'" id="mf-all" onclick="mapFilt(&quot;all&quot;)">Todas las rutas</button>';
+    Object.values(routes).forEach(function(r){
+      html_mrf+='<button class="fb '+(mapFiltVal===r.id?"active":"")+'" id="mf-'+r.id+'" onclick="mapFilt(&quot;'+r.id+'&quot;)">'+escapeHtml(r.nombre)+'</button>';
+    });
+    mrf.innerHTML=html_mrf;
+  }
+  // Update tramo selects in modals (if open)
+  ['f-tramo','eb-tramo'].forEach(function(id){
+    var sel=document.getElementById(id);
+    if(!sel)return;
+    var cur=sel.value;
+    sel.innerHTML=tramos.map(function(t){
+      return '<option value="'+t.tramo+'"'+(cur===t.tramo?' selected':'')+'>'+t.tramo+'</option>';
+    }).join('');
+  });
+}
+function escapeHtml(str){
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+
 function renderAll(){
   kpis();
   const keys=Object.keys(routes);
@@ -2435,6 +2473,7 @@ function renderAll(){
   routeSummary("sr2",keys[1]||"r2");
   recBit();
   renderHitos();
+  renderRouteFilters();
   if(activeTab==="tramos")renderTramoList();
   if(activeTab==="bitacora")renderBitList();
   if(activeTab==="rutas"){renderRutasList();if(editingRoute)selEditRoute(editingRoute);}

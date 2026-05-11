@@ -162,9 +162,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
   <!-- OVERVIEW -->
   <div id="t-overview" class="tv active">
     <div class="kpi-row" id="kpi-row"></div>
-    <div class="two-col">
-      <div id="route-summary-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px"></div>
-    </div>
+    <div id="route-summary-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px"></div>
     <div class="card">
       <div class="card-h"><span class="card-t">Últimas gestiones</span><button class="btn btn-p btn-sm" onclick="openModal('gestion')">+ Nueva gestión</button></div>
       <div class="card-b"><div id="rec-bit" class="bl" style="max-height:200px"></div></div>
@@ -443,6 +441,9 @@ async function loadFromDB(){
     if(dbRutas && dbRutas.length > 0){
       routes = {};
       dbRutas.forEach(function(r){ routes[r.id] = {id:r.id, nombre:r.nombre, color:r.color}; });
+    } else {
+      // No routes in DB - seed the defaults
+      for(var rid in routes){ saveRutaToDB(routes[rid]); }
     }
     
     // Load tramos
@@ -1241,8 +1242,9 @@ function saveNuevaRuta(){
   const n=gv("nr-n").trim(), rid=gv("nr-id").trim()||"r"+uid(), c=gv("nr-c");
   if(!n){toast("Ingresa el nombre de la ruta","err");return;}
   routes[rid]={id:rid,nombre:n,color:c||"#34D399"};
+  saveRutaToDB(routes[rid]);
   closeModal(); renderRutasList(); renderAll();
-  toast("Ruta creada: "+n);
+  toast("Ruta creada: "+n+" · Guardada en base de datos");
 }
 
 function saveEditRuta(rid){

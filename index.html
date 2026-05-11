@@ -585,6 +585,7 @@ async function saveTramoToDB(t){
       id:t.id, ruta:t.ruta, tramo:t.tramo, actor:t.actor,
       km:t.km, estado:t.estado, proxima:t.proxima||'', fp:t.fp||'',
       concesion:t.concesion||'', coords:t.coords,
+      parent_id:t.parent_id||null, tipo_elemento:t.tipo_elemento||'tramo',
       updated_at: new Date().toISOString()
     }]);
   } catch(e){ console.error('saveTramoToDB:', e); }
@@ -639,6 +640,7 @@ let activeTab="overview", fRuta="all", fEst="all", fBit="all";
 let selTramo=null, mapFiltVal="all", editingRoute=null;
 let mapInst=null, mapLines={};
 let emlFiles=[], emlResults=[], emlImported=[];
+var kmzParsed={tramos:[],puntos:[],capas:[]};
 
 // ─── HELPERS ────────────────────────────────────────────────
 
@@ -661,11 +663,13 @@ function toast(msg,type){
 
 // ─── KPIs ────────────────────────────────────────────────────
 function kpis(){
+  var solopadres=tramos.filter(function(t){return !t.parent_id;});
+  var tramos_kpi=solopadres;
   var km=function(a){return a.reduce(function(s,t){return s+t.km;},0);};
-  var kpiHtml='<div class="kpi acc"><div class="kpi-l">Tramos</div><div class="kpi-v">'+tramos.length+'</div><div class="kpi-s">'+km(tramos)+' km totales</div></div>';
+  var kpiHtml='<div class="kpi acc"><div class="kpi-l">Tramos</div><div class="kpi-v">'+tramos_kpi.length+'</div><div class="kpi-s">'+km(tramos)+' km totales</div></div>';
   Object.keys(SC).forEach(function(estado){
     var color=SC[estado];
-    var group=tramos.filter(function(t){return t.estado===estado;});
+    var group=tramos_kpi.filter(function(t){return getTramoEfectivo(t)===estado;});
     kpiHtml+='<div class="kpi" style="border-color:'+color+'44"><div class="kpi-l" style="color:'+color+'">'+estado+'</div>'
       +'<div class="kpi-v" style="color:'+color+'">'+group.length+'</div>'
       +'<div class="kpi-s">'+km(group)+' km</div></div>';
@@ -799,7 +803,12 @@ function drawAllLines(){
     (function(t){
       var color=lineColor(t);if(!color)return;
       var vis=mapFiltVal==='all'||t.ruta===mapFiltVal;
-      var line=L.polyline(t.coords,{color:color,weight:vis?5:2,opacity:vis?0.9:0.2,lineCap:'round',lineJoin:'round'}).addTo(mapInst);
+      var isSubtramo=t.parent_id||t.tipo_elemento==='subtramo';
+      var lineWeight=vis?(isSubtramo?3:5):(isSubtramo?1:2);
+      var lineDash=isSubtramo?'5,5':null;
+      var lineOpts={color:color,weight:lineWeight,opacity:vis?0.85:0.15,lineCap:'round',lineJoin:'round'};
+      if(lineDash)lineOpts.dashArray=lineDash;
+      var line=L.polyline(t.coords,lineOpts).addTo(mapInst);
       line.bindPopup(buildPopup(t),{maxWidth:280});
       line.on('click',function(){hlSide(t.id);});
       mapLines[t.id]=line;
@@ -946,13 +955,90 @@ function focusMapTramo(id){
   sw('mapa');setTimeout(function(){if(!mapInst)initMap();else{mapInst.invalidateSize();focusT(id);}},200);
 }
 
+// ─── JERARQUÍA DE TRAMOS ─────────────────────────────────────
+function getTramoEfectivo(t){
+  // If tramo has children, compute worst-case estado
+  var hijos = tramos.filter(function(x){ return x.parent_id === t.id; });
+  if(!hijos.length) return t.estado;
+  var scKeys = Object.keys(SC);
+  var worst = t.estado;
+  hijos.forEach(function(h){
+    // Higher index in SC = worse state (assuming order: Avanzado, En gestión, Crítico)
+    if(scKeys.indexOf(h.estado) > scKeys.indexOf(worst)) worst = h.estado;
+  });
+  return worst;
+}
+
+function getTramosPadre(){
+  return tramos.filter(function(t){ return !t.parent_id; });
+}
+
+function getHijos(parentId){
+  return tramos.filter(function(t){ return t.parent_id === parentId; });
+}
+
+
 function renderTramoList(){
-  const f=tramos.filter(t=>(fRuta==="all"||t.ruta===fRuta)&&(fEst==="all"||t.estado===fEst));
-  document.getElementById("tl-panel").innerHTML=f.map(t=>`
-    <div class="ti-item${selTramo===t.id?" sel":""}" onclick="selT('${t.id}')">
-      <div class="ti-n">${t.tramo}</div>
-      <div class="ti-m">${sb(t.estado)}<span class="rpill ${t.ruta}" style="padding:1px 6px;font-size:8px">${routes[t.ruta]?.nombre?.split("–")[1]||t.ruta}</span><span>${t.km} km</span></div>
-    </div>`).join("")||'<div class="empty">Sin tramos</div>';
+  var padres=getTramosPadre().filter(function(t){
+    return (fRuta==='all'||t.ruta===fRuta);
+  });
+  var html='';
+  padres.forEach(function(t){
+    var efectivo=getTramoEfectivo(t);
+    if(fEst!=='all'&&efectivo!==fEst)return;
+    var hijos=getHijos(t.id);
+    var isOpen=window._openTramos&&window._openTramos[t.id];
+    var rColor=(routes[t.ruta]&&routes[t.ruta].color)||'#60A5FA';
+    var rNombre=(routes[t.ruta]&&routes[t.ruta].nombre)?routes[t.ruta].nombre.split('–').pop():t.ruta;
+    // Parent row - use DOM to avoid quote issues
+    var row=document.createElement('div');
+    row.className='ti-item'+(selTramo===t.id?' sel':'');
+    row.dataset.id=t.id;
+    row.onclick=function(){selT(this.dataset.id);};
+    var inner='<div style="display:flex;align-items:center;gap:6px">';
+    if(hijos.length){
+      inner+='<span class="toggle-btn" data-tid="'+t.id+'" style="cursor:pointer;color:var(--acc);font-size:11px;width:14px;text-align:center">'+(isOpen?'&#9662;':'&#9658;')+'</span>';
+    } else {
+      inner+='<span style="width:14px"></span>';
+    }
+    inner+='<div style="flex:1"><div class="ti-n">'+t.tramo+'</div>'
+      +'<div class="ti-m">'+sb(efectivo)
+      +'<span style="background:'+rColor+'22;color:'+rColor+';padding:1px 6px;border-radius:4px;font-size:8px;font-weight:700">'+rNombre+'</span>'
+      +(hijos.length?'<span style="font-size:9px;color:var(--muted)">'+hijos.length+' subelementos</span>':'')
+      +'<span>'+t.km+' km</span></div></div></div>';
+    row.innerHTML=inner;
+    html+=row.outerHTML;
+    // Children rows if expanded
+    if(isOpen&&hijos.length){
+      hijos.forEach(function(h){
+        var tc=h.tipo_elemento==='subtramo'?'#34D399':h.tipo_elemento==='crítico'?'#EF4444':'#94A3B8';
+        var crow=document.createElement('div');
+        crow.className='ti-item'+(selTramo===h.id?' sel':'');
+        crow.dataset.id=h.id;
+        crow.onclick=function(){selT(this.dataset.id);};
+        crow.style.cssText='padding-left:28px;border-left:2px solid var(--border);margin-left:7px';
+        crow.innerHTML='<div style="flex:1"><div class="ti-n" style="font-size:11px">'+h.tramo+'</div>'
+          +'<div class="ti-m">'+sb(h.estado)
+          +'<span style="background:'+tc+'22;color:'+tc+';padding:1px 6px;border-radius:4px;font-size:8px;font-weight:700">'+h.tipo_elemento+'</span>'
+          +'<span>'+h.km+' km</span></div></div>';
+        html+=crow.outerHTML;
+      });
+    }
+  });
+  var panel=document.getElementById('tl-panel');
+  panel.innerHTML=html||'<div class="empty">Sin tramos</div>';
+  // Re-attach toggle click handlers
+  panel.querySelectorAll('.toggle-btn').forEach(function(btn){
+    btn.onclick=function(e){
+      e.stopPropagation();
+      toggleTramoOpen(this.dataset.tid);
+    };
+  });
+}
+function toggleTramoOpen(id){
+  if(!window._openTramos)window._openTramos={};
+  window._openTramos[id]=!window._openTramos[id];
+  renderTramoList();
 }
 
 function selT(id){
@@ -985,6 +1071,27 @@ function selT(id){
       </div>
       <div class="divd"></div>
       <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Historial de gestiones (${tb.length})</div>
+      ${(function(){
+        var hijos=getHijos(t.id);
+        if(!hijos.length&&!t.parent_id)return '';
+        var s='<div class="divd"></div>';
+        if(hijos.length){
+          s+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Subelementos ('+hijos.length+')</div>';
+          hijos.forEach(function(h){
+            var tc=SC[h.estado]||'#94A3B8';
+            s+='<div class="sub-row" data-hid="'+h.id+'" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer">'
+              +'<div style="width:4px;height:32px;border-radius:2px;background:'+tc+';flex-shrink:0"></div>'
+              +'<div style="flex:1"><div style="font-size:11px;color:#fff">'+h.tramo+'</div>'
+              +'<div style="font-size:9px;color:var(--muted)">'+h.tipo_elemento+' · '+h.km+' km</div></div>'
+              +sb(h.estado)+'</div>';
+          });
+        }
+        if(t.parent_id){
+          var padre=tramos.find(function(x){return x.id===t.parent_id;})||{tramo:'—',id:''};
+          s+='<div class="divd"></div><div style="font-size:9px;color:var(--muted)">Tramo padre: <span class="padre-link" data-pid="'+padre.id+'" style="color:var(--acc);cursor:pointer">'+padre.tramo+'</span></div>';
+        }
+        return s;
+      })()}
       ${tb.map(b=>`
         <div class="bi ${b.tipo}" style="margin-bottom:7px">
           <div class="bi-d">${tt(b.tipo)}<span>${fmt(b.fecha)}</span></div>
@@ -1750,6 +1857,49 @@ function doExtractKMZ(arrayBuffer){
   });
 }
 
+function getFolderHierarchy(pm){
+  var folders=[];
+  var parent=pm.parentElement;
+  while(parent){
+    if(parent.tagName==='Folder'||parent.tagName==='Document'){
+      var fn=(parent.querySelector(':scope > name')||{textContent:''}).textContent.trim();
+      if(fn) folders.unshift(fn);
+    }
+    parent=parent.parentElement;
+  }
+  return folders;
+}
+
+function getParentFolderName(pm){
+  // Walk up to find the grandparent folder
+  var parent=pm.parentElement;
+  var depth=0;
+  while(parent&&depth<3){
+    if(parent.tagName==='Folder'){
+      var fn=(parent.querySelector(':scope > name')||{textContent:''}).textContent.trim();
+      if(fn&&depth===1) return fn; // immediate parent folder
+    }
+    parent=parent.parentElement;
+    depth++;
+  }
+  return '';
+}
+
+function detectTipoElemento(folderName, name){
+  var f=(folderName||'').toLowerCase();
+  var n=(name||'').toLowerCase();
+  if(f.includes('subtramo')||n.includes('subtramo')) return 'subtramo';
+  if(f.includes('caja')||n.includes('caja')) return 'caja';
+  if(f.includes('puente')||n.includes('puente')) return 'puente';
+  if(f.includes('cruce')||n.includes('cruce')) return 'cruce';
+  if(f.includes('critico')||n.includes('critico')||f.includes('crítico')) return 'crítico';
+  if(f.includes('obstac')) return 'obstáculo';
+  if(f.includes('nodo')) return 'nodo';
+  // Default: subtramo if LineString inside a non-root folder
+  return 'subtramo';
+}
+
+
 function parseKMLString(kmlStr){
   var status=document.getElementById('kmz-upload-status');
   status.textContent='Analizando estructura...';
@@ -1809,11 +1959,32 @@ function parseKMLString(kmlStr){
           puntos.push({
             nombre: name,
             tipo: folderName||'Marcador',
-            lat: lat,
-            lng: lng,
-            ruta: detectRutaFromFolder(folderName+' '+name)
+            lat: lat, lng: lng,
+            ruta: detectRutaFromFolder(folderName+' '+name),
+            // Store full folder hierarchy for parent detection
+            folders: getFolderHierarchy(pm)
           });
         }
+      }
+    }
+    // LineString inside a subfolder = could be a subtramo
+    var ls=pm.querySelector('LineString');
+    if(ls&&folderName){
+      var coordsTxt=(ls.querySelector('coordinates')||{textContent:''}).textContent.trim();
+      var coords=parseCoords(coordsTxt);
+      if(coords.length>=2){
+        // Determine tipo_elemento from folder name
+        var tipoEl=detectTipoElemento(folderName, name);
+        // Get parent folder (grandparent folder = tramo padre name)
+        var parentFolderName=getParentFolderName(pm);
+        tramos.push({
+          name: name,
+          folder: folderName,
+          parentFolder: parentFolderName,
+          coords: coords,
+          tipo_elemento: tipoEl,
+          ruta: detectRutaFromFolder(folderName+' '+name)
+        });
       }
     }
   });
@@ -1873,7 +2044,6 @@ function detectRutaFromFolder(txt){
   var sel=document.getElementById('kmz-ruta-assign');
   return (sel&&sel.value&&sel.value!=='__new__'&&sel.value!=='')?sel.value:(Object.keys(routes)[0]||'r1');
 }
-
 function showKMZPreview(){
   populateKmzRutaAssign();
   // Update counters
@@ -1890,13 +2060,18 @@ function showKMZPreview(){
   // Tramos list
   var tp=document.getElementById('kmz-tramos-preview');
   tp.innerHTML=kmzParsed.tramos.map(function(t,i){
-    var rutaColor=t.ruta==='r1'?'#60A5FA':'#A78BFA';
-    return '<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin-bottom:5px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center">'
+    var rutaColor=(routes[t.ruta]&&routes[t.ruta].color)||'#60A5FA';
+    var tipoEl=t.tipo_elemento||'tramo';
+    var tipoColor=tipoEl==='subtramo'?'#34D399':tipoEl==='tramo'?rutaColor:'#94A3B8';
+    var parentLabel=t.parentFolder?(' &#9658; '+escHtmlKmz(t.parentFolder)):'';
+    var indent=t.parentFolder?'margin-left:12px;border-left:2px solid #34D399;':'';
+    return '<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin-bottom:5px;'+indent+'">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:6px">'
       +'<span style="font-size:11px;color:#fff;font-weight:500">'+escHtmlKmz(t.name)+'</span>'
+      +'<span style="font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:'+tipoColor+'22;color:'+tipoColor+'">'+tipoEl+'</span>'
       +'<span style="font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:'+rutaColor+'22;color:'+rutaColor+'">'+t.ruta.toUpperCase()+'</span>'
       +'</div>'
-      +'<div style="font-size:9px;color:var(--muted);margin-top:2px">'+escHtmlKmz(t.folder||'Raiz')+' &middot; '+t.coords.length+' puntos</div>'
+      +'<div style="font-size:9px;color:var(--muted);margin-top:2px">'+escHtmlKmz(t.folder||'Raiz')+parentLabel+' &middot; '+t.coords.length+' puntos</div>'
       +'<select class="inp" id="kmz-ruta-t-'+i+'" style="margin-top:5px;font-size:10px;padding:3px 7px;height:auto" onchange="kmzHandleTramoRutaChange('+i+', this.value)">'
       +buildRutaOptions(t.ruta)
       +'<option value="__new__">+ Crear nueva ruta...</option>'
@@ -1924,7 +2099,40 @@ function showKMZPreview(){
     +(removed.length?'<div style="font-size:9px;font-weight:700;color:var(--cr);margin:8px 0 5px">YA NO ESTAN ('+removed.length+')</div>'+removed.map(function(n){return '<div style="font-size:10px;color:var(--cr);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)">- '+escHtmlKmz(n)+'</div>';}).join(''):'')
     ||'<div class="empty">Sin comparacion disponible</div>';
 }
+    // Build name->id map for parent lookup
+    var nameToId={};
+    tramos.forEach(function(t){ nameToId[t.tramo.toLowerCase()]=t.id; });
 
+    var newTramos=kmzParsed.tramos.map(function(t,i){
+      var rutaEl=document.getElementById('kmz-ruta-t-'+i);
+      var ruta=rutaEl?rutaEl.value:(t.ruta||'r1');
+      if(ruta==='__new__'||!ruta||!routes[ruta]) ruta=Object.keys(routes)[0]||'r1';
+      var existing=stateMap[t.name.toLowerCase()];
+      var tipoEl=t.tipo_elemento||'tramo';
+      var parentId=t.parentFolder?nameToId[t.parentFolder.toLowerCase()]||null:null;
+      return {
+        id: existing?existing.id:uid(),
+        ruta: ruta,
+        tramo: t.name,
+        actor: existing?existing.actor:'Pendiente',
+        km: existing?existing.km:Math.round(calcKm(t.coords)),
+        estado: (keepStates&&existing)?existing.estado:'En gestión',
+        proxima: existing?existing.proxima:'',
+        fp: existing?existing.fp:'',
+        concesion: existing?existing.concesion:'',
+        coords: t.coords,
+        tipo_elemento: tipoEl,
+        parent_id: parentId
+      };
+    });
+    // Second pass: resolve parents within batch
+    var batchMap={};
+    newTramos.forEach(function(t){ batchMap[t.tramo.toLowerCase()]=t.id; });
+    newTramos.forEach(function(t,i){
+      if(!t.parent_id&&kmzParsed.tramos[i]&&kmzParsed.tramos[i].parentFolder){
+        t.parent_id=batchMap[kmzParsed.tramos[i].parentFolder.toLowerCase()]||null;
+      }
+    });
 async function kmzApply(){
   var keepStates=document.getElementById('kmz-keep-states').checked;
 
@@ -1960,7 +2168,7 @@ async function kmzApply(){
     await sbUpsert('tramos', newTramos.map(function(t){
       return {id:t.id,ruta:t.ruta,tramo:t.tramo,actor:t.actor,km:t.km,
         estado:t.estado,proxima:t.proxima||'',fp:t.fp||'',
-        concesion:t.concesion||'',coords:t.coords,
+        concesion:t.concesion||'',coords:t.coords,tipo_elemento:t.tipo_elemento||'tramo',parent_id:t.parent_id||null,
         updated_at:new Date().toISOString()};
     }));
 
@@ -2573,6 +2781,8 @@ function saveEstados(){
 }
 
 
+function buildRouteFilterBtns(){ renderRouteFilters(); }
+
 function renderAll(){
   kpis();
   renderRouteSummaryCards();
@@ -2592,8 +2802,6 @@ if(apiNotice&&apiKey)apiNotice.style.display="none";
 renderAll();
 setTimeout(setupDropZone,100);
 // Load data from Supabase
-loadFromDB();
-
-</script>
+loadFromDB();</script>
 </body>
 </html>

@@ -1969,104 +1969,182 @@ function detectTipoElemento(folderName, name){
 
 function parseKMLString(kmlStr){
   var status=document.getElementById('kmz-upload-status');
-  status.textContent='Analizando estructura...';
+  if(!status) status={style:{color:''},textContent:''};
 
-  var parser=new DOMParser();
-  var doc=parser.parseFromString(kmlStr,'text/xml');
+  // Clean namespaces
+  var cleaned=kmlStr
+    .replace(/xmlns[^=]*="[^"]*"/g,'')
+    .replace(/<kml:/g,'<').replace(/<\/kml:/g,'</')
+    .replace(/\s+gx:\w+="[^"]*"/g,'');
 
-  // Strip namespace for easier querying
-  var cleaned=kmlStr.replace(/xmlns[^=]*="[^"]*"/g,'').replace(/<kml:/g,'<').replace(/<\/kml:/g,'</');
-  doc=parser.parseFromString(cleaned,'text/xml');
+  var tramos=[], puntos=[], capas=new Set();
 
-  var tramos=[];
-  var puntos=[];
-  var capas=new Set();
-
-  // Get all Placemark elements regardless of nesting
-  var placemarks=doc.querySelectorAll('Placemark');
-
-  placemarks.forEach(function(pm){
-    var name=(pm.querySelector('name')||{textContent:''}).textContent.trim()||'Sin nombre';
-    // Find parent folder name
-    var folderName='';
-    var parent=pm.parentElement;
-    while(parent){
-      if(parent.tagName==='Folder'||parent.tagName==='Document'){
-        var fn=(parent.querySelector(':scope > name')||{textContent:''}).textContent.trim();
-        if(fn){ folderName=fn; capas.add(fn); break; }
+  // Helper: parse coordinates text -> [[lat,lng],...]
+  function parseCoords(txt){
+    var result=[];
+    (txt||'').trim().split(/\s+/).forEach(function(pt){
+      var p=pt.split(',');
+      if(p.length>=2){
+        var lng=parseFloat(p[0]),lat=parseFloat(p[1]);
+        if(!isNaN(lat)&&!isNaN(lng)&&lat>=1&&lat<=12&&lng>=-80&&lng<=-65)
+          result.push([Math.round(lat*1e6)/1e6,Math.round(lng*1e6)/1e6]);
       }
-      parent=parent.parentElement;
-    }
+    });
+    return result;
+  }
 
-    // LineString = tramo
-    var ls=pm.querySelector('LineString');
-    if(ls){
-      var coordsTxt=(ls.querySelector('coordinates')||{textContent:''}).textContent.trim();
-      var coords=parseCoords(coordsTxt);
-      if(coords.length>=2){
-        tramos.push({
-          name: name,
-          folder: folderName,
-          coords: coords,
-          // Try to detect ruta from folder name
-          ruta: detectRutaFromFolder(folderName+' '+name)
-        });
-      }
-    }
+  // Helper: get direct text of first <name> tag
+  function getName(str){
+    var m=str.match(/<name>\s*([^<]+?)\s*<\/name>/);
+    return m?m[1].trim():'';
+  }
 
-    // Point = POI
-    var pt=pm.querySelector('Point');
-    if(pt){
-      var cTxt=(pt.querySelector('coordinates')||{textContent:''}).textContent.trim();
-      var parts=cTxt.split(',');
-      if(parts.length>=2){
-        var lat=parseFloat(parts[1]);
-        var lng=parseFloat(parts[0]);
-        if(!isNaN(lat)&&!isNaN(lng)&&lat>=1&&lat<=12&&lng>=-80&&lng<=-65){
-          puntos.push({
-            nombre: name,
-            tipo: folderName||'Marcador',
-            lat: lat, lng: lng,
-            ruta: detectRutaFromFolder(folderName+' '+name),
-            // Store full folder hierarchy for parent detection
-            folders: getFolderHierarchy(pm)
-          });
+  // Helper: get all <coordinates> blocks from a string
+  function getAllCoords(str){
+    var result=[], m, re=/<coordinates>([\s\S]*?)<\/coordinates>/g;
+    while((m=re.exec(str))!==null) result.push(parseCoords(m[1]));
+    return result;
+  }
+
+  // Detect tipo_elemento from folder name
+  function detectTipo(folderName){
+    var f=(folderName||'').toLowerCase();
+    if(f.includes('puente')) return 'Puente';
+    if(f.includes('peaje')) return 'Peaje';
+    if(f.includes('tunel')||f.includes('túnel')) return 'Túnel';
+    if(f.includes('obstac')) return 'Obstáculo';
+    if(f.includes('gasolinera')) return 'Gasolinera';
+    if(f.includes('recámara')||f.includes('recamara')) return 'Recámara';
+    if(f.includes('proyecci')) return 'Cámara';
+    if(f.includes('elemento')) return 'Elemento';
+    if(f.includes('unidad')) return 'Unidad funcional';
+    if(f.includes('nodo')) return 'Nodo';
+    return folderName||'POI';
+  }
+
+  // Split XML into Folder blocks at a given level
+  function splitFolders(str){
+    var result=[], depth=0, start=-1;
+    var i=0;
+    while(i<str.length){
+      if(str.substr(i,8)==='<Folder>'){
+        if(depth===0) start=i;
+        depth++;
+        i+=8;
+      } else if(str.substr(i,9)==='</Folder'){
+        depth--;
+        if(depth===0&&start>=0){
+          result.push(str.substring(start,i+9));
+          start=-1;
         }
-      }
+        i+=9;
+      } else i++;
     }
-    // LineString inside a subfolder = could be a subtramo
-    var ls=pm.querySelector('LineString');
-    if(ls&&folderName){
-      var coordsTxt=(ls.querySelector('coordinates')||{textContent:''}).textContent.trim();
-      var coords=parseCoords(coordsTxt);
-      if(coords.length>=2){
-        // Determine tipo_elemento from folder name
-        var tipoEl=detectTipoElemento(folderName, name);
-        // Get parent folder (grandparent folder = tramo padre name)
-        var parentFolderName=getParentFolderName(pm);
-        tramos.push({
-          name: name,
-          folder: folderName,
-          parentFolder: parentFolderName,
-          coords: coords,
-          tipo_elemento: tipoEl,
-          ruta: detectRutaFromFolder(folderName+' '+name)
-        });
-      }
+    return result;
+  }
+
+  // Extract Point placemarks from a section
+  function extractPoints(str, tipoOverride){
+    var pms=str.split('<Placemark>');
+    pms.forEach(function(pm){
+      if(!pm.includes('<Point>')) return;
+      var name=getName(pm);
+      var cm=pm.match(/<coordinates>\s*([^<]+?)\s*<\/coordinates>/);
+      if(!cm) return;
+      var p=cm[1].trim().split(',');
+      if(p.length<2) return;
+      var lng=parseFloat(p[0]),lat=parseFloat(p[1]);
+      if(isNaN(lat)||isNaN(lng)||lat<1||lat>12||lng<-80||lng>-65) return;
+      var tipo=tipoOverride||'POI';
+      capas.add(tipo);
+      puntos.push({nombre:name,tipo:tipo,lat:Math.round(lat*1e6)/1e6,lng:Math.round(lng*1e6)/1e6,ruta:''});
+    });
+  }
+
+  // Find the top-level tramo folder block for "N. Name" patterns
+  // Strategy: find all Folder blocks at depth 4 (under Document>Folder>Folder>Folder>Folder)
+  // Simpler: just find all <name>N. ... patterns
+
+  var TRAMO_RE=/(<Folder>[\s\S]*?<name>(\d+\.\s+[^<]+)<\/name>[\s\S]*?<\/Folder>)/g;
+  // This is too greedy - use positional approach instead
+
+  // Find each "N. Name" folder by position
+  var tramoMatches=[];
+  var nr=/<name>(\d+\.\s+[^<]+)<\/name>/g, nm;
+  while((nm=nr.exec(cleaned))!==null){
+    tramoMatches.push({pos:nm.index, name:nm[1].trim()});
+  }
+
+  tramoMatches.forEach(function(tm, idx){
+    var tramoName=tm.name.replace(/^\d+\.\s+/,'');
+    // Content between this match and next tramo match (or NODOS)
+    var endPos=idx+1<tramoMatches.length?tramoMatches[idx+1].pos:cleaned.indexOf('<name>NODOS');
+    if(endPos<0) endPos=cleaned.length;
+    var section=cleaned.substring(tm.pos, endPos);
+
+    // Find main route: look for <name>Ruta</name> subfolder first
+    var rutaCoords=[];
+    var rutaM=section.match(/<name>Ruta<\/name>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>/);
+    if(rutaM) rutaCoords=parseCoords(rutaM[1]);
+
+    // If no Ruta folder, use first/longest LineString directly
+    if(!rutaCoords.length){
+      var allC=getAllCoords(section);
+      var longest=[];
+      allC.forEach(function(c){ if(c.length>longest.length) longest=c; });
+      rutaCoords=longest;
     }
+
+    // Find subtramos: Folder names matching "Tramo N..." with LineString
+    var subFolders=splitFolders(section);
+    var subtramos=[];
+    subFolders.forEach(function(sf){
+      var sfName=getName(sf);
+      if(!sfName.match(/^Tramo\s+\d+/i)) return; // only "Tramo N..." folders
+      var sfCoords=getAllCoords(sf);
+      var combined=[];
+      sfCoords.forEach(function(c){ combined=combined.concat(c); });
+      if(combined.length>=2){
+        subtramos.push({name:sfName, coords:combined, tipo_elemento:'subtramo', parentFolder:tramoName});
+      }
+    });
+
+    // Find POI points by subfolder type
+    var poiFolders=['Puentes','Peajes','Tunel','Túnel','Posibles obstáculos',
+                    'Gasolinera','Proyección de Cámaras','Elementos importantes',
+                    'Unidades funcionales','Recámaras existentes'];
+    poiFolders.forEach(function(pf){
+      var pfRe=new RegExp('<name>'+pf.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'<\/name>([\s\S]*?)<\/Folder>');
+      var pfM=section.match(pfRe);
+      if(pfM) extractPoints(pfM[1], detectTipo(pf));
+    });
+
+    if(rutaCoords.length>=2){
+      tramos.push({name:tramoName, coords:rutaCoords, folder:tramoName,
+                   tipo_elemento:'tramo', parentFolder:null, ruta:''});
+    }
+    subtramos.forEach(function(st){ tramos.push(st); });
   });
 
-  kmzParsed={tramos:tramos, puntos:puntos, capas:Array.from(capas)};
+  // NODOS PRINCIPALES
+  var nodosM=cleaned.match(/<name>NODOS PRINCIPALES<\/name>([\s\S]*?)<\/Folder>/);
+  if(nodosM) extractPoints(nodosM[1], 'Nodo');
 
-  if(tramos.length===0&&puntos.length===0){
-    status.textContent='No se detectaron tramos ni puntos. Verifica que el KMZ tenga geometrias.';
+  // Also catch any remaining Points not in tramo folders (global POIs)
+  // Get content after all tramos
+  var lastTramoEnd=tramoMatches.length>0?tramoMatches[tramoMatches.length-1].pos:0;
+  extractPoints(cleaned.substring(lastTramoEnd), null);
+
+  if(!tramos.length&&!puntos.length){
     status.style.color='var(--cr)';
+    status.textContent='No se encontraron elementos en el KMZ';
     return;
   }
 
-  status.textContent='Detectados: '+tramos.length+' tramos y '+puntos.length+' puntos en '+capas.size+' capas.';
   status.style.color='var(--av)';
+  status.textContent='KMZ analizado: '+tramos.length+' tramos, '+puntos.length+' puntos de interés';
 
+  kmzParsed={tramos:tramos, puntos:puntos, capas:Array.from(capas)};
   showKMZPreview();
   kmzSetStep(2);
 }

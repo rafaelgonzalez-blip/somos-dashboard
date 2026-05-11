@@ -1068,7 +1068,7 @@ function sw(name){
   if(name==="mapa")setTimeout(function(){if(!mapInst)initMap();else{mapInst.invalidateSize();drawAllLines();drawPuntos();}},100);
   if(name==="tramos")renderTramoList();
   if(name==="bitacora")renderBitList();
-  if(name==="rutas"){renderRutasList();}
+  if(name==="rutas"){renderRutasList();setTimeout(setupKMZDropZone,50);}
 }
 
 // ─── MODAL ───────────────────────────────────────────────────
@@ -1664,18 +1664,19 @@ function kmzReset(){
 function setupKMZDropZone(){
   var dz=document.getElementById('kmz-drop-zone');
   var inp=document.getElementById('kmz-input');
-  if(!dz||!inp)return;
-  dz.addEventListener('click',function(){inp.click();});
-  dz.addEventListener('dragover',function(e){e.preventDefault();dz.style.borderColor='var(--acc)';});
-  dz.addEventListener('dragleave',function(){dz.style.borderColor='';});
-  dz.addEventListener('drop',function(e){
+  if(!dz||!inp||dz._kmzReady)return;
+  dz._kmzReady=true;
+  dz.onclick=function(){inp.click();};
+  dz.ondragover=function(e){e.preventDefault();dz.style.borderColor='var(--acc)';};
+  dz.ondragleave=function(){dz.style.borderColor='';};
+  dz.ondrop=function(e){
     e.preventDefault();dz.style.borderColor='';
     var f=e.dataTransfer.files[0];
     if(f) processKMZFile(f);
-  });
-  inp.addEventListener('change',function(e){
+  };
+  inp.onchange=function(e){
     if(e.target.files[0]) processKMZFile(e.target.files[0]);
-  });
+  };
 }
 
 function processKMZFile(file){
@@ -2263,6 +2264,7 @@ try{
   if(apiNotice&&apiKey)apiNotice.style.display="none";
   renderAll();
   setTimeout(setupDropZone,100);
+  setTimeout(setupKMZDropZone,150);
   loadFromDB();
 }catch(initErr){
   console.error('INIT ERROR:',initErr);

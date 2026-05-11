@@ -473,6 +473,16 @@ async function sbUpsert(table, data){
   return r.json();
 }
 
+async function sbPatch(table, id, fields){
+  var r = await fetch(SB_URL + '/rest/v1/' + table + '?id=eq.' + id, {
+    method: 'PATCH',
+    headers: Object.assign({}, sbHeaders(), {'Prefer': 'return=minimal'}),
+    body: JSON.stringify(fields)
+  });
+  if(!r.ok){ var e=await r.text(); throw new Error('sbPatch '+table+': '+e); }
+  return true;
+}
+
 async function sbDelete(table, id){
   var r = await fetch(SB_URL + '/rest/v1/' + table + '?id=eq.' + encodeURIComponent(id), {
     method: 'DELETE',
@@ -2826,7 +2836,11 @@ async function saveEstados(){
     tramos.forEach(function(t){
       if(renames[t.estado]){
         t.estado=renames[t.estado];
-        tramosToSave.push(saveTramoToDB(t));
+        // Use PATCH to only update estado field (avoids sending huge coords)
+        tramosToSave.push(sbPatch('tramos', t.id, {
+          estado: t.estado,
+          updated_at: new Date().toISOString()
+        }));
       }
     });
     var bitToSave=[];

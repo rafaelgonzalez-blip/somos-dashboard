@@ -651,7 +651,7 @@ const KMZ_PUNTOS=[{"nombre":"INICIO C13","tipo":"MARCADORES","lat":6.449437,"lng
 let SC={Avanzado:"#10B981","En gestión":"#F59E0B","Crítico":"#EF4444"};
 try{var _sc=localStorage.getItem('somos_sc');if(_sc)SC=JSON.parse(_sc);}catch(e){}
 
-let tramos=KMZ_TRAMOS.map(function(t){return Object.assign({},t);});
+let tramos=KMZ_TRAMOS.map(function(t){var r=Object.assign({},t);r.estado=normalizeEstado(r.estado);return r;});
 let routes={r1:{id:'r1',nombre:'Medellín–Barranquilla',color:'#60A5FA'},r2:{id:'r2',nombre:'Medellín–Bogotá',color:'#A78BFA'}};
 
 let bitacora=[

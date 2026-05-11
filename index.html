@@ -1880,10 +1880,22 @@ function parseCoords(txt){
 }
 
 function detectRutaFromFolder(txt){
+  if(!txt) return Object.keys(routes)[0]||'r1';
   var t=txt.toLowerCase();
-  if(t.includes('barranquilla')||t.includes('baq')||t.includes('r1')) return 'r1';
-  if(t.includes('bogot')||t.includes('bog')||t.includes('r2')) return 'r2';
-  return document.getElementById('kmz-ruta-assign')?document.getElementById('kmz-ruta-assign').value:'r1';
+  // Try to match against configured route names
+  var match=Object.values(routes).find(function(r){
+    var rname=r.nombre.toLowerCase();
+    // Check if any word from the route name appears in the folder text
+    var words=rname.split(/[\s\-–—\/]+/).filter(function(w){return w.length>3;});
+    return words.some(function(w){return t.includes(w);});
+  });
+  if(match) return match.id;
+  // Fallback: hardcoded keywords
+  if(t.includes('barranquilla')||t.includes('baq')) return 'r1';
+  if(t.includes('bogot')||t.includes('bog')) return 'r2';
+  // Return selected route in assign dropdown or first route
+  var sel=document.getElementById('kmz-ruta-assign');
+  return (sel&&sel.value&&sel.value!=='__new__'&&sel.value!=='')?sel.value:(Object.keys(routes)[0]||'r1');
 }
 
 function buildRutaOptions(selectedRuta){
@@ -1908,32 +1920,28 @@ function populateKmzRutaAssign(){
 function kmzRutaAssignChange(val){
   if(val==='__new__'){
     kmzPromptNewRuta(function(newId){
-      // After creating, re-populate and select the new route
       populateKmzRutaAssign();
       var sel=document.getElementById('kmz-ruta-assign');
       if(sel) sel.value=newId;
-      // Also update all tramo selects that have __new__
+      // Rebuild ALL tramo selects with new route included
       kmzParsed.tramos.forEach(function(t,i){
         var ts=document.getElementById('kmz-ruta-t-'+i);
-        if(ts&&ts.value==='__new__'){
-          // Rebuild its options
-          ts.innerHTML=buildRutaOptions(newId)+'<option value="__new__">+ Crear nueva ruta...</option>';
-          ts.value=newId;
+        if(ts){
+          var cur=ts.value==='__new__'?newId:ts.value;
+          ts.innerHTML=buildRutaOptions(cur)+'<option value="__new__">+ Crear nueva ruta...</option>';
+          ts.value=cur;
         }
       });
     });
-    // Reset select while waiting
     var sel=document.getElementById('kmz-ruta-assign');
     if(sel) sel.value='';
   } else if(val){
-    // Assign this ruta to all new tramos (not existing ones)
-    var existing=tramos.map(function(t){return t.tramo.toLowerCase();});
+    // Assign this ruta to ALL tramos (both new and existing)
     kmzParsed.tramos.forEach(function(t,i){
-      if(!existing.includes(t.name.toLowerCase())){
-        var ts=document.getElementById('kmz-ruta-t-'+i);
-        if(ts) ts.value=val;
-      }
+      var ts=document.getElementById('kmz-ruta-t-'+i);
+      if(ts) ts.value=val;
     });
+    toast('Ruta asignada a todos los tramos');
   }
 }
 

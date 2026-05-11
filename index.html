@@ -685,21 +685,24 @@ function kpis(){
 function routeSummary(elId,rid){
   const r=tramos.filter(t=>t.ruta===rid);
   if(!r.length){document.getElementById(elId).innerHTML='<div class="empty">Sin tramos configurados</div>';return;}
-  const av=r.filter(t=>t.estado==="Avanzado").length;
-  const eg=r.filter(t=>t.estado==="En gestión").length;
-  const cr=r.filter(t=>t.estado==="Crítico").length;
-  const km=r.reduce((s,t)=>s+t.km,0);
-  const pct=r.length?((av+eg)/r.length*100).toFixed(0):0;
-  document.getElementById(elId).innerHTML=`
-    <div style="display:flex;gap:8px;margin-bottom:10px">
-      <div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--av)">${av}</div><div style="font-size:8px;color:var(--muted)">avanzados</div></div>
-      <div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--eg)">${eg}</div><div style="font-size:8px;color:var(--muted)">en gestión</div></div>
-      <div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--cr)">${cr}</div><div style="font-size:8px;color:var(--muted)">críticos</div></div>
-    </div>
-    <div style="font-size:9px;color:var(--muted);margin-bottom:4px">${km} km · ${r.length} tramos</div>
-    <div class="pbar"><div class="pf" style="width:${pct}%;background:linear-gradient(90deg,var(--av),var(--acc))"></div></div>
-    <div style="font-size:8px;color:var(--muted);margin-top:3px">${pct}% gestión activa</div>
-    ${r.filter(t=>t.estado==="Crítico").map(t=>`<div style="margin-top:6px;display:flex;justify-content:space-between;font-size:10px"><span style="color:#fff">${t.tramo}</span><span style="color:var(--cr);font-size:8px;font-weight:700">⚠ ${fmt(t.fp)}</span></div>`).join("")}`;
+  var kmTotal=r.reduce(function(s,t){return s+t.km;},0);
+  var pct=0; var statCounts={};
+  Object.keys(SC).forEach(function(e){ statCounts[e]=r.filter(function(t){return t.estado===e;}).length; });
+  var active=r.filter(function(t){return SC[t.estado];}).length;
+  pct=r.length?(active/r.length*100).toFixed(0):0;
+  var statsHtml='<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">';
+  Object.keys(SC).forEach(function(e){
+    var color=SC[e];
+    statsHtml+='<div style="flex:1;text-align:center;min-width:50px">'
+      +'<div style="font-size:18px;font-weight:700;color:'+color+'">'+statCounts[e]+'</div>'
+      +'<div style="font-size:8px;color:var(--muted)">'+e.toLowerCase()+'</div></div>';
+  });
+  statsHtml+='</div>';
+  document.getElementById(elId).innerHTML=statsHtml
+    +'<div style="font-size:9px;color:var(--muted);margin-bottom:4px">'+kmTotal+' km · '+r.length+' tramos</div>'
+    +'<div class="pbar"><div class="pf" style="width:'+pct+'%;background:linear-gradient(90deg,var(--av),var(--acc))"></div></div>'
+    +'<div style="font-size:8px;color:var(--muted);margin-top:3px">'+pct+'% activa</div>'
+    +r.filter(function(t){return t.estado==='Crítico'||SC[t.estado]===SC[Object.keys(SC)[Object.keys(SC).length-1]];}).map(function(t){return '<div style="margin-top:6px;display:flex;justify-content:space-between;font-size:10px"><span style="color:#fff">'+t.tramo+'</span><span style="color:'+SC[t.estado]+';font-size:8px;font-weight:700">⚠ '+fmt(t.fp)+'</span></div>';}).join('');
 }
 
 function recBit(){
@@ -961,14 +964,16 @@ function focusMapTramo(id){
 
 // ─── JERARQUÍA DE TRAMOS ─────────────────────────────────────
 function getTramoEfectivo(t){
-  // If tramo has children, compute worst-case estado
-  var hijos = tramos.filter(function(x){ return x.parent_id === t.id; });
-  if(!hijos.length) return t.estado;
   var scKeys = Object.keys(SC);
-  var worst = t.estado;
+  var fallback = scKeys[0]||t.estado;
+  var hijos = tramos.filter(function(x){ return x.parent_id === t.id; });
+  if(!hijos.length){
+    return scKeys.indexOf(t.estado)>=0 ? t.estado : fallback;
+  }
+  var worst = scKeys.indexOf(t.estado)>=0 ? t.estado : fallback;
   hijos.forEach(function(h){
-    // Higher index in SC = worse state (assuming order: Avanzado, En gestión, Crítico)
-    if(scKeys.indexOf(h.estado) > scKeys.indexOf(worst)) worst = h.estado;
+    var hEstado = scKeys.indexOf(h.estado)>=0 ? h.estado : fallback;
+    if(scKeys.indexOf(hEstado) > scKeys.indexOf(worst)) worst = hEstado;
   });
   return worst;
 }
@@ -2799,21 +2804,41 @@ function deleteEstado(name){
 }
 
 function saveEstados(){
-  // Read current rows
   var newSC={};
+  var oldKeys=Object.keys(SC);
   var entries=Object.entries(SC);
+  var renames={}; // oldName -> newName
   entries.forEach(function(kv,i){
     var nameEl=document.getElementById('es-name-'+i);
     var colorEl=document.getElementById('es-color-'+i);
     if(nameEl&&colorEl&&nameEl.value.trim()){
-      newSC[nameEl.value.trim()]=colorEl.value;
+      var newName=nameEl.value.trim();
+      var oldName=kv[0];
+      newSC[newName]=colorEl.value;
+      if(newName!==oldName) renames[oldName]=newName;
     }
   });
   SC=newSC;
+  // Migrate tramos and bitacora to new state names
+  if(Object.keys(renames).length){
+    tramos.forEach(function(t){
+      if(renames[t.estado]){
+        t.estado=renames[t.estado];
+        saveTramoToDB(t);
+      }
+    });
+    bitacora.forEach(function(b){
+      if(b.estado_sugerido&&renames[b.estado_sugerido]){
+        b.estado_sugerido=renames[b.estado_sugerido];
+        saveBitacoraEntryToDB(b);
+      }
+    });
+  }
   closeModal();
   renderAll();
+  if(mapInst) refreshLines();
   buildEstadoFilters();
-  toast('Estados actualizados correctamente');
+  toast('Estados actualizados · Tramos migrados');
 }
 
 

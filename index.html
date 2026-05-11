@@ -162,9 +162,8 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
   <!-- OVERVIEW -->
   <div id="t-overview" class="tv active">
     <div class="kpi-row" id="kpi-row"></div>
-    <div class="two-col">
-      <div class="card"><div class="card-h"><span class="card-t">Medellín–Barranquilla</span><span class="rpill r1">R1</span></div><div class="card-b" id="sr1"></div></div>
-      <div class="card"><div class="card-h"><span class="card-t">Medellín–Bogotá</span><span class="rpill r2">R2</span></div><div class="card-b" id="sr2"></div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+      <div id="route-summary-cards" style="display:contents"></div>
     </div>
     <div class="card">
       <div class="card-h"><span class="card-t">Últimas gestiones</span><button class="btn btn-p btn-sm" onclick="openModal('gestion')">+ Nueva gestión</button></div>
@@ -494,6 +493,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
 // ─── SUPABASE ─────────────────────────────────────────────
 const SB_URL = 'https://ayjkwlykkqhkehkihzel.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5amt3bHlra3Foa2Voa2loemVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyODAwMjksImV4cCI6MjA5Mzg1NjAyOX0.QFKfxqEhIZUm_qhRkcu3IoJV3Uk15aeJ7-EncHHbQg0';
+
 
 function sbHeaders(){
   return {
@@ -2468,15 +2468,37 @@ function escapeHtml(str){
 
 function renderAll(){
   kpis();
-  const keys=Object.keys(routes);
-  routeSummary("sr1",keys[0]||"r1");
-  routeSummary("sr2",keys[1]||"r2");
+  renderRouteSummaryCards();
   recBit();
   renderHitos();
   renderRouteFilters();
   if(activeTab==="tramos")renderTramoList();
   if(activeTab==="bitacora")renderBitList();
   if(activeTab==="rutas"){renderRutasList();if(editingRoute)selEditRoute(editingRoute);}
+}
+
+function renderRouteSummaryCards(){
+  var container=document.getElementById('route-summary-cards');
+  if(!container)return;
+  var rkeys=Object.keys(routes);
+  // Build a card per route
+  var cardsHtml='';
+  rkeys.forEach(function(rid){
+    var r=routes[rid];
+    var color=r.color||'#60A5FA';
+    cardsHtml+='<div class="card">'
+      +'<div class="card-h">'
+      +'<span class="card-t">'+escapeHtml(r.nombre)+'</span>'
+      +'<span class="rpill" style="background:'+color+'22;color:'+color+';border:1px solid '+color+'44">'+rid.toUpperCase()+'</span>'
+      +'</div>'
+      +'<div class="card-b" id="sr-'+rid+'"></div>'
+      +'</div>';
+  });
+  container.innerHTML=cardsHtml;
+  // Now populate each card
+  rkeys.forEach(function(rid){
+    routeSummary('sr-'+rid, rid);
+  });
 }
 
 // ─── INIT ────────────────────────────────────────────────────

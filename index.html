@@ -481,6 +481,7 @@ async function loadFromDB(){
     showDBStatus('');
     console.log('[LDB] routes after load:', JSON.stringify(routes));
     renderAll();
+    buildEstadoFilters();
     if(mapInst) refreshLines();
     
   } catch(e){
@@ -1042,7 +1043,7 @@ function sw(name){
   const tabs=["overview","mapa","tramos","bitacora","rutas","gmail"];
   document.querySelectorAll(".nb")[tabs.indexOf(name)]?.classList.add("active");
   if(name==="mapa")setTimeout(function(){if(!mapInst)initMap();else{mapInst.invalidateSize();drawAllLines();drawPuntos();}},100);
-  if(name==="tramos")renderTramoList();
+  if(name==="tramos"){renderTramoList();buildEstadoFilters();}
   if(name==="bitacora")renderBitList();
   if(name==="rutas"){renderRutasList();}
 }
@@ -2513,6 +2514,7 @@ function renderAll(){
   recBit();
   renderHitos();
   renderRouteFilters();
+  buildEstadoFilters();
   if(activeTab==="tramos")renderTramoList();
   if(activeTab==="bitacora")renderBitList();
   if(activeTab==="rutas"){renderRutasList();if(editingRoute)selEditRoute(editingRoute);}

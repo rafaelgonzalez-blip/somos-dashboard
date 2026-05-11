@@ -162,7 +162,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
   <!-- OVERVIEW -->
   <div id="t-overview" class="tv active">
     <div class="kpi-row" id="kpi-row"></div>
-    <div id="route-summary-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px"></div>
+    <div id="route-summary-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:14px"></div>
     <div class="card">
       <div class="card-h"><span class="card-t">Últimas gestiones</span><button class="btn btn-p btn-sm" onclick="openModal('gestion')">+ Nueva gestión</button></div>
       <div class="card-b"><div id="rec-bit" class="bl" style="max-height:200px"></div></div>
@@ -433,6 +433,7 @@ async function sbDelete(table, id){
 var dbLoaded = false;
 
 async function loadFromDB(){
+  console.log('[LDB] starting...');
   try{
     showDBStatus('Cargando datos...');
     
@@ -441,6 +442,9 @@ async function loadFromDB(){
     if(dbRutas && dbRutas.length > 0){
       routes = {};
       dbRutas.forEach(function(r){ routes[r.id] = {id:r.id, nombre:r.nombre, color:r.color}; });
+      console.log('[LDB] routes loaded:', Object.keys(routes));
+      renderRouteSummaryCards();
+      renderRouteFilters();
     } else {
       // No routes in DB - seed the defaults
       for(var rid in routes){ saveRutaToDB(routes[rid]); }

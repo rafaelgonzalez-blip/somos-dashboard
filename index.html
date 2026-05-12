@@ -434,8 +434,8 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
 </div><!-- end content -->
 
 <!-- MODAL -->
-<div class="modal-overlay" id="modal-overlay">
-  <div class="modal" id="modal-inner">
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal()">
+  <div class="modal" id="modal-inner" onclick="event.stopPropagation()">
     <div class="modal-hd">
       <span class="modal-title" id="modal-title">Modal</span>
       <button class="btn-x" onclick="closeModal()">×</button>
@@ -1498,7 +1498,12 @@ function openModal(type,id,preTramo){
   }
 }
 
-function closeModal(){document.getElementById("modal-overlay").classList.remove("open");}
+function closeModal(){
+  // Don't close if a color picker is being interacted with
+  var active = document.activeElement;
+  if(active && active.type === 'color') return;
+  document.getElementById("modal-overlay").classList.remove("open");
+}
 document.getElementById("modal-overlay").addEventListener("click",e=>{if(e.target===document.getElementById("modal-overlay"))closeModal();});
 
 // ─── GUARDAR FORMULARIOS ─────────────────────────────────────

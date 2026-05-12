@@ -201,7 +201,11 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;padding:9px 14px;border-bottom:1px solid #253352;flex-wrap:wrap">
-        <span style="font-size:9px;color:#7a95bb;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Capas:</span>
+        <span style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px">DETALLE:</span>
+          <button class="fb active" id="md-main" onclick="setMapDetail('main')">Tramos</button>
+          <button class="fb" id="md-sub" onclick="setMapDetail('sub')">Subtramos</button>
+          <button class="fb" id="md-all" onclick="setMapDetail('all')">Todos</button>
+          <span style="font-size:9px;color:#7a95bb;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Capas:</span>
         <label otoggleLayer('tramos')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 11px;font-size:11px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.12);user-select:none">
           <input type="checkbox" id="lay-tramos" checked style="accent-color:#3B82F6;cursor:pointer"> Tramos
         </label>
@@ -434,7 +438,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
 </div><!-- end content -->
 
 <!-- MODAL -->
-<div class="modal-overlay" id="modal-overlay" onclick="closeModal()">
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="modal-inner" onclick="event.stopPropagation()">
     <div class="modal-hd">
       <span class="modal-title" id="modal-title">Modal</span>
@@ -446,9 +450,10 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
 
 <div class="toast-el" id="toast-el"></div>
 
+// ─── SUPABASE ─────────────────────────────────────────────
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ─── SUPABASE ─────────────────────────────────────────────
 const SB_URL = 'https://ayjkwlykkqhkehkihzel.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5amt3bHlra3Foa2Voa2loemVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyODAwMjksImV4cCI6MjA5Mzg1NjAyOX0.QFKfxqEhIZUm_qhRkcu3IoJV3Uk15aeJ7-EncHHbQg0';
 
@@ -830,6 +835,17 @@ function buildPopup(t){
   if(lb)h+='<br><br><span style="font-size:10px;color:#555"><b>Ultima gestion ('+fmt(lb.fecha)+'):</b><br>'+lb.gestion+'</span>';
   return h+'</div>';
 }
+function setMapDetail(level){
+  mapDetailLevel=level;
+  // Update button states
+  ['main','sub','all'].forEach(function(l){
+    var btn=document.getElementById('md-'+l);
+    if(btn) btn.classList.toggle('active', l===level);
+  });
+  if(mapInst){ drawAllLines(); }
+}
+
+
 function drawAllLines(){
   if(!mapInst)return;
   var ids=Object.keys(mapLines);
@@ -840,9 +856,13 @@ function drawAllLines(){
       var color=lineColor(t);if(!color)return;
       var vis=mapFiltVal==='all'||t.ruta===mapFiltVal;
       var isSubtramo=t.parent_id||t.tipo_elemento==='subtramo';
-      // Skip parent tramos that have subtramos - draw subtramos instead
       var hasChildren=tramos.some(function(x){return x.parent_id===t.id;});
-      if(hasChildren) return; // skip - subtramos will be drawn
+      var isSubtramo=!!(t.parent_id||t.tipo_elemento==='subtramo');
+      // Filter by detail level
+      if(mapDetailLevel==='main' && isSubtramo) return; // only main tramos
+      if(mapDetailLevel==='sub' && !isSubtramo) return;  // only subtramos
+      if(mapDetailLevel==='main' && hasChildren) return; // skip parents with children shown as 'all'
+      if(mapDetailLevel==='all' && hasChildren) return;  // always skip concatenated parents
       var lineWeight=vis?(isSubtramo?3:5):(isSubtramo?1:2);
       var lineDash=null; // no dash - subtramos follow real path
       var lineOpts={color:color,weight:lineWeight,opacity:vis?0.85:0.15,lineCap:'round',lineJoin:'round'};
@@ -1499,9 +1519,6 @@ function openModal(type,id,preTramo){
 }
 
 function closeModal(){
-  // Don't close if a color picker is being interacted with
-  var active = document.activeElement;
-  if(active && active.type === 'color') return;
   document.getElementById("modal-overlay").classList.remove("open");
 }
 document.getElementById("modal-overlay").addEventListener("click",e=>{if(e.target===document.getElementById("modal-overlay"))closeModal();});
@@ -1657,8 +1674,16 @@ function detectTramo(txt){
 }
 
 function importarGmail(m){
-  bitacora.unshift({id:uid(),fecha:m.date,tipo:m.tipo==="response"?"response":"email",tramo:detectTramo((m.subj||"")+" "+(m.snip||""))||"Pendiente asignar",actor:(m.from||m.to||"").split("@")[1]||"",gestion:"[Gmail] "+m.subj,resultado:m.tipo==="response"?m.snip.slice(0,120):"",proxima:"",fp:""});
-  renderAll(); toast("Correo importado a bitácora");
+  var entry={id:uid(),fecha:m.date||today(),tipo:m.tipo==='response'?'response':'email',
+    tramo:detectTramo((m.subj||'')+' '+(m.snip||''))||'Pendiente asignar',
+    actor:(m.from||m.to||'').split('@')[1]||'',
+    gestion:'[Gmail] '+m.subj,
+    resultado:m.tipo==='response'?m.snip.slice(0,120):'',
+    proxima:'',fp:''};
+  bitacora.unshift(entry);
+  saveBitacoraEntryToDB(entry);
+  renderAll();
+  toast('Correo importado a bitácora');
 }
 
 async function analizarGmail(m){
@@ -3072,6 +3097,8 @@ if(apiNotice&&apiKey)apiNotice.style.display="none";
 renderAll();
 setTimeout(setupDropZone,100);
 // Load data from Supabase
+loadFromDB();
+Supabase
 loadFromDB();
 </script>
 </body>

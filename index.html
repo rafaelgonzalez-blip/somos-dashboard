@@ -2335,6 +2335,21 @@ async function kmzApply(){
         updated_at:new Date().toISOString()};
     }));
 
+    // Explicitly PATCH parent_id and tipo_elemento for subtramos
+    // sbUpsert merge-duplicates may not update these fields on existing records
+    var subtramoPatches = newTramos.filter(function(t){ return t.parent_id && t.tipo_elemento==='subtramo'; });
+    if(subtramoPatches.length > 0){
+      console.log('[KMZ] Patching', subtramoPatches.length, 'subtramos with parent_id');
+      await Promise.all(subtramoPatches.map(function(t){
+        return fetch(SB_URL + '/rest/v1/tramos?id=eq.' + t.id, {
+          method: 'PATCH',
+          headers: Object.assign({}, sbHeaders(), {'Prefer': 'return=minimal'}),
+          body: JSON.stringify({parent_id: t.parent_id, tipo_elemento: 'subtramo'})
+        });
+      }));
+      console.log('[KMZ] Patch complete');
+    }
+
     // Delete tramos that no longer exist
     var newNames=newTramos.map(function(t){return t.tramo.toLowerCase();});
     var toDelete=tramos.filter(function(t){return !newNames.includes(t.tramo.toLowerCase());});

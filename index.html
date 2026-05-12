@@ -513,7 +513,7 @@ async function loadFromDB(){
     }
     
     // Load tramos
-    var dbTramos = await sbGet('tramos', 'order=updated_at.desc');
+    var dbTramos = await sbGet('tramos');
     if(dbTramos && dbTramos.length > 0){
       // Merge DB state with KMZ coords (coords stay from KMZ, state from DB)
       dbTramos.forEach(function(dt){

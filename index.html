@@ -2301,6 +2301,21 @@ async function kmzApply(){
     };
   });
 
+  // === SECOND PASS: resolve parent_ids ===
+  var batchMap={};
+  // Map existing tramos (tramo name -> id)
+  tramos.forEach(function(t){ if(!t.parent_id) batchMap[t.tramo.toLowerCase()]=t.id; });
+  // Map new tramos that are tipo='tramo' (parent candidates)
+  newTramos.forEach(function(t){ if(t.tipo_elemento==='tramo') batchMap[t.tramo.toLowerCase()]=t.id; });
+  // Resolve parent_id for each subtramo
+  newTramos.forEach(function(t){
+    if(t._parentFolder){
+      t.parent_id = batchMap[t._parentFolder.toLowerCase()] || null;
+    }
+    delete t._parentFolder;
+  });
+  console.log('[KMZ] parent_ids resolved:', newTramos.filter(function(t){return t.parent_id;}).length, 'subtramos');
+
   // Show loading
   document.getElementById('kmz-panel-2').innerHTML='<div class="thinking"><span></span><span></span><span></span><span style="margin-left:8px">Guardando en base de datos y actualizando mapa...</span></div>';
 

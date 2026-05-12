@@ -2240,13 +2240,18 @@ function showKMZPreview(){
         parent_id: parentId
       };
     });
-    // Second pass: resolve parents within batch
+    // Second pass: resolve parent_ids
     var batchMap={};
-    newTramos.forEach(function(t){ batchMap[t.tramo.toLowerCase()]=t.id; });
-    newTramos.forEach(function(t,i){
-      if(!t.parent_id&&kmzParsed.tramos[i]&&kmzParsed.tramos[i].parentFolder){
-        t.parent_id=batchMap[kmzParsed.tramos[i].parentFolder.toLowerCase()]||null;
+    // First build map of tramo names -> ids from BOTH existing tramos and new ones
+    tramos.forEach(function(t){ if(!t.parent_id) batchMap[t.tramo.toLowerCase()]=t.id; });
+    newTramos.forEach(function(t){ if(t.tipo_elemento==='tramo') batchMap[t.tramo.toLowerCase()]=t.id; });
+    // Now resolve parent_ids for subtramos
+    newTramos.forEach(function(t){
+      var pf=t._parentFolder||(kmzParsed.tramos[newTramos.indexOf(t)]&&kmzParsed.tramos[newTramos.indexOf(t)].parentFolder);
+      if(pf&&!t.parent_id){
+        t.parent_id=batchMap[pf.toLowerCase()]||null;
       }
+      delete t._parentFolder;
     });
 async function kmzApply(){
   var keepStates=document.getElementById('kmz-keep-states').checked;
@@ -2261,17 +2266,22 @@ async function kmzApply(){
     var ruta=rutaEl?rutaEl.value:(t.ruta||'r1');
     if(ruta==='__new__'||!ruta||!routes[ruta]) ruta=Object.keys(routes)[0]||'r1';
     var existing=stateMap[t.name.toLowerCase()];
+    var tipoEl=t.tipo_elemento||'tramo';
+    // parent_id will be resolved in second pass
     return {
       id: existing?existing.id:uid(),
       ruta: ruta,
       tramo: t.name,
       actor: existing?existing.actor:'Pendiente',
       km: existing?existing.km:Math.round(calcKm(t.coords)),
-      estado: (keepStates&&existing)?existing.estado:'En gestión',
+      estado: normalizeEstado((keepStates&&existing)?existing.estado:Object.keys(SC)[1]||'En gestión'),
       proxima: existing?existing.proxima:'',
       fp: existing?existing.fp:'',
       concesion: existing?existing.concesion:'',
-      coords: t.coords
+      coords: t.coords,
+      tipo_elemento: tipoEl,
+      parent_id: null,
+      _parentFolder: t.parentFolder||null
     };
   });
 

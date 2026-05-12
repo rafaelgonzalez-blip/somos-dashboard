@@ -1991,53 +1991,77 @@ function parseKMLString(kmlStr){
     return result;
   }
 
-  // Find all "N. Name" tramo folder positions
-  var tramoFolderStarts=[];
-  var re1=/<Folder>\s*<name>(\d+\.\s+[^<]+)<\/name>/g, m1;
-  while((m1=re1.exec(cleaned))!==null){
-    var fStart=cleaned.lastIndexOf('<Folder>',m1.index);
-    var tName=m1[1].trim().replace(/^\d+\.\s+/,'');
-    tramoFolderStarts.push({start:fStart,name:tName});
+  function isSubtramoName(n){
+    var nl=(n||'').toLowerCase();
+    if(/^tramo\s+\d+/.test(nl)) return true;
+    if(/^horizon_tramo/.test(nl)) return true;
+    if(/^rc\d+/.test(nl)) return true;
+    if(/^uf\d+/.test(nl)) return true;
+    return false;
   }
 
   var POI_TYPES={
     'Puentes':'Puente','Peajes':'Peaje','Tunel':'T\u00famel','T\u00famel':'T\u00famel',
     'Posibles obst\u00e1culos':'Obst\u00e1culo','Gasolinera':'Gasolinera',
-    'Proyecci\u00f3n de C\u00e1maras':'Rec\u00e1mara','Elementos importantes':'Elemento',
-    'Unidades funcionales':'Unidad funcional','Rec\u00e1maras existentes':'Rec\u00e1mara'
+    'Proyecci\u00f3n de C\u00e1maras':'Rec\u00e1mara',
+    'Elementos importantes':'Elemento',
+    'Unidades funcionales (segun concesion)':'Unidad funcional',
+    'Rec\u00e1maras existentes':'Rec\u00e1mara'
   };
 
-  tramoFolderStarts.forEach(function(tm,idx){
-    var endPos=idx+1<tramoFolderStarts.length?tramoFolderStarts[idx+1].start:cleaned.length;
+  // Find each "N. Name" tramo folder
+  var tramoStarts=[];
+  var re1=/<Folder>\s*<name>(\d+\.\s+[^<]+)<\/name>/g, m1;
+  while((m1=re1.exec(cleaned))!==null){
+    tramoStarts.push({start:m1.index, name:m1[1].trim().replace(/^\d+\.\s+/,'')});
+  }
+
+  tramoStarts.forEach(function(tm,idx){
+    var endPos=idx+1<tramoStarts.length?tramoStarts[idx+1].start:cleaned.length;
     var nodosPos=cleaned.indexOf('<name>NODOS PRINCIPALES</name>');
     if(nodosPos>0&&nodosPos<endPos) endPos=cleaned.lastIndexOf('<Folder>',nodosPos);
     var section=cleaned.substring(tm.start,endPos);
 
-    // Find subtramos (Tramo N... sub-folders with Ruta LineString)
-    var subMatches=[];
-    var re2=/<Folder>\s*<name>(Tramo\s+\d+[^<]+)<\/name>/g, m2;
-    while((m2=re2.exec(section))!==null) subMatches.push({pos:m2.index,name:m2[1].trim()});
+    var subtramos=[], seen={};
 
-    var subtramos=[];
-    subMatches.forEach(function(sm,si){
-      var stEnd=si+1<subMatches.length?subMatches[si+1].pos:section.length;
-      var stSection=section.substring(sm.pos,stEnd);
-      var rutaM=stSection.match(/<name>Ruta<\/name>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>/);
+    // Pattern A: Sub-folders named "Tramo N..." each with Ruta or direct LS
+    var sfRe=/<Folder>\s*<name>(Tramo[^<]+)<\/name>([\s\S]*?)<\/Folder>/g, sfM;
+    while((sfM=sfRe.exec(section))!==null){
+      var sfName=sfM[1].trim();
+      if(seen[sfName]) continue;
+      var sfContent=sfM[2];
+      var rutaM=sfContent.match(/<name>Ruta<\/name>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>/);
       var coords=rutaM?parseCoords(rutaM[1]):[];
       if(!coords.length){
-        var lsM=stSection.match(/<LineString>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>/);
+        var lsM=sfContent.match(/<LineString>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>/);
         if(lsM) coords=parseCoords(lsM[1]);
       }
-      if(coords.length>=2) subtramos.push({name:sm.name,coords:coords});
-    });
+      if(coords.length>=2){ seen[sfName]=1; subtramos.push({name:sfName,coords:coords}); }
+    }
 
-    // Main tramo coords: concat subtramos or longest LineString
+    // Pattern B: Placemarks with LineString named like subtramos (any depth)
+    var pmRe=/<Placemark[^>]*>([\s\S]*?)<\/Placemark>/g, pmM;
+    while((pmM=pmRe.exec(section))!==null){
+      var content=pmM[1];
+      if(content.indexOf('<LineString>')<0) continue;
+      var nameM=content.match(/<name>(.*?)<\/name>/);
+      var pmName=nameM?nameM[1].trim():'';
+      if(!pmName||seen[pmName]) continue;
+      if(!isSubtramoName(pmName)) continue;
+      var coordsM=content.match(/<coordinates>([\s\S]*?)<\/coordinates>/);
+      if(coordsM){
+        var coords=parseCoords(coordsM[1]);
+        if(coords.length>=2){ seen[pmName]=1; subtramos.push({name:pmName,coords:coords}); }
+      }
+    }
+
+    // Main coords: concat all subtramos, or longest LS
     var mainCoords=[];
     if(subtramos.length){
       subtramos.forEach(function(st){mainCoords=mainCoords.concat(st.coords);});
     } else {
-      var allLS=[],lsRe=/<LineString>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>/g,lsM;
-      while((lsM=lsRe.exec(section))!==null) allLS.push(parseCoords(lsM[1]));
+      var allLS=[],lsRe2=/<coordinates>([\s\S]*?)<\/coordinates>/g,lsM2;
+      while((lsM2=lsRe2.exec(section))!==null) allLS.push(parseCoords(lsM2[1]));
       allLS.forEach(function(c){if(c.length>mainCoords.length)mainCoords=c;});
     }
 
@@ -2047,18 +2071,16 @@ function parseKMLString(kmlStr){
       var fEsc=fname.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
       var fM=section.match(new RegExp('<name>'+fEsc+'<\\/name>([\\s\\S]*?)<\\/Folder>'));
       if(!fM) return;
-      var pmRe=/<name>(.*?)<\/name>[\s\S]*?<Point>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>/g,pm;
-      while((pm=pmRe.exec(fM[1]))!==null){
-        var p=pm[2].trim().split(',');
-        if(p.length>=2){
-          try{
-            var lng=parseFloat(p[0]),lat=parseFloat(p[1]);
-            if(lat>=1&&lat<=12&&lng>=-80&&lng<=-65){
-              capas.add(tipo);
-              puntos.push({nombre:pm[1].trim(),tipo:tipo,lat:Math.round(lat*1e6)/1e6,lng:Math.round(lng*1e6)/1e6,ruta:''});
-            }
-          }catch(e){}
-        }
+      var pRe=/<name>(.*?)<\/name>[\s\S]*?<Point>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>/g,pM;
+      while((pM=pRe.exec(fM[1]))!==null){
+        var p=pM[2].trim().split(',');
+        if(p.length>=2){try{
+          var lng=parseFloat(p[0]),lat=parseFloat(p[1]);
+          if(lat>=1&&lat<=12&&lng>=-80&&lng<=-65){
+            capas.add(tipo);
+            puntos.push({nombre:pM[1].trim(),tipo:tipo,lat:Math.round(lat*1e6)/1e6,lng:Math.round(lng*1e6)/1e6,ruta:''});
+          }
+        }catch(e){}}
       }
     });
 
@@ -2072,14 +2094,14 @@ function parseKMLString(kmlStr){
   // NODOS PRINCIPALES
   var nodosM=cleaned.match(/<name>NODOS PRINCIPALES<\/name>([\s\S]*?)<\/Folder>/);
   if(nodosM){
-    var nmRe=/<Placemark>[\s\S]*?<name>(.*?)<\/name>[\s\S]*?<Point>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>/g,nm;
-    while((nm=nmRe.exec(nodosM[1]))!==null){
-      var p=nm[2].trim().split(',');
+    var nRe=/<Placemark>[\s\S]*?<name>(.*?)<\/name>[\s\S]*?<Point>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>/g,nM;
+    while((nM=nRe.exec(nodosM[1]))!==null){
+      var p=nM[2].trim().split(',');
       if(p.length>=2){try{
         var lng=parseFloat(p[0]),lat=parseFloat(p[1]);
         if(lat>=1&&lat<=12&&lng>=-80&&lng<=-65){
           capas.add('Nodo');
-          puntos.push({nombre:nm[1].trim(),tipo:'Nodo',lat:Math.round(lat*1e6)/1e6,lng:Math.round(lng*1e6)/1e6,ruta:''});
+          puntos.push({nombre:nM[1].trim(),tipo:'Nodo',lat:Math.round(lat*1e6)/1e6,lng:Math.round(lng*1e6)/1e6,ruta:''});
         }
       }catch(e){}}
     }

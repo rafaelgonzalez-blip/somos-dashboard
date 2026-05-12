@@ -539,8 +539,12 @@ async function loadFromDB(){
         }
       });
     } else {
-      // First load — seed tramos to DB
-      await seedTramosToDB();
+      // Table is empty - seed default routes only (no tramos)
+      // Tramos should be loaded via KMZ importer
+      var rrows = Object.values(routes).map(function(r){
+        return {id:r.id, nombre:r.nombre, color:r.color};
+      });
+      await sbUpsert('rutas', rrows);
     }
     
     // Load bitacora

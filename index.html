@@ -1865,6 +1865,7 @@ function setupKMZDropZone(){
 
 function processKMZFile(file){
   var status=document.getElementById('kmz-upload-status');
+  if(!status) status={textContent:'',style:{color:''}};
   status.textContent='Leyendo archivo...';
   status.style.color='var(--muted)';
 
@@ -2026,6 +2027,19 @@ function parseKMLString(kmlStr){
     var section=cleaned.substring(tm.start,endPos);
 
     var subtramos=[], seen={};
+    function dedupeSubtramos(list){
+      // Remove horizon_tramo_N if Tramo N already exists
+      var hasTramoN={};
+      list.forEach(function(st){
+        var m=st.name.match(/^Tramo\s+(\d+)/i);
+        if(m) hasTramoN[m[1]]=true;
+      });
+      return list.filter(function(st){
+        var m=st.name.match(/^horizon_tramo_(\d+)$/i);
+        if(m && hasTramoN[m[1]]) return false; // skip - Tramo N exists
+        return true;
+      });
+    }
 
     // Pattern A: Sub-folders named "Tramo N..." each with Ruta or direct LS
     var sfRe=/<Folder>\s*<name>(Tramo[^<]+)<\/name>([\s\S]*?)<\/Folder>/g, sfM;
@@ -2090,6 +2104,7 @@ function parseKMLString(kmlStr){
     if(mainCoords.length>=2)
       var tmExisting=window.tramos&&window.tramos.find?window.tramos.find(function(x){return x.tramo.toLowerCase()===tm.name.toLowerCase();}):null;
     var tmRuta=(tmExisting&&routes[tmExisting.ruta])?tmExisting.ruta:(detectRutaFromFolder(tm.name)||Object.keys(routes)[0]||'r1');
+    subtramos=dedupeSubtramos(subtramos);
     tramos.push({name:tm.name,coords:mainCoords,folder:tm.name,tipo_elemento:'tramo',parentFolder:null,ruta:tmRuta});
     subtramos.forEach(function(st){
       tramos.push({name:st.name,coords:st.coords,folder:tm.name,tipo_elemento:'subtramo',parentFolder:tm.name,ruta:tmRuta}); // inherit parent ruta
@@ -2433,7 +2448,7 @@ async function kmzApply(){
 
 function kmzReset(){
   kmzParsed={tramos:[],puntos:[],capas:[]};
-  document.getElementById('kmz-upload-status').textContent='';
+  var _ks=document.getElementById('kmz-upload-status'); if(_ks) _ks.textContent='';
   document.getElementById('kmz-input').value='';
   kmzSetStep(1);
 }

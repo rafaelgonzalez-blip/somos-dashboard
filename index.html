@@ -798,6 +798,7 @@ function initMap(){
   renderMapSide();
   renderLayerControls();
   renderMapLegend();
+  renderMapLegend();
   setTimeout(function(){
     drawPuntos();
     try{
@@ -979,7 +980,7 @@ function refreshLines(){
 }
 function renderMapSide(){
   var vis=[];
-  for(var i=0;i<tramos.length;i++){if(mapFiltVal==='all'||tramos[i].ruta===mapFiltVal)vis.push(tramos[i]);}
+  for(var i=0;i<tramos.length;i++){var _t=tramos[i];if((_t.parent_id||_t.tipo_elemento==='subtramo'))continue;if(mapFiltVal==='all'||_t.ruta===mapFiltVal)vis.push(_t);}
   var h='';
   for(var i=0;i<vis.length;i++){
     var t=vis[i];var sc=t.estado; // use estado directly - sb() handles colors
@@ -1783,12 +1784,14 @@ async function _gmailGetUser(){
 
 function gmailDisconnect(){
   gmailToken = null; gmailUser = null;
-  document.getElementById('btn-gmail-connect').style.display='inline-flex';
-  document.getElementById('btn-gmail-disconnect').style.display='none';
-  document.getElementById('gmail-user-info').innerHTML='';
-  const badge = document.getElementById('gmail-conn-badge');
-  if(badge) badge.style.display='none';
-  document.getElementById('gmail-emails').innerHTML='<div class="empty">Conecta Gmail y realiza una busqueda</div>';
+  var ca=document.getElementById('gmail-connect-area');
+  var sa=document.getElementById('gmail-search-area');
+  if(ca) ca.style.display='block';
+  if(sa) sa.style.display='none';
+  var ui=document.getElementById('gmail-user-info');
+  if(ui) ui.innerHTML='';
+  var ge=document.getElementById('gmail-emails');
+  if(ge) ge.innerHTML='<div class="empty">Conecta Gmail y haz una búsqueda</div>';
   toast('Gmail desconectado');
 }
 

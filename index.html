@@ -855,14 +855,15 @@ function drawAllLines(){
     (function(t){
       var color=lineColor(t);if(!color)return;
       var vis=mapFiltVal==='all'||t.ruta===mapFiltVal;
-      var isSubtramo=t.parent_id||t.tipo_elemento==='subtramo';
       var hasChildren=tramos.some(function(x){return x.parent_id===t.id;});
       var isSubtramo=!!(t.parent_id||t.tipo_elemento==='subtramo');
-      // Filter by detail level
-      if(mapDetailLevel==='main' && isSubtramo) return; // only main tramos
-      if(mapDetailLevel==='sub' && !isSubtramo) return;  // only subtramos
-      if(mapDetailLevel==='main' && hasChildren) return; // skip parents with children shown as 'all'
-      if(mapDetailLevel==='all' && hasChildren) return;  // always skip concatenated parents
+      // Filter by detail level:
+      // 'main' = only tramos principales (no parent_id)
+      // 'sub'  = only subtramos (has parent_id) 
+      // 'all'  = all tramos but skip main ones that have children (subtramos show the detail)
+      if(mapDetailLevel==='main' && isSubtramo) return;
+      if(mapDetailLevel==='sub' && !isSubtramo) return;
+      if(mapDetailLevel==='all' && !isSubtramo && hasChildren) return;
       var lineWeight=vis?(isSubtramo?3:5):(isSubtramo?1:2);
       var lineDash=null; // no dash - subtramos follow real path
       var lineOpts={color:color,weight:lineWeight,opacity:vis?0.85:0.15,lineCap:'round',lineJoin:'round'};

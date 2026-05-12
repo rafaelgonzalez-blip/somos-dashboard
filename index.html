@@ -1997,7 +1997,11 @@ function parseKMLString(kmlStr){
 
   function isSubtramoName(n){
     var nl=(n||'').toLowerCase();
-    if(/^tramo\s+\d+/.test(nl)) return true;
+    // Exclude recamara notation: "Tramo N (RCN-RCN+1)" - no real path
+    if(/^tramo\s+\d+\s*\(rc\d+/.test(nl)) return false;
+    if(/^tramo\s+\d+\s*-\s*\(rc\d+/.test(nl)) return false;
+    // Include: "Tramo N- UF..." real path subtramos
+    if(/^tramo\s+\d+[-_\s]/.test(nl)) return true;
     if(/^horizon_tramo/.test(nl)) return true;
     if(/^rc\d+/.test(nl)) return true;
     if(/^uf\d+/.test(nl)) return true;

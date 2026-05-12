@@ -2372,13 +2372,24 @@ async function kmzApply(){
       console.log('[KMZ] Patch complete');
     }
 
-    // Delete tramos that no longer exist
-    var newNames=newTramos.map(function(t){return t.tramo.toLowerCase();});
-    var toDelete=tramos.filter(function(t){return !newNames.includes(t.tramo.toLowerCase());});
+    // Only delete tramos from the SAME routes as the imported KMZ
+    // This preserves tramos from other routes
+    var importedRoutes={};
+    newTramos.forEach(function(t){ importedRoutes[t.ruta]=true; });
+    var newIds=newTramos.map(function(t){return t.id;});
+    var toDelete=tramos.filter(function(t){
+      // Only consider deleting if it's in one of the imported routes
+      if(!importedRoutes[t.ruta]) return false;
+      // Don't delete if it's in the new batch
+      if(newIds.includes(t.id)) return false;
+      // Don't delete tramos from other routes
+      return true;
+    });
     await Promise.all(toDelete.map(function(t){return sbDelete('tramos',t.id).catch(function(){});}));
 
-    // Update local state - tramos
-    tramos=newTramos;
+    // Update local state - merge new tramos with existing ones from other routes
+    var otherRouteTramos=tramos.filter(function(t){return !importedRoutes[t.ruta];});
+    tramos=otherRouteTramos.concat(newTramos);
 
     // Save puntos to Supabase if any detected
     var newPuntos=kmzParsed.puntos.map(function(p){

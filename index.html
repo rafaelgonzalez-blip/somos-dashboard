@@ -354,22 +354,31 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
 
     <div class="two-col" style="align-items:start">
       <div class="card">
-        <div class="card-h"><span class="card-t">Gmail / búsqueda de correos</span></div>
+        <div class="card-h">
+          <span class="card-t">Conexión Gmail</span>
+          <div id="gmail-user-info" style="font-size:10px;color:var(--muted)"></div>
+        </div>
         <div class="card-b">
-          <p style="font-size:11px;color:var(--muted);margin-bottom:10px">Simula búsqueda de correos enviados a concesiones y respuestas recibidas para agregarlos a la bitácora.</p>
-          <div class="fl" style="margin-bottom:10px">
-            <label>Buscar en correos</label>
-            <input class="inp" id="gmail-q" value="fibra óptica viabilidad ANI Invias permiso">
+          <div id="gmail-connect-area">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Conecta tu cuenta de Gmail para buscar correos relacionados con permisos viales y agregarlos a la bitácora.</p>
+            <button class="btn btn-p" onclick="gmailAuth()">🔗 Conectar con Gmail</button>
           </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn btn-p btn-sm" onclick="buscarCorreos(false)">Buscar correos enviados</button>
-            <button class="btn btn-g btn-sm" onclick="buscarCorreos(true)">Buscar respuestas</button>
+          <div id="gmail-search-area" style="display:none">
+            <div class="fl" style="margin-bottom:10px">
+              <label>Buscar en Gmail</label>
+              <input class="inp" id="gmail-q" placeholder="permiso vial ANI concesión...">
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+              <button class="btn btn-p btn-sm" onclick="gmailSearch(false)">Buscar enviados</button>
+              <button class="btn btn-g btn-sm" onclick="gmailSearch(true)">Buscar respuestas</button>
+              <button class="btn btn-danger btn-sm" onclick="gmailDisconnect()">Desconectar</button>
+            </div>
           </div>
         </div>
       </div>
       <div class="card">
-        <div class="card-h"><span class="card-t">Correos detectados</span></div>
-        <div class="card-b" id="gmail-emails"><div class="empty">Haz una búsqueda para ver correos</div></div>
+        <div class="card-h"><span class="card-t">Correos encontrados</span></div>
+        <div class="card-b" id="gmail-emails"><div class="empty">Conecta Gmail y haz una búsqueda</div></div>
       </div>
     </div>
 
@@ -1728,11 +1737,12 @@ async function _gmailGetUser(){
     });
     const u = await r.json();
     gmailUser = u.email;
-    document.getElementById('btn-gmail-connect').style.display='none';
-    document.getElementById('btn-gmail-disconnect').style.display='inline-flex';
-    document.getElementById('gmail-user-info').innerHTML = '<span style="color:var(--av)">Conectado como <strong>'+gmailUser+'</strong></span>';
-    const badge = document.getElementById('gmail-conn-badge');
-    if(badge){ badge.textContent='CONECTADO'; badge.style.cssText='font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;background:rgba(16,185,129,.15);color:var(--av);border:1px solid rgba(16,185,129,.3)'; badge.style.display='inline'; }
+    var ca=document.getElementById('gmail-connect-area');
+    var sa=document.getElementById('gmail-search-area');
+    if(ca) ca.style.display='none';
+    if(sa) sa.style.display='block';
+    var ui=document.getElementById('gmail-user-info');
+    if(ui) ui.innerHTML='<span style="color:var(--av)">✓ '+gmailUser+'</span>';
     toast('Gmail conectado como '+gmailUser);
   }catch(e){
     toast('Error obteniendo perfil: '+e.message,'err');

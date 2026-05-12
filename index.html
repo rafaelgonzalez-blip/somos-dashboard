@@ -1890,7 +1890,7 @@ function processKMZFile(file){
 }
 
 function extractKMZAndParse(arrayBuffer){
-  var status=document.getElementById('kmz-upload-status');
+  var status=document.getElementById('kmz-upload-status')||{textContent:'',style:{color:''}};
   // Load JSZip dynamically
   if(typeof JSZip==='undefined'){
     var script=document.createElement('script');
@@ -1904,7 +1904,7 @@ function extractKMZAndParse(arrayBuffer){
 }
 
 function doExtractKMZ(arrayBuffer){
-  var status=document.getElementById('kmz-upload-status');
+  var status=document.getElementById('kmz-upload-status')||{textContent:'',style:{color:''}};
   JSZip.loadAsync(arrayBuffer).then(function(zip){
     // Find the KML file inside
     var kmlFile=null;

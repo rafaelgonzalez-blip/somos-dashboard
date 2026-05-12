@@ -655,7 +655,7 @@ var SC={Avanzado:"#10B981","En gestión":"#F59E0B","Crítico":"#EF4444"};
 try{var _sc=localStorage.getItem('somos_sc');if(_sc)SC=JSON.parse(_sc);}catch(e){}
 
 var tramos=KMZ_TRAMOS.map(function(t){var r=Object.assign({},t);r.estado=normalizeEstado(r.estado);return r;});
-var routes={r1:{id:'r1',nombre:'Medellín–Barranquilla',color:'#60A5FA'},r2:{id:'r2',nombre:'Medellín–Bogotá',color:'#A78BFA'}};
+var routes={};
 
 var bitacora=[];
 
@@ -2284,21 +2284,26 @@ async function kmzApply(){
     var rutaEl=document.getElementById('kmz-ruta-t-'+i);
     var ruta=rutaEl?rutaEl.value:(t.ruta||'');
     var existing=stateMap[t.name.toLowerCase()];
-    // Priority 1: existing tramo's ruta
-    if(existing&&routes[existing.ruta]) ruta=existing.ruta;
-    // Priority 2: if subtramo, use parent tramo's ruta
-    if((!ruta||!routes[ruta])&&t.parentFolder){
-      var parentTramo=tramos.find(function(x){return x.tramo.toLowerCase()===t.parentFolder.toLowerCase();});
-      if(parentTramo&&routes[parentTramo.ruta]) ruta=parentTramo.ruta;
-    }
-    // Priority 3: global assign dropdown
-    if(!ruta||!routes[ruta]){
+    // Priority 1: individual selector in preview row
+    if(ruta&&routes[ruta]&&ruta!=='__new__'){}
+    // Priority 2: existing tramo's ruta
+    else if(existing&&routes[existing.ruta]) ruta=existing.ruta;
+    // Priority 3: global assign dropdown (user explicitly selected)
+    else {
       var sel=document.getElementById('kmz-ruta-assign');
-      if(sel&&sel.value&&sel.value!=='__new__'&&routes[sel.value]) ruta=sel.value;
+      if(sel&&sel.value&&sel.value!=='__new__'&&sel.value!==''&&routes[sel.value]) ruta=sel.value;
     }
-    // Priority 4: detect from folder name
-    if(!ruta||!routes[ruta]) ruta=t.ruta||Object.keys(routes)[0]||'r1';
-    if(ruta==='__new__'||!routes[ruta]) ruta=Object.keys(routes)[0]||'r1';
+    // Priority 4: if subtramo, inherit from newTramos parent
+    if(!ruta||!routes[ruta]||ruta==='__new__'){
+      if(t.parentFolder){
+        var pInBatch=newTramos.find(function(x){return x.tramo&&x.tramo.toLowerCase()===t.parentFolder.toLowerCase()&&x.tipo_elemento==='tramo';});
+        if(pInBatch&&routes[pInBatch.ruta]) ruta=pInBatch.ruta;
+      }
+    }
+    // Priority 5: detect from t.ruta set during parse
+    if(!ruta||!routes[ruta]||ruta==='__new__') ruta=t.ruta||'';
+    // Fallback
+    if(!ruta||!routes[ruta]||ruta==='__new__') ruta=Object.keys(routes)[0]||'r1';
     var tipoEl=t.tipo_elemento||'tramo';
     // parent_id will be resolved in second pass
     return {

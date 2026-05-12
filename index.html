@@ -466,7 +466,7 @@ async function sbGet(table, params){
 async function sbUpsert(table, data){
   var r = await fetch(SB_URL + '/rest/v1/' + table, {
     method: 'POST',
-    headers: Object.assign({}, sbHeaders(), {'Prefer': 'resolution=merge-duplicates,return=minimal'}),
+    headers: Object.assign({}, sbHeaders(), {'Prefer': 'resolution=merge-duplicates,return=representation'}),
     body: JSON.stringify(data)
   });
   if(!r.ok){ var e=await r.text(); throw new Error('sbUpsert '+table+': '+e); }
@@ -2347,7 +2347,7 @@ async function kmzApply(){
           method: 'PATCH',
           headers: Object.assign({}, sbHeaders(), {'Prefer': 'return=minimal'}),
           body: JSON.stringify({parent_id: t.parent_id, tipo_elemento: 'subtramo'})
-        });
+        }).then(function(r){ return r.ok; }).catch(function(e){ console.error('PATCH error:',e); });
       }));
       console.log('[KMZ] Patch complete');
     }

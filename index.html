@@ -2314,7 +2314,14 @@ async function kmzApply(){
     }
     delete t._parentFolder;
   });
-  console.log('[KMZ] parent_ids resolved:', newTramos.filter(function(t){return t.parent_id;}).length, 'subtramos');
+  var resolved=newTramos.filter(function(t){return t.parent_id;});
+  var unresolved=newTramos.filter(function(t){return t.tipo_elemento==='subtramo'&&!t.parent_id;});
+  console.log('[KMZ] Resolved:', resolved.length, 'Unresolved subtramos:', unresolved.length);
+  if(unresolved.length>0){
+    console.log('[KMZ] First unresolved:', unresolved[0].tramo, '_parentFolder was:', unresolved[0]._parentFolder);
+    console.log('[KMZ] batchMap keys:', Object.keys(batchMap).slice(0,10));
+  }
+  if(resolved.length>0) console.log('[KMZ] First resolved:', resolved[0].tramo, '-> parent:', resolved[0].parent_id);
 
   // Show loading
   document.getElementById('kmz-panel-2').innerHTML='<div class="thinking"><span></span><span></span><span></span><span style="margin-left:8px">Guardando en base de datos y actualizando mapa...</span></div>';

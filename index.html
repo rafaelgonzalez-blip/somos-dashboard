@@ -1969,7 +1969,10 @@ function detectTipoElemento(folderName, name){
 
 function parseKMLString(kmlStr){
   var status=document.getElementById('kmz-upload-status');
-  if(!status) status={style:{color:''},textContent:''};
+  if(!status) status={style:{color:''},textContent:'',set:function(){}};
+  function setStatus(msg,isErr){
+    try{status.style.color=isErr?'var(--cr)':'var(--av)';status.textContent=msg;}catch(e){}
+  }
 
   var cleaned=kmlStr
     .replace(/xmlns[^=]*="[^"]*"/g,'')
@@ -2110,8 +2113,7 @@ function parseKMLString(kmlStr){
   }
 
   if(!tramos.length&&!puntos.length){
-    status.style.color='var(--cr)';
-    status.textContent='No se encontraron elementos en el KMZ';
+    setStatus('No se encontraron elementos en el KMZ', true);
     return;
   }
   status.style.color='var(--av)';

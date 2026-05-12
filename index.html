@@ -364,6 +364,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
             <button class="btn btn-p" onclick="gmailAuth()">🔗 Conectar con Gmail</button>
           </div>
           <div id="gmail-search-area" style="display:none">
+          <div id="gmail-thinking" class="thinking" style="display:none"><span></span><span></span><span></span></div>
             <div class="fl" style="margin-bottom:10px">
               <label>Buscar en Gmail</label>
               <input class="inp" id="gmail-q" placeholder="permiso vial ANI concesión...">
@@ -443,13 +444,9 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
   </div>
 </div>
 
-<div class="toast-el" id="toast"></div>
-
-</div><!-- end app -->
+<div class="toast-el" id="toast-el"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-
 <script>
 // ─── SUPABASE ─────────────────────────────────────────────
 const SB_URL = 'https://ayjkwlykkqhkehkihzel.supabase.co';
@@ -1766,8 +1763,8 @@ async function gmailSearch(soloRespuestas){
   if(!q){ toast('Ingresa palabras clave para buscar','err'); return; }
   const thinking = document.getElementById('gmail-thinking');
   const emailsEl = document.getElementById('gmail-emails');
-  thinking.style.display = 'flex';
-  emailsEl.innerHTML = '';
+  if(thinking) thinking.style.display = 'flex';
+  if(emailsEl) emailsEl.innerHTML = '<div class="thinking"><span></span><span></span><span></span></div>';
   try{
     const query = soloRespuestas ? q+' in:inbox' : q+' in:sent';
     const searchResp = await fetch(
@@ -1777,7 +1774,7 @@ async function gmailSearch(soloRespuestas){
     if(!searchResp.ok){ throw new Error('Gmail API error '+searchResp.status); }
     const searchData = await searchResp.json();
     if(!searchData.messages || searchData.messages.length===0){
-      thinking.style.display='none';
+      if(thinking) thinking.style.display='none';
       emailsEl.innerHTML='<div class="empty">No se encontraron correos con esas palabras clave</div>';
       return;
     }
@@ -1788,9 +1785,8 @@ async function gmailSearch(soloRespuestas){
         { headers: {'Authorization': 'Bearer '+gmailToken} }
       ).then(function(r){ return r.json(); });
     }));
-    thinking.style.display='none';
-    const badge = document.getElementById('gmail-count-badge');
-    if(badge) badge.textContent = details.length+' correos encontrados';
+    if(thinking) thinking.style.display='none';
+
     // Store message data indexed by id for onclick access
     window._gmailMsgs = [];
     emailsEl.innerHTML = details.map(function(msg){
@@ -1818,7 +1814,7 @@ async function gmailSearch(soloRespuestas){
         +'</div>';
     }).join('');
   }catch(e){
-    thinking.style.display='none';
+    if(thinking) thinking.style.display='none';
     if(e.message && (e.message.includes('401')||e.message.includes('403'))){
       toast('Sesion Gmail expirada. Reconecta tu cuenta.','err');
       gmailDisconnect();

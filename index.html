@@ -505,8 +505,35 @@ async function sbDelete(table, id){
 // ─── CARGA INICIAL DESDE SUPABASE ─────────────────────────
 var dbLoaded = false;
 
+
+async function saveScToSupabase(){
+  try{
+    await sbUpsert('puntos',[{
+      id:'__sc_config__',
+      nombre:'SC_CONFIG',
+      tipo:'__config__',
+      lat:0, lng:0,
+      label: JSON.stringify(SC)
+    }]);
+  }catch(e){ console.warn('SC save to DB failed:',e); }
+}
+
+async function loadScFromSupabase(){
+  try{
+    var rows=await sbGet('puntos','id=eq.__sc_config__');
+    if(rows&&rows.length&&rows[0].label){
+      var parsed=JSON.parse(rows[0].label);
+      if(parsed&&Object.keys(parsed).length) return parsed;
+    }
+  }catch(e){ console.warn('SC load from DB failed:',e); }
+  return null;
+}
+
 async function loadFromDB(){
   console.log('[LDB] starting...');
+  // Load SC (estados) from Supabase first - overrides localStorage
+  var dbSC=await loadScFromSupabase();
+  if(dbSC){ SC=dbSC; try{localStorage.setItem('somos_sc',JSON.stringify(SC));}catch(e){} }
   try{
     showDBStatus('Cargando datos...');
     
@@ -1195,7 +1222,7 @@ function selEditRoute(rid){
   editingRoute=rid;
   const r=routes[rid]; if(!r)return;
   document.getElementById("editor-title").textContent="Tramos: "+r.nombre;
-  document.getElementById("editor-actions").innerHTML=`<button class="btn btn-p btn-sm" onclick="openModal('nuevo-tramo','${rid}')">+ Agregar tramo</button>`;
+  document.getElementById("editor-actions").innerHTML=`<button class="btn btn-sm" onclick="sortTramos()" title="Ordenar tramos por numeral">⇅ Ordenar</button> <button class="btn btn-p btn-sm" onclick="openModal('nuevo-tramo','${rid}')">+ Agregar tramo</button>`;
   const rt=tramos.filter(t=>t.ruta===rid);
   document.getElementById("tramo-editor-body").innerHTML=`<div style="max-height:380px;overflow-y:auto" class="sc">${
     rt.map(t=>`<div class="tramo-edit-row">
@@ -1463,6 +1490,16 @@ function openModal(type,id,preTramo){
         <div class="fl"><label>Fecha próxima acción</label><input type="date" class="inp" id="et-fp" value="${t.fp||""}"></div>
       </div>
       <div class="fl"><label>Próxima acción</label><input type="text" class="inp" id="et-p" value="${t.proxima||""}"></div>
+      <div class="fl"><label>Tipo de elemento</label>
+        <select class="inp" id="et-tipo" onchange="document.getElementById('et-parent-wrap').style.display=this.value==='subtramo'?'block':'none'">
+          <option value="tramo"${(!t.parent_id&&t.tipo_elemento!=='subtramo')?' selected':''}>Tramo principal</option>
+          <option value="subtramo"${(t.parent_id||t.tipo_elemento==='subtramo')?' selected':''}>Subtramo</option>
+        </select>
+      </div>
+      <div class="fl" id="et-parent-wrap" style="display:${(t.parent_id||t.tipo_elemento==='subtramo')?'block':'none'}">
+        <label>Tramo padre</label>
+        <select class="inp" id="et-parent">${tramos.filter(x=>!x.parent_id&&x.id!==t.id).map(x=>'<option value="'+x.id+'"'+(x.id===t.parent_id?' selected':'')+'>'+x.tramo+'</option>').join('')}</select>
+      </div>
       <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
         <button class="btn btn-p" onclick="saveEditTramo('${id}')">Guardar cambios</button>
@@ -1602,12 +1639,17 @@ function saveNuevoTramo(rutaId){
 
 function saveEditTramo(id){
   const t=tramos.find(x=>x.id===id); if(!t)return;
-  t.tramo=gv("et-n"); t.ruta=gv("et-r"); t.estado=gv("et-e");
-  t.actor=gv("et-a"); t.concesion=gv("et-c");
-  t.km=parseFloat(gv("et-km"))||t.km; t.fp=gv("et-fp"); t.proxima=gv("et-p");
+  t.tramo=gv('et-n'); t.ruta=gv('et-r'); t.estado=gv('et-e');
+  t.actor=gv('et-a'); t.concesion=gv('et-c');
+  t.km=parseFloat(gv('et-km'))||t.km; t.fp=gv('et-fp'); t.proxima=gv('et-p');
+  var tipoEl=gv('et-tipo')||'tramo';
+  var parentId=(tipoEl==='subtramo'&&gv('et-parent'))?gv('et-parent'):null;
+  t.tipo_elemento=tipoEl; t.parent_id=parentId||null;
+  if(parentId&&!window._openTramos)window._openTramos={};
+  if(parentId)window._openTramos[parentId]=true;
   closeModal(); renderAll(); refreshLines(); if(selTramo)selT(selTramo); if(editingRoute)selEditRoute(editingRoute);
   var et=tramos.find(function(x){return x.id===id;});if(et)saveTramoToDB(et);
-  toast("Tramo actualizado · Guardado en base de datos");
+  toast('Tramo actualizado · Guardado en base de datos');
 }
 
 function doDividir(id){
@@ -3054,8 +3096,9 @@ async function saveEstados(){
     // Wait for all saves to complete before closing
     try{ await Promise.all(tramosToSave.concat(bitToSave)); }catch(e){}
   }
-  // Persist SC
+  // Persist SC in localStorage AND Supabase
   try{localStorage.setItem('somos_sc', JSON.stringify(SC));}catch(e){}
+  saveScToSupabase(); // async, no await needed
 
   closeModal();
   renderAll();
@@ -3078,6 +3121,39 @@ function renderMapLegend(){
     c.appendChild(div);
   });
 }
+
+function sortTramos(){
+  // Extract leading number from tramo name for sorting
+  function getNum(name){
+    var m=(name||'').match(/^(?:Tramo\s*)?(\d+)/i);
+    return m?parseInt(m[1]):9999;
+  }
+  // Sort maintaining parent-child grouping
+  var parents=tramos.filter(function(t){return !t.parent_id;});
+  var children=tramos.filter(function(t){return t.parent_id;});
+  // Sort parents by numeral
+  parents.sort(function(a,b){
+    // First sort by ruta, then by numeral
+    if(a.ruta!==b.ruta)return a.ruta<b.ruta?-1:1;
+    return getNum(a.tramo)-getNum(b.tramo);
+  });
+  // Sort children by numeral within each parent
+  children.sort(function(a,b){
+    if(a.parent_id!==b.parent_id)return 0;
+    return getNum(a.tramo)-getNum(b.tramo);
+  });
+  // Reassemble: parents with their children grouped after each parent
+  var sorted=[];
+  parents.forEach(function(p){
+    sorted.push(p);
+    children.filter(function(c){return c.parent_id===p.id;}).forEach(function(c){sorted.push(c);});
+  });
+  tramos=sorted;
+  renderAll();
+  if(mapInst){drawAllLines(); renderMapSide();}
+  toast('Tramos ordenados por numeral');
+}
+
 
 function renderAll(){
   kpis();

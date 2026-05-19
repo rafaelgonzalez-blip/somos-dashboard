@@ -637,6 +637,8 @@ async function loadFromDB(){
       }
     }catch(e){ console.warn('[LDB] puntos load failed:',e); }
     renderAll();
+    // Draw puntos after map is ready
+    setTimeout(function(){ if(mapInst){drawPuntos();renderLayerControls();} }, 500);
     buildEstadoFilters();
     if(mapInst) refreshLines();
     
@@ -3216,6 +3218,7 @@ function renderAll(){
   if(activeTab==="tramos")renderTramoList();
   if(activeTab==="bitacora")renderBitList();
   if(activeTab==="rutas"){renderRutasList();if(editingRoute)selEditRoute(editingRoute);}
+  if(activeTab==="mapa"&&mapInst){drawPuntos();renderLayerControls();}
 }
 
 // ─── INIT ────────────────────────────────────────────────────

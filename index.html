@@ -629,6 +629,13 @@ async function loadFromDB(){
     console.log('[LDB] routes after load:', JSON.stringify(routes));
     // Auto-sort tramos by numeral on load
     _autoSortTramos();
+    // Load puntos (POIs) from Supabase
+    try{
+      var dbPuntos=await sbGet('puntos','tipo=neq.__config__');
+      if(dbPuntos&&dbPuntos.length){
+        window._dbPuntos=dbPuntos;
+      }
+    }catch(e){ console.warn('[LDB] puntos load failed:',e); }
     renderAll();
     buildEstadoFilters();
     if(mapInst) refreshLines();
@@ -933,28 +940,36 @@ function drawAllLines(){
 }
 function drawPuntos(){
   if(!mapInst)return;
+  // Clear existing markers
   var keys=Object.keys(markerGroups);
   for(var i=0;i<keys.length;i++){if(markerGroups[keys[i]])markerGroups[keys[i]].clearLayers();}
-  for(var i=0;i<KMZ_PUNTOS.length;i++){
+  // Use puntos from Supabase (_dbPuntos) OR KMZ_PUNTOS as fallback
+  var pList=(window._dbPuntos&&window._dbPuntos.length)?window._dbPuntos:KMZ_PUNTOS;
+  var needsRebuild=false;
+  for(var i=0;i<pList.length;i++){
     (function(p){
-      if(mapFiltVal!=='all'&&p.ruta!==mapFiltVal)return;
       if(!p.lat||!p.lng||isNaN(p.lat)||isNaN(p.lng))return;
       if(p.lat<1||p.lat>12||p.lng<-80||p.lng>-65)return;
-      var color=getLayerColor(p.tipo);
-      var gkey=p.tipo||'Marcador';
-      if(!markerGroups[gkey]&&mapInst){
+      if(mapFiltVal!=='all'&&p.ruta&&p.ruta!==mapFiltVal)return;
+      var tipo=p.tipo||p.label||'Marcador';
+      // Skip config entries
+      if(tipo==='__config__')return;
+      var color=getLayerColor(tipo);
+      var gkey=tipo;
+      if(!markerGroups[gkey]){
         markerGroups[gkey]=L.layerGroup().addTo(mapInst);
-        renderLayerControls();
+        needsRebuild=true;
       }
       var grp=markerGroups[gkey];
-      if(!grp||!mapInst)return;
+      if(!grp)return;
       try{
-        var mk=L.circleMarker([p.lat,p.lng],{radius:4,fillColor:color,color:'#fff',weight:1,fillOpacity:0.9,opacity:0.9});
-        mk.bindPopup('<b>'+(p.nombre||'Sin nombre')+'</b><br><small>'+(p.tipo||'')+'</small>');
+        var mk=L.circleMarker([p.lat,p.lng],{radius:5,fillColor:color,color:'#fff',weight:1.5,fillOpacity:0.9,opacity:1});
+        mk.bindPopup('<b>'+(p.nombre||'Sin nombre')+'</b><br><small style="color:#aaa">'+tipo+'</small><br><small>'+(p.ruta&&routes[p.ruta]?routes[p.ruta].nombre:'')+'</small>',{maxWidth:200});
         grp.addLayer(mk);
       }catch(e){}
-    })(KMZ_PUNTOS[i]);
+    })(pList[i]);
   }
+  if(needsRebuild) renderLayerControls();
 }
 function getLayerColor(tipo){
   if(!tipo)return '#60A5FA';

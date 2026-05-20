@@ -2126,13 +2126,22 @@ function parseKMLString(kmlStr){
 
   function detectPOIType(name,folderName){
     var n=(name||'').toLowerCase(),f=(folderName||'').toLowerCase();
-    if(/^rc\d+/.test(n)||/^rcf/.test(n)||f.indexOf('recámara')>=0||f.indexOf('recamara')>=0||f.indexOf('proyecci')>=0)return 'Recamara';
-    if(/puente/.test(n)||f==='puentes')return 'Puente';
-    if(/peaje/.test(n)||f==='peajes')return 'Peaje';
-    if(/tunel|túnel/.test(n)||f==='tunel')return 'Tunel';
-    if(/estaci|gasolinera|terpel|zeuss/.test(n)||f==='gasolinera')return 'Gasolinera';
-    if(/posible|obstáculo|obstaculo/.test(n)||f.indexOf('obstáculo')>=0)return 'Obstaculo';
-    if(/^nodo|^pop/.test(n)||f.indexOf('nodo')>=0)return 'Nodo';
+    // FOLDER NAME takes priority - any element inside these folders gets that type
+    if(f==='puentes'||f.indexOf('puente')>=0) return 'Puente';
+    if(f==='peajes'||f.indexOf('peaje')>=0) return 'Peaje';
+    if(f==='tunel'||f.indexOf('tunel')>=0||f.indexOf('túnel')>=0) return 'Tunel';
+    if(f==='gasolinera'||f.indexOf('gasolinera')>=0) return 'Gasolinera';
+    if(f.indexOf('obstáculo')>=0||f.indexOf('obstaculo')>=0) return 'Obstaculo';
+    if(f.indexOf('nodo')>=0||f.indexOf('pop')>=0) return 'Nodo';
+    if(f.indexOf('recámara')>=0||f.indexOf('recamara')>=0||f.indexOf('proyecci')>=0) return 'Recamara';
+    // Fallback: detect by name patterns
+    if(/^rc\d+/.test(n)||/^rcf/.test(n)) return 'Recamara';
+    if(/puente|pv-\d+/.test(n)) return 'Puente';
+    if(/peaje|^p\d+/.test(n)) return 'Peaje';
+    if(/tunel|túnel/.test(n)) return 'Tunel';
+    if(/estaci|gasolinera|terpel|zeuss|^eds/.test(n)) return 'Gasolinera';
+    if(/posible|obstáculo|obstaculo/.test(n)) return 'Obstaculo';
+    if(/^nodo|^pop/.test(n)) return 'Nodo';
     return null;
   }
 
@@ -2243,11 +2252,32 @@ function parseKMLString(kmlStr){
       var nameM=kml.substr(pos,200).match(/<name>([^<]+)<\/name>/);
       if(!nameM||nameM[1].trim()!==fname)return;
       var xml=getFolderAt(kml,pos);
+      // Get sub-folder names to pass as context
+      var subFolderNames=[];
+      var sfRe2=/<Folder>\s*<name>([^<]+)<\/name>/g,sfM2;
+      while((sfM2=sfRe2.exec(xml))!==null) subFolderNames.push(sfM2[1].trim());
+      // Process each subfolder with its name as context
+      subFolderNames.forEach(function(sfName){
+        var sfRe3=new RegExp('<Folder>\\s*<name>'+sfName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'<\/name>([\\s\\S]*?)<\/Folder>');
+        var sfM3=xml.match(sfRe3);
+        if(!sfM3)return;
+        getAllTags(sfM3[1],'Placemark').forEach(function(pm){
+          if(pm.indexOf('<Point>')<0)return;
+          var pmName=getTag(pm,'name');
+          var tipo=detectPOIType(pmName,sfName); // use subfolder name
+          if(!tipo)tipo=sfName.replace(/s$/,'');
+          var c=parseCoords(getTag(pm,'coordinates'),1);
+          if(c.length<1)return;
+          if(!allPuntos.some(function(p){return p.nombre===pmName&&p.tipo===tipo;}))
+            allPuntos.push({nombre:pmName,tipo:tipo,lat:c[0][0],lng:c[0][1]});
+        });
+      });
+      // Also process Points directly in main folder
       getAllTags(xml,'Placemark').forEach(function(pm){
         if(pm.indexOf('<Point>')<0)return;
         var pmName=getTag(pm,'name');
         var tipo=detectPOIType(pmName,fname);
-        if(!tipo)tipo=fname.replace(/s$/,'');
+        if(!tipo)return;
         var c=parseCoords(getTag(pm,'coordinates'),1);
         if(c.length<1)return;
         if(!allPuntos.some(function(p){return p.nombre===pmName&&p.tipo===tipo;}))

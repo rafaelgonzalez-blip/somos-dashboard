@@ -993,9 +993,21 @@ function renderLayerControls(){
   var container=document.getElementById('dynamic-layers');
   if(!container)return;
   container.innerHTML='';
-  // Always add tramos toggle first
-  // Then add one button per markerGroup
+  // Tramos toggle always first
+  (function(){
+    var chkT=document.getElementById('lay-tramos');
+    var chkTon=chkT?chkT.checked:true;
+    var btnT=document.createElement('label');
+    btnT.onclick=function(){toggleLayer('tramos');};
+    btnT.style.cssText='display:inline-flex;align-items:center;gap:5px;padding:4px 11px;font-size:11px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.12);user-select:none;margin:2px';
+    btnT.innerHTML='<input type="checkbox" id="lay-tramos"'+(chkTon?' checked':'')+' style="accent-color:#3B82F6;cursor:pointer"> Tramos';
+    container.appendChild(btnT);
+  })();
+  // One button per POI layer - skip empty/unnamed
   Object.keys(markerGroups).forEach(function(tipo){
+    if(!tipo||tipo==='Marcador')return;
+    var layers=markerGroups[tipo];
+    if(layers&&layers.getLayers&&layers.getLayers().length===0)return;
     var color=getLayerColor(tipo);
     var id='lay-dyn-'+tipo.replace(/\s+/g,'_');
     var chk=document.getElementById(id);
@@ -2234,15 +2246,27 @@ function parseKMLString(kmlStr){
     builtSubs.push({name:pmName,mainNum:mNum,coords:c,puntos:[]});
   });
 
-  // ── Also add horizon_tramo_N (GTD legacy) ─────────────────
-  getAllTags(kml,'Placemark').forEach(function(pm){
-    if(pm.indexOf('<LineString>')<0)return;
-    var pmName=getTag(pm,'name');
-    if(!/^horizon_tramo_\d+|^horizon_ruta_tramo_\d+/i.test(pmName))return;
-    if(builtSubs.some(function(s){return s.name===pmName;}))return;
-    var c=parseCoords(getTag(pm,'coordinates'),300);
-    if(c.length<2)return;
-    builtSubs.push({name:pmName,mainNum:1,coords:c,puntos:[]});
+  // ── Also add horizon_tramo_N (GTD legacy) with folder context name ──
+  // Find them inside their parent folder to get proper display name
+  fPositions.forEach(function(pos){
+    var nameM=kml.substr(pos,200).match(/<name>([^<]+)<\/name>/);
+    if(!nameM)return;
+    var fname=nameM[1].trim();
+    if(!/^\d+\.\s+/.test(fname))return; // only inside main tramo folders
+    var mNum=parseInt(fname.match(/^(\d+)\./)[1]);
+    var fxml=getFolderAt(kml,pos);
+    getAllTags(fxml,'Placemark').forEach(function(pm){
+      if(pm.indexOf('<LineString>')<0)return;
+      var pmName=getTag(pm,'name');
+      if(!/^horizon_tramo_\d+|^horizon_ruta_tramo_\d+/i.test(pmName))return;
+      if(builtSubs.some(function(s){return s.name===pmName;}))return;
+      // Use the parent folder subfolder name if available, else keep horizon name
+      var num=pmName.match(/_(\d+)$/);
+      var displayName=num?('Tramo '+mNum+'.'+num[1]+'_'+fname.replace(/^\d+\.\s*/,'')):pmName;
+      var c=parseCoords(getTag(pm,'coordinates'),300);
+      if(c.length<2)return;
+      builtSubs.push({name:displayName,mainNum:mNum,coords:c,puntos:[]});
+    });
   });
 
   // ── POI folders ───────────────────────────────────────────

@@ -2096,201 +2096,194 @@ function detectTipoElemento(folderName, name){
 
 function parseKMLString(kmlStr){
   var status=document.getElementById('kmz-upload-status')||{textContent:'',style:{color:''}};
-  function setStatus(msg,isErr){
-    try{status.style.color=isErr?'var(--cr)':'var(--av)';status.textContent=msg;}catch(e){}
+  function setStatus(msg,isErr){try{status.style.color=isErr?'var(--cr)':'var(--av)';status.textContent=msg;}catch(e){}}
+
+  function stripNS(s){return s.replace(/xmlns[^=]*="[^"]*"/g,'').replace(/<kml:/g,'<').replace(/<\/kml:/g,'</');}
+  function getTag(xml,tag){var m=xml.match(new RegExp('<'+tag+'[^>]*>([\\s\\S]*?)<\\/'+tag+'>'));return m?m[1].trim():'';}
+  function getAllTags(xml,tag){var re=new RegExp('<'+tag+'[^>]*>[\\s\\S]*?<\\/'+tag+'>','g'),m,r=[];while((m=re.exec(xml))!==null)r.push(m[0]);return r;}
+
+  function getFolderAt(kml,pos){
+    var depth=0,i=pos;
+    while(i<kml.length){
+      if(kml.substr(i,8)==='<Folder>'){depth++;i+=8;}
+      else if(kml.substr(i,9)==='</Folder>'){depth--;if(depth===0)return kml.substring(pos,i+9);i+=9;}
+      else i++;
+    }
+    return kml.substring(pos);
   }
-  function stripNS(s){ return s.replace(/xmlns[^=]*="[^"]*"/g,'').replace(/<kml:/g,'<').replace(/<\/kml:/g,'</'); }
-  function getTag(xml,tag){
-    var m=xml.match(new RegExp('<'+tag+'[^>]*>([\\s\\S]*?)<\\/'+tag+'>'));
-    return m?m[1].trim():'';
-  }
-  function getAllTags(xml,tag){
-    var re=new RegExp('<'+tag+'[^>]*>[\\s\\S]*?<\\/'+tag+'>','g'),m,res=[];
-    while((m=re.exec(xml))!==null) res.push(m[0]);
-    return res;
-  }
+
   function parseCoords(txt,maxPts){
-    var pts=[],raw=(txt||'').trim().split(/\s+/);
-    maxPts=maxPts||500;
+    var pts=[],raw=(txt||'').trim().split(/\s+/),max=maxPts||500;
     for(var i=0;i<raw.length;i++){
-      var p=raw[i].split(',');
-      if(p.length<2)continue;
-      try{
-        var lng=parseFloat(p[0]),lat=parseFloat(p[1]);
-        if(lat>=1&&lat<=12&&lng>=-80&&lng<=-65) pts.push([Math.round(lat*1e6)/1e6,Math.round(lng*1e6)/1e6]);
+      var p=raw[i].split(',');if(p.length<2)continue;
+      try{var lng=parseFloat(p[0]),lat=parseFloat(p[1]);
+        if(lat>=1&&lat<=12&&lng>=-80&&lng<=-65)pts.push([Math.round(lat*1e6)/1e6,Math.round(lng*1e6)/1e6]);
       }catch(e){}
     }
-    if(pts.length>maxPts){
-      var step=Math.ceil(pts.length/maxPts),out=[pts[0]];
-      for(var i=step;i<pts.length-1;i+=step) out.push(pts[i]);
-      out.push(pts[pts.length-1]);
-      return out;
-    }
+    if(pts.length>max){var step=Math.ceil(pts.length/max),out=[pts[0]];for(var i=step;i<pts.length-1;i+=step)out.push(pts[i]);out.push(pts[pts.length-1]);return out;}
     return pts;
   }
+
   function detectPOIType(name,folderName){
     var n=(name||'').toLowerCase(),f=(folderName||'').toLowerCase();
-    if(/^rc\d+/.test(n)||/^rcf/.test(n)||f.indexOf('recámara')>=0||f.indexOf('recamara')>=0||f.indexOf('proyección')>=0) return 'Recamara';
-    if(/puente/.test(n)||f==='puentes') return 'Puente';
-    if(/peaje/.test(n)||f==='peajes') return 'Peaje';
-    if(/tunel|túnel/.test(n)||f==='tunel') return 'Tunel';
-    if(/estaci|gasolinera|terpel|zeuss/.test(n)||f==='gasolinera') return 'Gasolinera';
-    if(/posible|obstáculo|obstaculo/.test(n)||f.indexOf('obstáculo')>=0) return 'Obstaculo';
-    if(/^nodo|^pop/.test(n)||f.indexOf('nodo')>=0) return 'Nodo';
+    if(/^rc\d+/.test(n)||/^rcf/.test(n)||f.indexOf('recámara')>=0||f.indexOf('recamara')>=0||f.indexOf('proyecci')>=0)return 'Recamara';
+    if(/puente/.test(n)||f==='puentes')return 'Puente';
+    if(/peaje/.test(n)||f==='peajes')return 'Peaje';
+    if(/tunel|túnel/.test(n)||f==='tunel')return 'Tunel';
+    if(/estaci|gasolinera|terpel|zeuss/.test(n)||f==='gasolinera')return 'Gasolinera';
+    if(/posible|obstáculo|obstaculo/.test(n)||f.indexOf('obstáculo')>=0)return 'Obstaculo';
+    if(/^nodo|^pop/.test(n)||f.indexOf('nodo')>=0)return 'Nodo';
     return null;
   }
-  function isRCNotation(name){
-    return /^Tramo\s+\d+\s*[-–]?\s*\(RC\d+/i.test(name||'');
+
+  // N.M_ pattern (subtramo folder or LineString)
+  function isSubName(name){
+    var n=(name||'').trim();
+    return /^\d+\.\d+\.?[_\s]/.test(n)||/^horizon_tramo_\d+/i.test(n)||/^horizon_ruta_tramo_\d+/i.test(n);
   }
+  function getMainNum(name){var m=(name||'').match(/^(\d+)\./);return m?parseInt(m[1]):null;}
 
   var kml=stripNS(kmlStr);
-  var result={tramos:[],puntos:[]};
+  var result={tramos:[],puntos:[],capas:[]};
+  var tmRuta=(typeof kmzParsed!=='undefined'&&kmzParsed&&kmzParsed.ruta)?kmzParsed.ruta:'';
   setStatus('Analizando KMZ...');
 
-  // Find all main tramo folders (N. Name)
-  var mfPositions=[];
-  var mfRe=/<Folder>\s*<name>(\d+\.\s+[^<]+)<\/name>/g,mfM;
-  while((mfM=mfRe.exec(kml))!==null){
-    mfPositions.push({start:mfM.index,name:mfM[1].replace(/^\d+\.\s+/,'').trim()});
-  }
+  // ── Collect main tramos (N. Name folders) ─────────────────
+  var mainTramos={};
+  var fPositions=[]; var fRe=/<Folder>/g,fM2;
+  while((fM2=fRe.exec(kml))!==null) fPositions.push(fM2.index);
 
-  var tmRuta=(typeof kmzParsed!=='undefined'&&kmzParsed.ruta)?kmzParsed.ruta:'';
-  var processedMain=false;
-
-  mfPositions.forEach(function(mf,mfIdx){
-    var sectionEnd=mfPositions[mfIdx+1]?mfPositions[mfIdx+1].start:kml.length;
-    var section=kml.substring(mf.start,sectionEnd);
-    var mainName=mf.name;
-    setStatus('Procesando: '+mainName+'...');
-
-    var subtramos=[],puntos=[];
-
-    // Pattern A: Sub-folders named "Tramo N_..." each with LineString
-    var sfRe=/<Folder>\s*<name>(Tramo\s+\d+[_\s][^<]*)<\/name>([\s\S]*?)<\/Folder>/g,sfM;
-    var foundSubFolders=false;
-    while((sfM=sfRe.exec(section))!==null){
-      var sfName=sfM[1].trim();
-      if(isRCNotation(sfName))continue;
-      var sfContent=sfM[2];
-      var lsXmls=getAllTags(sfContent,'LineString');
-      if(lsXmls.length===0)continue;
-      var bestCoords=[];
-      lsXmls.forEach(function(lsXml){
-        var c=parseCoords(getTag(lsXml,'coordinates'),300);
-        if(c.length>bestCoords.length)bestCoords=c;
-      });
-      if(bestCoords.length<2)continue;
-      // Collect RC points from this sub-folder
-      getAllTags(sfContent,'Placemark').forEach(function(pmXml){
-        if(pmXml.indexOf('<Point>')<0)return;
-        var pmName=getTag(pmXml,'name');
-        var tipo=detectPOIType(pmName,'');
-        if(!tipo)return;
-        var c=parseCoords(getTag(pmXml,'coordinates'),1);
-        if(c.length<1)return;
-        puntos.push({nombre:pmName,tipo:tipo,lat:c[0][0],lng:c[0][1]});
-      });
-      subtramos.push({name:sfName,coords:bestCoords});
-      foundSubFolders=true;
+  fPositions.forEach(function(pos){
+    var nameM=kml.substr(pos,200).match(/<name>([^<]+)<\/name>/);
+    if(!nameM)return;
+    var fname=nameM[1].trim();
+    if(/^\d+\.\s+/.test(fname)){
+      var num=parseInt(fname.match(/^(\d+)\./)[1]);
+      if(!mainTramos[num]) mainTramos[num]={name:fname.replace(/^\d+\.\s+/,'').trim(),pos:pos};
     }
-
-    // Pattern B: "Ruta" folder with LineStrings (each segment between recamaras)
-    if(!foundSubFolders){
-      var rutaM=section.match(/<Folder>\s*<name>Ruta<\/name>([\s\S]*?)<\/Folder>/);
-      if(rutaM){
-        getAllTags(rutaM[1],'Placemark').forEach(function(pmXml){
-          if(pmXml.indexOf('<LineString>')<0)return;
-          var pmName=getTag(pmXml,'name');
-          if(isRCNotation(pmName))return;
-          var c=parseCoords(getTag(pmXml,'coordinates'),300);
-          if(c.length<2)return;
-          subtramos.push({name:pmName,coords:c});
-        });
-      }
-    }
-
-    // Pattern C: Direct LineStrings in section
-    if(subtramos.length===0){
-      getAllTags(section,'Placemark').forEach(function(pmXml){
-        if(pmXml.indexOf('<LineString>')<0)return;
-        var pmName=getTag(pmXml,'name');
-        if(isRCNotation(pmName))return;
-        var c=parseCoords(getTag(pmXml,'coordinates'),500);
-        if(c.length<2)return;
-        subtramos.push({name:pmName,coords:c});
-      });
-    }
-
-    // Collect POIs from named folders
-    ['Tunel','Puentes','Peajes','Gasolinera','Posibles obstáculos','Elementos importantes','Recámaras existentes','Proyección de Cámaras','NODOS PRINCIPALES'].forEach(function(fname){
-      var fRe=new RegExp('<Folder>\\s*<name>'+fname.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'<\\/name>([\\s\\S]*?)<\\/Folder>');
-      var fM=section.match(fRe);
-      if(!fM)return;
-      getAllTags(fM[1],'Placemark').forEach(function(pmXml){
-        if(pmXml.indexOf('<Point>')<0)return;
-        var pmName=getTag(pmXml,'name');
-        var tipo=detectPOIType(pmName,fname);
-        if(!tipo)tipo=fname.replace(/s$/,'');
-        var c=parseCoords(getTag(pmXml,'coordinates'),1);
-        if(c.length<1)return;
-        if(!puntos.some(function(p){return p.nombre===pmName&&p.tipo===tipo;}))
-          puntos.push({nombre:pmName,tipo:tipo,lat:c[0][0],lng:c[0][1]});
-      });
-    });
-
-    // Collect RC* points directly
-    getAllTags(section,'Placemark').forEach(function(pmXml){
-      if(pmXml.indexOf('<Point>')<0)return;
-      var pmName=getTag(pmXml,'name');
-      if(!/^RC\d+|^RCF/.test(pmName))return;
-      if(puntos.some(function(p){return p.nombre===pmName;}))return;
-      var c=parseCoords(getTag(pmXml,'coordinates'),1);
-      if(c.length<1)return;
-      puntos.push({nombre:pmName,tipo:'Recamara',lat:c[0][0],lng:c[0][1]});
-    });
-
-    // Dedup horizon_tramo_N vs Tramo N
-    var hasTramoN={};
-    subtramos.forEach(function(st){var m=st.name.match(/^Tramo\s+(\d+)/i);if(m)hasTramoN[m[1]]=true;});
-    subtramos=subtramos.filter(function(st){var m=st.name.match(/^horizon_tramo_(\d+)$/i);return!(m&&hasTramoN[m[1]]);});
-
-    // Main coords = concat of subtramos
-    var mainCoords=[];
-    subtramos.forEach(function(st){mainCoords=mainCoords.concat(st.coords);});
-    if(mainCoords.length===0){
-      var anyLS=section.match(/<coordinates>([\s\S]*?)<\/coordinates>/);
-      if(anyLS)mainCoords=parseCoords(anyLS[1],200);
-    }
-
-    result.tramos.push({name:mainName,coords:mainCoords,folder:mainName,tipo_elemento:'tramo',parentFolder:null,ruta:tmRuta});
-    subtramos.forEach(function(st){
-      result.tramos.push({name:st.name,coords:st.coords,folder:mainName,tipo_elemento:'subtramo',parentFolder:mainName,ruta:tmRuta});
-    });
-    puntos.forEach(function(p){result.puntos.push(Object.assign({},p,{ruta:tmRuta}));});
-    processedMain=true;
   });
 
-  // Fallback: simple KMZ
-  if(!processedMain){
+  // ── Collect subtramos from folders (N.M_ folders) ─────────
+  var builtSubs=[];
+
+  fPositions.forEach(function(pos){
+    var nameM=kml.substr(pos,200).match(/<name>([^<]+)<\/name>/);
+    if(!nameM)return;
+    var fname=nameM[1].trim();
+    if(!isSubName(fname))return;
+    var mNum=getMainNum(fname);
+    var xml=getFolderAt(kml,pos);
+
+    var bestCoords=[];
+    // Try Ruta subfolder - include ALL linestrings (even RC segments = real path)
+    var rutaM=xml.match(/<Folder>\s*<name>Ruta(?:\s+del\s+Tunel)?<\/name>([\s\S]*?)<\/Folder>/);
+    if(rutaM){
+      getAllTags(rutaM[1],'Placemark').forEach(function(pm){
+        if(pm.indexOf('<LineString>')<0)return;
+        var c=parseCoords(getTag(pm,'coordinates'),300);
+        bestCoords=bestCoords.concat(c); // concat ALL = real path
+      });
+    }
+    // Fallback: best single LS in folder
+    if(bestCoords.length<2){
+      getAllTags(xml,'Placemark').forEach(function(pm){
+        if(pm.indexOf('<LineString>')<0)return;
+        var c=parseCoords(getTag(pm,'coordinates'),300);
+        if(c.length>bestCoords.length)bestCoords=c;
+      });
+    }
+    if(bestCoords.length<2)return;
+
+    // RC points from recamara subfolders
+    var rcPts=[];
+    ['Recámaras existentes','Recamaras existentes','Recamaras proyectadas','Recámaras proyectadas'].forEach(function(rname){
+      var rfM=xml.match(new RegExp('<Folder>\\s*<name>'+rname.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'<\\/name>([\\s\\S]*?)<\\/Folder>'));
+      if(!rfM)return;
+      getAllTags(rfM[1],'Placemark').forEach(function(pm){
+        if(pm.indexOf('<Point>')<0)return;
+        var pmName=getTag(pm,'name');
+        var c=parseCoords(getTag(pm,'coordinates'),1);
+        if(c.length<1)return;
+        rcPts.push({nombre:pmName,tipo:'Recamara',lat:c[0][0],lng:c[0][1]});
+      });
+    });
+
+    builtSubs.push({name:fname,mainNum:mNum,coords:bestCoords,puntos:rcPts});
+  });
+
+  // ── Collect subtramos from direct LineStrings (N.M_ placemarks, tramos 4-7) ──
+  getAllTags(kml,'Placemark').forEach(function(pm){
+    if(pm.indexOf('<LineString>')<0)return;
+    var pmName=getTag(pm,'name');
+    if(!isSubName(pmName))return;
+    var mNum=getMainNum(pmName);
+    if(!mNum)return;
+    // Skip if already have a folder version with same name
+    if(builtSubs.some(function(s){return s.name===pmName;}))return;
+    var c=parseCoords(getTag(pm,'coordinates'),500);
+    if(c.length<2)return;
+    builtSubs.push({name:pmName,mainNum:mNum,coords:c,puntos:[]});
+  });
+
+  // ── Also add horizon_tramo_N (GTD legacy) ─────────────────
+  getAllTags(kml,'Placemark').forEach(function(pm){
+    if(pm.indexOf('<LineString>')<0)return;
+    var pmName=getTag(pm,'name');
+    if(!/^horizon_tramo_\d+|^horizon_ruta_tramo_\d+/i.test(pmName))return;
+    if(builtSubs.some(function(s){return s.name===pmName;}))return;
+    var c=parseCoords(getTag(pm,'coordinates'),300);
+    if(c.length<2)return;
+    builtSubs.push({name:pmName,mainNum:1,coords:c,puntos:[]});
+  });
+
+  // ── POI folders ───────────────────────────────────────────
+  var allPuntos=[];
+  ['Tunel','Puentes','Peajes','Gasolinera','Posibles obstáculos','Elementos importantes','NODOS PRINCIPALES'].forEach(function(fname){
+    fPositions.forEach(function(pos){
+      var nameM=kml.substr(pos,200).match(/<name>([^<]+)<\/name>/);
+      if(!nameM||nameM[1].trim()!==fname)return;
+      var xml=getFolderAt(kml,pos);
+      getAllTags(xml,'Placemark').forEach(function(pm){
+        if(pm.indexOf('<Point>')<0)return;
+        var pmName=getTag(pm,'name');
+        var tipo=detectPOIType(pmName,fname);
+        if(!tipo)tipo=fname.replace(/s$/,'');
+        var c=parseCoords(getTag(pm,'coordinates'),1);
+        if(c.length<1)return;
+        if(!allPuntos.some(function(p){return p.nombre===pmName&&p.tipo===tipo;}))
+          allPuntos.push({nombre:pmName,tipo:tipo,lat:c[0][0],lng:c[0][1]});
+      });
+    });
+  });
+
+  // ── Assemble result ───────────────────────────────────────
+  var mainNums=Object.keys(mainTramos).map(Number).sort(function(a,b){return a-b;});
+
+  if(mainNums.length===0){
+    // Fallback: simple KMZ
     setStatus('Modo simple...');
-    getAllTags(kml,'Placemark').forEach(function(pmXml){
-      if(pmXml.indexOf('<LineString>')<0)return;
-      var pmName=getTag(pmXml,'name')||'Tramo importado';
-      var c=parseCoords(getTag(pmXml,'coordinates'),500);
+    getAllTags(kml,'Placemark').forEach(function(pm){
+      if(pm.indexOf('<LineString>')<0)return;
+      var pmName=getTag(pm,'name')||'Tramo importado';
+      var c=parseCoords(getTag(pm,'coordinates'),500);
       if(c.length<2)return;
       result.tramos.push({name:pmName,coords:c,folder:pmName,tipo_elemento:'tramo',parentFolder:null,ruta:tmRuta});
     });
-    getAllTags(kml,'Placemark').forEach(function(pmXml){
-      if(pmXml.indexOf('<Point>')<0)return;
-      var pmName=getTag(pmXml,'name')||'POI';
-      var tipo=detectPOIType(pmName,'');
-      if(!tipo)return;
-      var c=parseCoords(getTag(pmXml,'coordinates'),1);
-      if(c.length<1)return;
-      result.puntos.push({nombre:pmName,tipo:tipo,lat:c[0][0],lng:c[0][1],ruta:tmRuta});
+  } else {
+    mainNums.forEach(function(num){
+      var mt=mainTramos[num];
+      var subs=builtSubs.filter(function(s){return s.mainNum===num;});
+      var mainCoords=[];
+      subs.forEach(function(s){mainCoords=mainCoords.concat(s.coords);});
+      result.tramos.push({name:mt.name,coords:mainCoords,folder:mt.name,tipo_elemento:'tramo',parentFolder:null,ruta:tmRuta});
+      subs.forEach(function(s){
+        result.tramos.push({name:s.name,coords:s.coords,folder:mt.name,tipo_elemento:'subtramo',parentFolder:mt.name,ruta:tmRuta});
+        s.puntos.forEach(function(p){allPuntos.push(Object.assign({},p,{ruta:tmRuta}));});
+      });
     });
   }
 
+  allPuntos.forEach(function(p){result.puntos.push(Object.assign({},p,{ruta:tmRuta}));});
   setStatus('KMZ analizado: '+result.tramos.length+' tramos, '+result.puntos.length+' POIs');
   return result;
 }

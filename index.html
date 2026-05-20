@@ -2002,7 +2002,7 @@ function processKMZFile(file){
       // KMZ is a ZIP - use a simple approach to extract KML
       // Try as plain KML first (if .kml file)
       if(file.name.toLowerCase().endsWith('.kml')){
-        kmzParsed=parseKMLString(new TextDecoder().decode(data)); kmzParsed.tramos=kmzParsed.tramos||[]; kmzParsed.puntos=kmzParsed.puntos||[];
+        kmzParsed=parseKMLString(new TextDecoder().decode(data)); kmzParsed.tramos=kmzParsed.tramos||[]; kmzParsed.puntos=kmzParsed.puntos||[]; kmzParsed.capas=kmzParsed.capas||[]; document.getElementById('kmz-panel-1').style.display='none'; document.getElementById('kmz-panel-2').style.display='block'; showKMZPreview();
       } else {
         // KMZ = ZIP, need to extract doc.kml
         extractKMZAndParse(data);
@@ -2043,7 +2043,7 @@ function doExtractKMZ(arrayBuffer){
       return;
     }
     return kmlFile.async('string').then(function(kmlStr){
-      kmzParsed=parseKMLString(kmlStr); kmzParsed.tramos=kmzParsed.tramos||[]; kmzParsed.puntos=kmzParsed.puntos||[];
+      kmzParsed=parseKMLString(kmlStr); kmzParsed.tramos=kmzParsed.tramos||[]; kmzParsed.puntos=kmzParsed.puntos||[]; kmzParsed.capas=kmzParsed.capas||[]; document.getElementById('kmz-panel-1').style.display='none'; document.getElementById('kmz-panel-2').style.display='block'; showKMZPreview();
     });
   }).catch(function(err){
     status.textContent='Error abriendo KMZ: '+err.message;
@@ -2620,6 +2620,9 @@ async function kmzApply(){
 }
 
 function kmzReset(){
+  document.getElementById('kmz-panel-1').style.display='block';
+  document.getElementById('kmz-panel-2').style.display='none';
+  kmzParsed={tramos:[],puntos:[],capas:[]};
   kmzParsed={tramos:[],puntos:[],capas:[]};
   var _ks=document.getElementById('kmz-upload-status'); if(_ks) _ks.textContent='';
   document.getElementById('kmz-input').value='';

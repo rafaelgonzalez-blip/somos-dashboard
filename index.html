@@ -206,9 +206,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
           <button class="fb" id="md-sub" onclick="setMapDetail('sub')">Subtramos</button>
           <button class="fb" id="md-all" onclick="setMapDetail('all')">Todos</button>
           <span style="font-size:9px;color:#7a95bb;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Capas:</span>
-        <label otoggleLayer('tramos')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 11px;font-size:11px;color:#3B82F6;cursor:pointer;border:1px solid #3B82F6;border-radius:20px;background:rgba(59,130,246,.12);user-select:none">
-          <input type="checkbox" id="lay-tramos" checked style="accent-color:#3B82F6;cursor:pointer"> Tramos
-        </label>
+        
         <span id="dynamic-layers" style="display:contents"></span>
       </div>
       <div style="position:relative;height:480px;border-radius:0 0 10px 10px;overflow:hidden">
@@ -953,9 +951,8 @@ function drawPuntos(){
       if(!p.lat||!p.lng||isNaN(p.lat)||isNaN(p.lng))return;
       if(p.lat<1||p.lat>12||p.lng<-80||p.lng>-65)return;
       if(mapFiltVal!=='all'&&p.ruta&&p.ruta!==mapFiltVal)return;
-      var tipo=p.tipo||p.label||'Marcador';
-      // Skip config entries
-      if(tipo==='__config__')return;
+      var tipo=p.tipo||p.label||'';
+      if(!tipo||tipo==='__config__'||tipo==='Marcador')return;
       var color=getLayerColor(tipo);
       var gkey=tipo;
       if(!markerGroups[gkey]){
@@ -971,7 +968,7 @@ function drawPuntos(){
       }catch(e){}
     })(pList[i]);
   }
-  if(needsRebuild) renderLayerControls();
+  renderLayerControls(); // always rebuild to reflect current state
 }
 function getLayerColor(tipo){
   if(!tipo)return '#60A5FA';

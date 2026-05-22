@@ -556,9 +556,20 @@ function _autoSortTramos(){
 
 async function loadFromDB(){
   console.log('[LDB] starting...');
-  // Load SC (estados) from Supabase first - overrides localStorage
+  // Load SC (estados) - priority: Supabase > localStorage > hardcoded defaults
   var dbSC=await loadScFromSupabase();
-  if(dbSC){ SC=dbSC; try{localStorage.setItem('somos_sc',JSON.stringify(SC));}catch(e){} }
+  if(dbSC){
+    SC=dbSC;
+    try{localStorage.setItem('somos_sc',JSON.stringify(SC));}catch(e){}
+  } else {
+    // Supabase has no SC - try localStorage
+    try{
+      var _lsSC=localStorage.getItem('somos_sc');
+      if(_lsSC){ SC=JSON.parse(_lsSC); }
+      // If localStorage has SC, save it back to Supabase for next time
+      if(SC&&Object.keys(SC).length>0) saveScToSupabase();
+    }catch(e){}
+  }
   try{
     showDBStatus('Cargando datos...');
     

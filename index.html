@@ -2304,15 +2304,20 @@ function parseKMLString(kmlStr){
     subFolders.push({name:fname,mainNum:mainNum,coords:coords,pts:coords.length,rcPts:rcPts});
   });
 
-  // ── Step 4: Direct LineStrings with N.M_ names (tramos 4-7) 
+  // ── Step 4: Direct LineStrings/MultiGeometry with N.M_ names (tramos 4-7) 
   getAllPM(kml).forEach(function(pm){
-    if(pm.indexOf('<LineString>')<0)return;
+    if(pm.indexOf('<LineString>')<0&&pm.indexOf('<MultiGeometry>')<0)return;
     var pname=getTag(pm,'name');
     if(!isSubName(pname))return;
     if(seenSubNames[pname])return; // already have folder version
     var mainNum=getMainNum(pname);
     if(!mainNum)return;
-    var coords=parseCoords(getTag(pm,'coordinates'));
+    // Extract ALL coordinates (handles MultiGeometry)
+    var coords=[];
+    var coordRe=/<coordinates>([\s\S]*?)<\/coordinates>/g,cM;
+    while((cM=coordRe.exec(pm))!==null){
+      coords=coords.concat(parseCoords(cM[1]));
+    }
     if(coords.length<2)return;
     seenSubNames[pname]=true;
     subFolders.push({name:pname,mainNum:mainNum,coords:coords,pts:coords.length,rcPts:[]});

@@ -2389,9 +2389,24 @@ function parseKMLString(kmlStr){
         return n(a)-n(b);
       });
 
-      // Main tramo coords = concat of all subtramos
+      // Main tramo coords: concat if contiguous, else use largest sub
       var mainCoords=[];
-      subs.forEach(function(s){mainCoords=mainCoords.concat(s.coords);});
+      if(subs.length>0){
+        var allContiguous=true;
+        for(var si=1;si<subs.length;si++){
+          var prev=subs[si-1].coords,curr=subs[si].coords;
+          if(!prev.length||!curr.length)continue;
+          var dlat=curr[0][0]-prev[prev.length-1][0];
+          var dlng=curr[0][1]-prev[prev.length-1][1];
+          if(Math.sqrt(dlat*dlat+dlng*dlng)*111>2.0){allContiguous=false;break;}
+        }
+        if(allContiguous){
+          subs.forEach(function(s){mainCoords=mainCoords.concat(s.coords);});
+        } else {
+          var biggest=subs.reduce(function(a,b){return a.coords.length>b.coords.length?a:b;});
+          mainCoords=biggest.coords;
+        }
+      }
 
       result.tramos.push({
         name:mt.name,coords:mainCoords,folder:mt.name,

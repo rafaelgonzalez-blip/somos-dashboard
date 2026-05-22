@@ -2156,14 +2156,18 @@ function parseKMLString(kmlStr){
   }
 
   function getRutaCoords(fxml){
-    // Get all LineStrings from Ruta subfolder, concatenated
+    // Get all coords from Ruta subfolder, handling both LineString and MultiGeometry
     var rutaM=fxml.match(/<Folder>\s*<name>Ruta<\/name>([\s\S]*?)<\/Folder>/);
     if(!rutaM)return[];
     var coords=[];
     getAllPM(rutaM[1]).forEach(function(pm){
-      if(pm.indexOf('<LineString>')<0)return;
-      var c=parseCoords(getTag(pm,'coordinates'));
-      coords=coords.concat(c);
+      // Accept LineString OR MultiGeometry (contains multiple LineStrings)
+      if(pm.indexOf('<LineString>')<0&&pm.indexOf('<MultiGeometry>')<0)return;
+      // Extract ALL <coordinates> blocks from this Placemark
+      var coordRe=/<coordinates>([\s\S]*?)<\/coordinates>/g,cM;
+      while((cM=coordRe.exec(pm))!==null){
+        coords=coords.concat(parseCoords(cM[1]));
+      }
     });
     return coords;
   }

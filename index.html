@@ -2463,9 +2463,9 @@ function showKMZPreview(){
       +'<div style="display:flex;justify-content:space-between;align-items:center;gap:6px">'
       +'<span style="font-size:11px;color:#fff;font-weight:500">'+escHtmlKmz(t.name)+'</span>'
       +'<span style="font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:'+tipoColor+'22;color:'+tipoColor+'">'+tipoEl+'</span>'
-      +'<span style="font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:'+rutaColor+'22;color:'+rutaColor+'">'+t.ruta.toUpperCase()+'</span>'
+      +'<span style="font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:'+rutaColor+'22;color:'+rutaColor+'">'+(t.ruta||'').toUpperCase()+'</span>'
       +'</div>'
-      +'<div style="font-size:9px;color:var(--muted);margin-top:2px">'+escHtmlKmz(t.folder||'Raiz')+parentLabel+' &middot; '+t.coords.length+' puntos</div>'
+      +'<div style="font-size:9px;color:var(--muted);margin-top:2px">'+escHtmlKmz(t.folder||'Raiz')+parentLabel+' &middot; '+((t.coords&&t.coords.length)||0)+' puntos</div>'
       +'<select class="inp" id="kmz-ruta-t-'+i+'" style="margin-top:5px;font-size:10px;padding:3px 7px;height:auto" onchange="kmzHandleTramoRutaChange('+i+', this.value)">'
       +buildRutaOptions(t.ruta)
       +'<option value="__new__">+ Crear nueva ruta...</option>'
@@ -2475,16 +2475,17 @@ function showKMZPreview(){
 
   // Comparison with existing tramos
   var cp=document.getElementById('kmz-compare-preview');
-  var existing=tramos.map(function(t){return t.tramo.toLowerCase();});
-  var newNames=kmzParsed.tramos.map(function(t){return t.name.toLowerCase();});
+  var existing=tramos.filter(function(t){return t.tramo;}).map(function(t){return t.tramo.toLowerCase();});
+  var newNames=kmzParsed.tramos.map(function(t){return (t.name||'').toLowerCase();});
 
   var kept=[], added=[], removed=[];
   tramos.forEach(function(t){
-    if(newNames.includes(t.tramo.toLowerCase())) kept.push(t.tramo);
+    if(!t.tramo)return;
+    if(newNames.indexOf(t.tramo.toLowerCase())>=0) kept.push(t.tramo);
     else removed.push(t.tramo);
   });
   kmzParsed.tramos.forEach(function(t){
-    if(!existing.includes(t.name.toLowerCase())) added.push(t.name);
+    if(existing.indexOf((t.name||'').toLowerCase())<0) added.push(t.name);
   });
 
   cp.innerHTML=

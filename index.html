@@ -2277,9 +2277,12 @@ function parseKMLString(kmlStr){
       getAllPM(rfM[1]).forEach(function(pm){
         if(pm.indexOf('<Point>')<0)return;
         var pnm=getTag(pm,'name');
+        // Prefix with subtramo number to make globally unique (e.g. "1.3 RC280-6")
+        var subPrefix=(fname.match(/^(\d+\.\d+)/)||['',''])[1];
+        var uniqueName=subPrefix?subPrefix+' '+pnm:pnm;
         var c=parseCoords(getTag(pm,'coordinates'),1);
         if(c.length<1)return;
-        rcPts.push({nombre:pnm,tipo:'Recamara',lat:c[0][0],lng:c[0][1],ruta:tmRuta});
+        rcPts.push({nombre:uniqueName,tipo:'Recamara',lat:c[0][0],lng:c[0][1],ruta:tmRuta});
       });
     });
 
@@ -2302,16 +2305,8 @@ function parseKMLString(kmlStr){
 
   // ── Step 4b: Collect RC Points from ALL sections (tramos 4-7 and others) ──
   // Look for Point placemarks with RC* names anywhere in the KMZ
-  getAllPM(kml).forEach(function(pm){
-    if(pm.indexOf('<Point>')<0)return;
-    var pname=getTag(pm,'name');
-    if(!/^RC\d+|^RCF/i.test(pname))return;
-    var c=parseCoords(getTag(pm,'coordinates'),1);
-    if(c.length<1)return;
-    // Avoid duplicates
-    if(allPuntos.some(function(p){return p.nombre===pname&&p.tipo==='Recamara';}))return;
-    allPuntos.push({nombre:pname,tipo:'Recamara',lat:c[0][0],lng:c[0][1],ruta:tmRuta});
-  });
+  // Step 4b RC points are already collected via subtramo folders above
+  // Skip direct RC collection to avoid confusion with prefixed versions
 
   // ── Step 5: POI folders ────────────────────────────────────
   var poiNames=['Tunel','Puentes','Peajes','Gasolinera','Posibles obstáculos','Elementos importantes','NODOS PRINCIPALES'];
@@ -2334,7 +2329,7 @@ function parseKMLString(kmlStr){
         if(!tipo)tipo=sfName.replace(/s$/,'');
         var c=parseCoords(getTag(pm,'coordinates'),1);
         if(c.length<1)return;
-        if(!allPuntos.some(function(p){return p.nombre===pnm&&p.tipo===tipo;}))
+        if(!allPuntos.some(function(p){return p.nombre===pnm&&p.tipo===tipo&&Math.abs(p.lat-c[0][0])<0.001;}))
           allPuntos.push({nombre:pnm,tipo:tipo,lat:c[0][0],lng:c[0][1],ruta:tmRuta});
       });
     }
@@ -2346,7 +2341,7 @@ function parseKMLString(kmlStr){
         if(!tipo)return;
         var c=parseCoords(getTag(pm,'coordinates'),1);
         if(c.length<1)return;
-        if(!allPuntos.some(function(p){return p.nombre===pnm&&p.tipo===tipo;}))
+        if(!allPuntos.some(function(p){return p.nombre===pnm&&p.tipo===tipo&&Math.abs(p.lat-c[0][0])<0.001;}))
           allPuntos.push({nombre:pnm,tipo:tipo,lat:c[0][0],lng:c[0][1],ruta:tmRuta});
       });
     }
@@ -2443,7 +2438,9 @@ function showKMZPreview(){
   // Update counters
   document.getElementById('kmz-count-tramos').textContent=kmzParsed.tramos.length;
   document.getElementById('kmz-count-puntos').textContent=kmzParsed.puntos.length;
-  document.getElementById('kmz-count-capas').textContent=kmzParsed.capas.length;
+  var tiposUnicos=[];
+  kmzParsed.puntos.forEach(function(p){if(p.tipo&&tiposUnicos.indexOf(p.tipo)<0)tiposUnicos.push(p.tipo);});
+  document.getElementById('kmz-count-capas').textContent=tiposUnicos.length;
   // Show puntos breakdown by type in the capas count
   var tipoCount={};
   kmzParsed.puntos.forEach(function(p){ tipoCount[p.tipo]=(tipoCount[p.tipo]||0)+1; });

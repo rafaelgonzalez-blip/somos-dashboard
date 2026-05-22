@@ -589,7 +589,7 @@ async function loadFromDB(){
     // Load tramos
     var dbTramos = await sbGet('tramos');
     if(dbTramos && dbTramos.length > 0){
-      // Merge DB state with KMZ coords (coords stay from KMZ, state from DB)
+      tramos=[]; // clear first - DB is the source of truth
       dbTramos.forEach(function(dt){
         var t = tramos.find(function(x){return x.id===dt.id;});
         if(t){

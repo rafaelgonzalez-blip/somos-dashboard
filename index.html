@@ -2225,6 +2225,8 @@ function parseKMLString(kmlStr){
     if(!mainTramos[num])mainTramos[num]={name:fname.replace(/^\d+\.\s+/,'').trim()};
   });
 
+  var allPuntos=[]; // declared early so Step 4b can use it
+
   // ── Step 3: Find ALL subtramo folders (N.M_ anywhere) ─────
   var subFolders=[];
   var seenSubNames={};
@@ -2312,7 +2314,6 @@ function parseKMLString(kmlStr){
   });
 
   // ── Step 5: POI folders ────────────────────────────────────
-  var allPuntos=[];
   var poiNames=['Tunel','Puentes','Peajes','Gasolinera','Posibles obstáculos','Elementos importantes','NODOS PRINCIPALES'];
   fPositions.forEach(function(pos){
     var nm=kml.substr(pos,200).match(/<name>([^<]+)<\/name>/);

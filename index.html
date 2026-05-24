@@ -529,9 +529,20 @@ async function loadScFromSupabase(){
 
 
 function _autoSortTramos(){
-  function getNum(name){
-    var m=(name||'').match(/^(?:Tramo[\s_\-]+)?(\d+)/i);
+  // For parents: extract first number (e.g. "GTD - Barbosa" -> 9999, use ruta sort)
+  // For children: extract sub-number after dot (e.g. "1.3_Calle..." -> 3, "5.10_..." -> 10)
+  function getParentNum(name){
+    var m=(name||'').match(/^(\d+)[\.\s_]/);
     if(m) return parseInt(m[1],10);
+    var m2=(name||'').match(/(\d+)/);
+    if(m2) return parseInt(m2[1],10);
+    return 9999;
+  }
+  function getChildNum(name){
+    // Match N.M_ pattern - extract M (sub number)
+    var m=(name||'').match(/^\d+\.(\d+)/);
+    if(m) return parseInt(m[1],10);
+    // Fallback: any number
     var m2=(name||'').match(/(\d+)/);
     if(m2) return parseInt(m2[1],10);
     return 9999;
@@ -540,11 +551,11 @@ function _autoSortTramos(){
   var children=tramos.filter(function(t){return t.parent_id;});
   parents.sort(function(a,b){
     if(a.ruta!==b.ruta)return a.ruta<b.ruta?-1:1;
-    return getNum(a.tramo)-getNum(b.tramo);
+    return getParentNum(a.tramo)-getParentNum(b.tramo);
   });
   children.sort(function(a,b){
     if(a.parent_id!==b.parent_id)return 0;
-    return getNum(a.tramo)-getNum(b.tramo);
+    return getChildNum(a.tramo)-getChildNum(b.tramo);
   });
   var sorted=[];
   parents.forEach(function(p){
@@ -3361,40 +3372,9 @@ function renderMapLegend(){
 }
 
 function sortTramos(){
-  // Extract leading number from tramo name for sorting
-  function getNum(name){
-    // Try: leading number like "1. GTD" or "Tramo 1" or "Tramo 11"
-    var m=(name||'').match(/^(?:Tramo[\s_\-]+)?(\d+)/i);
-    if(m) return parseInt(m[1],10);
-    // Try: any number in the name
-    var m2=(name||'').match(/(\d+)/);
-    if(m2) return parseInt(m2[1],10);
-    // No number found - sort alphabetically by appending large number
-    return 9999;
-  }
-  // Sort maintaining parent-child grouping
-  var parents=tramos.filter(function(t){return !t.parent_id;});
-  var children=tramos.filter(function(t){return t.parent_id;});
-  // Sort parents by numeral
-  parents.sort(function(a,b){
-    // First sort by ruta, then by numeral
-    if(a.ruta!==b.ruta)return a.ruta<b.ruta?-1:1;
-    return getNum(a.tramo)-getNum(b.tramo);
-  });
-  // Sort children by numeral within each parent
-  children.sort(function(a,b){
-    if(a.parent_id!==b.parent_id)return 0;
-    return getNum(a.tramo)-getNum(b.tramo);
-  });
-  // Reassemble: parents with their children grouped after each parent
-  var sorted=[];
-  parents.forEach(function(p){
-    sorted.push(p);
-    children.filter(function(c){return c.parent_id===p.id;}).forEach(function(c){sorted.push(c);});
-  });
-  tramos=sorted;
+  _autoSortTramos();
   renderAll();
-  if(mapInst){drawAllLines(); renderMapSide();}
+  if(mapInst){drawAllLines();renderMapSide();}
   toast('Tramos ordenados por numeral');
 }
 

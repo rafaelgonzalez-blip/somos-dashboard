@@ -529,8 +529,6 @@ async function loadScFromSupabase(){
 
 
 function _autoSortTramos(){
-  // For parents: extract first number (e.g. "GTD - Barbosa" -> 9999, use ruta sort)
-  // For children: extract sub-number after dot (e.g. "1.3_Calle..." -> 3, "5.10_..." -> 10)
   function getParentNum(name){
     var m=(name||'').match(/^(\d+)[\.\s_]/);
     if(m) return parseInt(m[1],10);
@@ -539,29 +537,27 @@ function _autoSortTramos(){
     return 9999;
   }
   function getChildNum(name){
-    // Match N.M_ pattern - extract M (sub number)
-    var m=(name||'').match(/^\d+\.(\d+)/);
+    // Extract sub-number after first dot: "1.10_..." -> 10, "5.3_..." -> 3
+    var m=(name||'').trim().match(/^\d+\.(\d+)/);
     if(m) return parseInt(m[1],10);
-    // Fallback: any number
-    var m2=(name||'').match(/(\d+)/);
-    if(m2) return parseInt(m2[1],10);
     return 9999;
   }
   var parents=tramos.filter(function(t){return !t.parent_id;});
-  var children=tramos.filter(function(t){return t.parent_id;});
   parents.sort(function(a,b){
     if(a.ruta!==b.ruta)return a.ruta<b.ruta?-1:1;
     return getParentNum(a.tramo)-getParentNum(b.tramo);
   });
-  children.sort(function(a,b){
-    if(a.parent_id!==b.parent_id)return 0;
-    return getChildNum(a.tramo)-getChildNum(b.tramo);
-  });
+  // Build sorted array: each parent followed by its children sorted by sub-number
   var sorted=[];
   parents.forEach(function(p){
     sorted.push(p);
-    children.filter(function(c){return c.parent_id===p.id;}).forEach(function(c){sorted.push(c);});
+    var children=tramos.filter(function(t){return t.parent_id===p.id;});
+    children.sort(function(a,b){return getChildNum(a.tramo)-getChildNum(b.tramo);});
+    children.forEach(function(c){sorted.push(c);});
   });
+  // Add any orphan children (no matching parent found)
+  tramos.filter(function(t){return t.parent_id&&!parents.find(function(p){return p.id===t.parent_id;});})
+    .forEach(function(t){sorted.push(t);});
   tramos=sorted;
 }
 

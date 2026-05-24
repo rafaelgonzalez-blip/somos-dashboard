@@ -917,7 +917,7 @@ function setMapDetail(level){
     var btn=document.getElementById('md-'+l);
     if(btn) btn.classList.toggle('active', l===level);
   });
-  if(mapInst){ drawAllLines(); }
+  if(mapInst){ drawAllLines(); renderMapSide(); }
 }
 
 
@@ -931,40 +931,33 @@ function drawAllLines(){
       var color=lineColor(t);if(!color)return;
       var vis=mapFiltVal==='all'||t.ruta===mapFiltVal;
       var isSubtramo=!!(t.parent_id||t.tipo_elemento==='subtramo');
-      if(mapDetailLevel==='main' && isSubtramo) return;
+      var lineWeight=vis?(isSubtramo?3:5):(isSubtramo?1:2);
+      // In 'main' mode: show main tramos (draw their subtramos as segments)
+      // In 'sub' mode: show only subtramos directly
+      // In 'all' mode: show everything
       if(mapDetailLevel==='sub' && !isSubtramo) return;
-      // For main tramos with subtramos, use largest sub coords to avoid straight lines
+      // For 'main' and 'all': skip individual subtramos (drawn via parent)
+      if(mapDetailLevel!=='sub' && isSubtramo) return;
+      // Draw main tramo using its children as separate segments
       var drawCoords=t.coords;
       if(!isSubtramo){
         var children=tramos.filter(function(x){return x.parent_id===t.id;});
         if(children.length>0){
-          // Check contiguity
-          var sorted=children.slice().sort(function(a,b){
-            function n(x){var m=(x.tramo||'').match(/^\d+\.(\d+)/);return m?parseInt(m[1]):999;}
-            return n(a)-n(b);
+          children.forEach(function(child){
+            if(!child.coords||child.coords.length<2)return;
+            var childVis=mapFiltVal==='all'||child.ruta===mapFiltVal;
+            var childOpts={color:color,weight:lineWeight,opacity:childVis?0.85:0.15,lineCap:'round',lineJoin:'round'};
+            try{
+              var childLine=L.polyline(child.coords,childOpts).addTo(mapInst);
+              childLine.bindPopup(buildPopup(t),{maxWidth:280});
+              childLine.on('click',function(){hlSide(t.id);});
+              mapLines[child.id]=childLine;
+            }catch(e){}
           });
-          var contiguous=true;
-          for(var ci=1;ci<sorted.length;ci++){
-            var pc=sorted[ci-1].coords,cc=sorted[ci].coords;
-            if(!pc||!pc.length||!cc||!cc.length)continue;
-            var dlat=cc[0][0]-pc[pc.length-1][0];
-            var dlng=cc[0][1]-pc[pc.length-1][1];
-            if(Math.sqrt(dlat*dlat+dlng*dlng)*111>2.0){contiguous=false;break;}
-          }
-          if(contiguous){
-            drawCoords=[];
-            sorted.forEach(function(c){if(c.coords)drawCoords=drawCoords.concat(c.coords);});
-          } else {
-            var biggest=sorted.reduce(function(a,b){
-              return (a.coords||[]).length>(b.coords||[]).length?a:b;
-            });
-            drawCoords=biggest.coords||t.coords;
-          }
+          return;
         }
       }
       if(!drawCoords||drawCoords.length<2) return;
-      var lineWeight=vis?(isSubtramo?3:5):(isSubtramo?1:2);
-      var lineDash=null; // no dash - subtramos follow real path
       var lineOpts={color:color,weight:lineWeight,opacity:vis?0.85:0.15,lineCap:'round',lineJoin:'round'};
       var line=L.polyline(drawCoords,lineOpts).addTo(mapInst);
       line.bindPopup(buildPopup(t),{maxWidth:280});
@@ -1103,16 +1096,35 @@ function refreshLines(){
   renderMapSide();
 }
 function renderMapSide(){
-  var vis=[];
-  for(var i=0;i<tramos.length;i++){var _t=tramos[i];if((_t.parent_id||_t.tipo_elemento==='subtramo'))continue;if(mapFiltVal==='all'||_t.ruta===mapFiltVal)vis.push(_t);}
   var h='';
-  for(var i=0;i<vis.length;i++){
-    var t=vis[i];var sc=t.estado; // use estado directly - sb() handles colors
-    h+='<div class="ms-item" onclick="focusT(\''+t.id+'\')">'
-      +'<div class="ms-nm">'+t.tramo+'</div>'
-      +'<div class="ms-meta">'+sb(t.estado)+' '+t.km+'km</div></div>';
+  if(mapDetailLevel==='sub'){
+    // Sub mode: show subtramos grouped by parent tramo
+    var parents=tramos.filter(function(_t){
+      return !_t.parent_id&&_t.tipo_elemento!=='subtramo'&&(mapFiltVal==='all'||_t.ruta===mapFiltVal);
+    });
+    parents.forEach(function(parent){
+      var children=tramos.filter(function(x){return x.parent_id===parent.id;});
+      if(children.length===0)return;
+      h+='<div style="font-size:10px;font-weight:700;color:var(--muted);padding:6px 8px 2px;text-transform:uppercase;letter-spacing:.5px">'+parent.tramo+'</div>';
+      children.forEach(function(t){
+        h+='<div class="ms-item" onclick="focusT(\''+t.id+'\')"><div class="ms-nm" style="font-size:11px">'+t.tramo+'</div><div class="ms-meta">'+sb(t.estado)+' '+t.km+'km</div></div>';
+      });
+    });
+    document.getElementById('map-tlist').innerHTML=h||'<div class="empty">Sin subtramos</div>';
+  } else {
+    // Main/All mode: show only main tramos
+    var vis=[];
+    for(var i=0;i<tramos.length;i++){
+      var _t=tramos[i];
+      if(_t.parent_id||_t.tipo_elemento==='subtramo')continue;
+      if(mapFiltVal==='all'||_t.ruta===mapFiltVal)vis.push(_t);
+    }
+    for(var i=0;i<vis.length;i++){
+      var t=vis[i];
+      h+='<div class="ms-item" onclick="focusT(\''+t.id+'\')"><div class="ms-nm">'+t.tramo+'</div><div class="ms-meta">'+sb(t.estado)+' '+t.km+'km</div></div>';
+    }
+    document.getElementById('map-tlist').innerHTML=h;
   }
-  document.getElementById('map-tlist').innerHTML=h;
 }
 function focusT(id){
   var t=null;for(var i=0;i<tramos.length;i++){if(tramos[i].id===id){t=tramos[i];break;}}

@@ -589,28 +589,17 @@ async function loadFromDB(){
     // Load tramos
     var dbTramos = await sbGet('tramos');
     if(dbTramos && dbTramos.length > 0){
-      tramos=[]; // clear first - DB is the source of truth
-      dbTramos.forEach(function(dt){
-        var t = tramos.find(function(x){return x.id===dt.id;});
-        if(t){
-          t.estado = normalizeEstado(dt.estado || t.estado);
-          t.actor = dt.actor || t.actor;
-          t.km = dt.km || t.km;
-          t.proxima = dt.proxima || t.proxima;
-          t.fp = dt.fp || t.fp;
-          t.concesion = dt.concesion || t.concesion;
-          t.tramo = dt.tramo || t.tramo;
-          t.ruta = dt.ruta || t.ruta;
-          t.parent_id = dt.parent_id||null;
-          t.tipo_elemento = dt.tipo_elemento||'tramo';
-        } else {
-          // New tramo added via dashboard (subtramos included)
-          if(dt.coords){
-            var nt=Object.assign({parent_id:null,tipo_elemento:'tramo'},dt,{coords:dt.coords});
-            nt.estado=normalizeEstado(nt.estado);
-            tramos.push(nt);
-          }
-        }
+      // Load all tramos from DB - DB is the source of truth
+      tramos = dbTramos.filter(function(dt){return dt.coords&&Array.isArray(dt.coords)&&dt.coords.length>0;}).map(function(dt){
+        return {
+          id:dt.id, tramo:dt.tramo||'', ruta:dt.ruta||'',
+          estado:normalizeEstado(dt.estado),
+          actor:dt.actor||'', km:dt.km||0,
+          proxima:dt.proxima||'', fp:dt.fp||'',
+          concesion:dt.concesion||'', coords:dt.coords,
+          parent_id:dt.parent_id||null,
+          tipo_elemento:dt.tipo_elemento||'tramo'
+        };
       });
     } else {
       // Table is empty - seed default routes only (no tramos)
@@ -932,12 +921,11 @@ function drawAllLines(){
       var vis=mapFiltVal==='all'||t.ruta===mapFiltVal;
       var isSubtramo=!!(t.parent_id||t.tipo_elemento==='subtramo');
       // Mode filters
-      if(mapDetailLevel==='sub' && !isSubtramo) return;
-      if(mapDetailLevel!=='sub' && isSubtramo) return;
-      // Line style
+      if(mapDetailLevel==='sub'&&!isSubtramo)return;
+      if(mapDetailLevel!=='sub'&&isSubtramo)return;
       var lineWeight=vis?5:2;
       var lineOpts={color:color,weight:lineWeight,opacity:vis?0.85:0.15,lineCap:'round',lineJoin:'round'};
-      // For main tramos: draw each child sub as separate segment
+      // Main tramo: draw each child as separate segment
       if(!isSubtramo){
         var children=tramos.filter(function(x){return x.parent_id===t.id;});
         if(children.length>0){
@@ -953,9 +941,8 @@ function drawAllLines(){
           return;
         }
       }
-      // No children or is subtramo: draw with own coords
       if(!t.coords||t.coords.length<2)return;
-      if(isSubtramo) lineOpts.weight=vis?3:1;
+      if(isSubtramo)lineOpts.weight=vis?3:1;
       try{
         var line=L.polyline(t.coords,lineOpts).addTo(mapInst);
         line.bindPopup(buildPopup(t),{maxWidth:280});

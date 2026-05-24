@@ -933,11 +933,40 @@ function drawAllLines(){
       var isSubtramo=!!(t.parent_id||t.tipo_elemento==='subtramo');
       if(mapDetailLevel==='main' && isSubtramo) return;
       if(mapDetailLevel==='sub' && !isSubtramo) return;
-      if(!t.coords||t.coords.length<2) return;
+      // For main tramos with subtramos, use largest sub coords to avoid straight lines
+      var drawCoords=t.coords;
+      if(!isSubtramo){
+        var children=tramos.filter(function(x){return x.parent_id===t.id;});
+        if(children.length>0){
+          // Check contiguity
+          var sorted=children.slice().sort(function(a,b){
+            function n(x){var m=(x.tramo||'').match(/^\d+\.(\d+)/);return m?parseInt(m[1]):999;}
+            return n(a)-n(b);
+          });
+          var contiguous=true;
+          for(var ci=1;ci<sorted.length;ci++){
+            var pc=sorted[ci-1].coords,cc=sorted[ci].coords;
+            if(!pc||!pc.length||!cc||!cc.length)continue;
+            var dlat=cc[0][0]-pc[pc.length-1][0];
+            var dlng=cc[0][1]-pc[pc.length-1][1];
+            if(Math.sqrt(dlat*dlat+dlng*dlng)*111>2.0){contiguous=false;break;}
+          }
+          if(contiguous){
+            drawCoords=[];
+            sorted.forEach(function(c){if(c.coords)drawCoords=drawCoords.concat(c.coords);});
+          } else {
+            var biggest=sorted.reduce(function(a,b){
+              return (a.coords||[]).length>(b.coords||[]).length?a:b;
+            });
+            drawCoords=biggest.coords||t.coords;
+          }
+        }
+      }
+      if(!drawCoords||drawCoords.length<2) return;
       var lineWeight=vis?(isSubtramo?3:5):(isSubtramo?1:2);
       var lineDash=null; // no dash - subtramos follow real path
       var lineOpts={color:color,weight:lineWeight,opacity:vis?0.85:0.15,lineCap:'round',lineJoin:'round'};
-      var line=L.polyline(t.coords,lineOpts).addTo(mapInst);
+      var line=L.polyline(drawCoords,lineOpts).addTo(mapInst);
       line.bindPopup(buildPopup(t),{maxWidth:280});
       line.on('click',function(){hlSide(t.id);});
       mapLines[t.id]=line;

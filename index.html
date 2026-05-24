@@ -931,38 +931,37 @@ function drawAllLines(){
       var color=lineColor(t);if(!color)return;
       var vis=mapFiltVal==='all'||t.ruta===mapFiltVal;
       var isSubtramo=!!(t.parent_id||t.tipo_elemento==='subtramo');
-      var lineWeight=vis?(isSubtramo?3:5):(isSubtramo?1:2);
-      // In 'main' mode: show main tramos (draw their subtramos as segments)
-      // In 'sub' mode: show only subtramos directly
-      // In 'all' mode: show everything
+      // Mode filters
       if(mapDetailLevel==='sub' && !isSubtramo) return;
-      // For 'main' and 'all': skip individual subtramos (drawn via parent)
       if(mapDetailLevel!=='sub' && isSubtramo) return;
-      // Draw main tramo using its children as separate segments
-      var drawCoords=t.coords;
+      // Line style
+      var lineWeight=vis?5:2;
+      var lineOpts={color:color,weight:lineWeight,opacity:vis?0.85:0.15,lineCap:'round',lineJoin:'round'};
+      // For main tramos: draw each child sub as separate segment
       if(!isSubtramo){
         var children=tramos.filter(function(x){return x.parent_id===t.id;});
         if(children.length>0){
           children.forEach(function(child){
             if(!child.coords||child.coords.length<2)return;
-            var childVis=mapFiltVal==='all'||child.ruta===mapFiltVal;
-            var childOpts={color:color,weight:lineWeight,opacity:childVis?0.85:0.15,lineCap:'round',lineJoin:'round'};
             try{
-              var childLine=L.polyline(child.coords,childOpts).addTo(mapInst);
-              childLine.bindPopup(buildPopup(t),{maxWidth:280});
-              childLine.on('click',function(){hlSide(t.id);});
-              mapLines[child.id]=childLine;
+              var cl=L.polyline(child.coords,lineOpts).addTo(mapInst);
+              cl.bindPopup(buildPopup(t),{maxWidth:280});
+              cl.on('click',function(){hlSide(t.id);});
+              mapLines[child.id]=cl;
             }catch(e){}
           });
           return;
         }
       }
-      if(!drawCoords||drawCoords.length<2) return;
-      var lineOpts={color:color,weight:lineWeight,opacity:vis?0.85:0.15,lineCap:'round',lineJoin:'round'};
-      var line=L.polyline(drawCoords,lineOpts).addTo(mapInst);
-      line.bindPopup(buildPopup(t),{maxWidth:280});
-      line.on('click',function(){hlSide(t.id);});
-      mapLines[t.id]=line;
+      // No children or is subtramo: draw with own coords
+      if(!t.coords||t.coords.length<2)return;
+      if(isSubtramo) lineOpts.weight=vis?3:1;
+      try{
+        var line=L.polyline(t.coords,lineOpts).addTo(mapInst);
+        line.bindPopup(buildPopup(t),{maxWidth:280});
+        line.on('click',function(){hlSide(t.id);});
+        mapLines[t.id]=line;
+      }catch(e){}
     })(tramos[i]);
   }
 }
@@ -1098,10 +1097,7 @@ function refreshLines(){
 function renderMapSide(){
   var h='';
   if(mapDetailLevel==='sub'){
-    // Sub mode: show subtramos grouped by parent tramo
-    var parents=tramos.filter(function(_t){
-      return !_t.parent_id&&_t.tipo_elemento!=='subtramo'&&(mapFiltVal==='all'||_t.ruta===mapFiltVal);
-    });
+    var parents=tramos.filter(function(_t){return !_t.parent_id&&_t.tipo_elemento!=='subtramo'&&(mapFiltVal==='all'||_t.ruta===mapFiltVal);});
     parents.forEach(function(parent){
       var children=tramos.filter(function(x){return x.parent_id===parent.id;});
       if(children.length===0)return;
@@ -1112,17 +1108,9 @@ function renderMapSide(){
     });
     document.getElementById('map-tlist').innerHTML=h||'<div class="empty">Sin subtramos</div>';
   } else {
-    // Main/All mode: show only main tramos
     var vis=[];
-    for(var i=0;i<tramos.length;i++){
-      var _t=tramos[i];
-      if(_t.parent_id||_t.tipo_elemento==='subtramo')continue;
-      if(mapFiltVal==='all'||_t.ruta===mapFiltVal)vis.push(_t);
-    }
-    for(var i=0;i<vis.length;i++){
-      var t=vis[i];
-      h+='<div class="ms-item" onclick="focusT(\''+t.id+'\')"><div class="ms-nm">'+t.tramo+'</div><div class="ms-meta">'+sb(t.estado)+' '+t.km+'km</div></div>';
-    }
+    for(var i=0;i<tramos.length;i++){var _t=tramos[i];if(_t.parent_id||_t.tipo_elemento==='subtramo')continue;if(mapFiltVal==='all'||_t.ruta===mapFiltVal)vis.push(_t);}
+    for(var i=0;i<vis.length;i++){var t=vis[i];h+='<div class="ms-item" onclick="focusT(\''+t.id+'\')"><div class="ms-nm">'+t.tramo+'</div><div class="ms-meta">'+sb(t.estado)+' '+t.km+'km</div></div>';}
     document.getElementById('map-tlist').innerHTML=h;
   }
 }

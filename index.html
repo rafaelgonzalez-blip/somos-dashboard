@@ -1468,11 +1468,28 @@ function openModal(type,id,preTramo){
     mb.innerHTML=`<div class="ff">
       <div class="frow">
         <div class="fl"><label>Fecha</label><input type="date" class="inp" id="eb-fecha" value="${b.fecha}"></div>
-        <div class="fl"><label>Tipo</label><select class="inp" id="eb-tipo"><option value="call"${b.tipo==="call"?" selected":""}>📞 Llamada</option><option value="email"${b.tipo==="email"?" selected":""}>📧 Correo</option><option value="meeting"${b.tipo==="meeting"?" selected":""}>🤝 Reunión</option><option value="response"${b.tipo==="response"?" selected":""}>📩 Respuesta</option></select></div>
+        <div class="fl"><label>Tipo</label><select class="inp" id="eb-tipo">
+          <option value="call"${b.tipo==="call"?" selected":""}>📞 Llamada</option>
+          <option value="email"${b.tipo==="email"?" selected":""}>📧 Correo</option>
+          <option value="meeting"${b.tipo==="meeting"?" selected":""}>🤝 Reunión</option>
+          <option value="response"${b.tipo==="response"?" selected":""}>📩 Respuesta</option>
+        </select></div>
       </div>
       <div class="frow">
-        <div class="fl"><label>Tramo</label><select class="inp" id="eb-tramo">${tramos.map(t=>`<option value="${t.tramo}"${b.tramo===t.tramo?" selected":""}>${t.tramo}</option>`).join("")}</select></div>
+        <div class="fl"><label>Ruta</label><select class="inp" id="eb-ruta" onchange="(function(){var rt=document.getElementById('eb-ruta').value;var ts=document.getElementById('eb-tramo');ts.innerHTML=tramos.filter(t=>rt===''||t.ruta===rt).map(t=>'<option value=\''+t.tramo+'\''+( t.tramo===document.getElementById('eb-tramo').value?' selected':'')+'>'+t.tramo+'</option>').join('');})()">
+          <option value="">— Todas las rutas —</option>
+          ${Object.values(routes).map(r=>`<option value="${r.id}"${tramos.find(t=>t.tramo===b.tramo)?.ruta===r.id?" selected":""}>${r.nombre}</option>`).join('')}
+        </select></div>
+        <div class="fl"><label>Tramo</label><select class="inp" id="eb-tramo">
+          ${tramos.filter(t=>{var br=document.getElementById('eb-ruta');return !br||br.value===''||t.ruta===br.value;}).map(t=>`<option value="${t.tramo}"${t.tramo===b.tramo?" selected":""}>${t.tramo}</option>`).join('')}
+        </select></div>
+      </div>
+      <div class="frow">
         <div class="fl"><label>Actor</label><input type="text" class="inp" id="eb-actor" value="${b.actor||""}"></div>
+        <div class="fl"><label>Actualizar estado tramo</label><select class="inp" id="eb-est">
+          <option value="">— Sin cambio —</option>
+          ${Object.keys(SC).map(k=>`<option value="${k}">${k}</option>`).join('')}
+        </select></div>
       </div>
       <div class="fl"><label>Descripción</label><textarea class="inp" id="eb-gestion">${b.gestion||""}</textarea></div>
       <div class="fl"><label>Resultado</label><textarea class="inp" id="eb-resultado">${b.resultado||""}</textarea></div>
@@ -1480,7 +1497,7 @@ function openModal(type,id,preTramo){
         <div class="fl"><label>Próxima acción</label><input type="text" class="inp" id="eb-prox" value="${b.proxima||""}"></div>
         <div class="fl"><label>Fecha próxima</label><input type="date" class="inp" id="eb-fp" value="${b.fp||""}"></div>
       </div>
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 0 4px;border-top:1px solid var(--border);margin-top:4px">Hitos de fecha</div>
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 0 4px">HITOS DE FECHA</div>
       <div class="frow">
         <div class="fl"><label>Radicacion</label><input type="date" class="inp" id="eb-hito-rad" value="${b.hito_rad||''}"></div>
         <div class="fl"><label>Propuesta</label><input type="date" class="inp" id="eb-hito-prop" value="${b.hito_prop||''}"></div>
@@ -1676,16 +1693,26 @@ function saveGestion(){
 
 function updateBit(id){
   const b=bitacora.find(x=>x.id===id); if(!b)return;
-  b.fecha=gv("eb-fecha"); b.tipo=gv("eb-tipo"); b.tramo=gv("eb-tramo");
-  b.actor=gv("eb-actor"); b.gestion=gv("eb-gestion"); b.resultado=gv("eb-resultado");
-  b.proxima=gv("eb-prox"); b.fp=gv("eb-fp");
-  b.hito_rad=gv("eb-hito-rad")||b.hito_rad||"";
-  b.hito_prop=gv("eb-hito-prop")||b.hito_prop||"";
-  b.hito_cierre=gv("eb-hito-cierre")||b.hito_cierre||"";
-  b.hito_venc=gv("eb-hito-venc")||b.hito_venc||"";
+  b.fecha=gv('eb-fecha'); b.tipo=gv('eb-tipo'); b.tramo=gv('eb-tramo');
+  b.actor=gv('eb-actor'); b.gestion=gv('eb-gestion'); b.resultado=gv('eb-resultado');
+  b.proxima=gv('eb-prox'); b.fp=gv('eb-fp');
+  b.hito_rad=gv('eb-hito-rad')||b.hito_rad||'';
+  b.hito_prop=gv('eb-hito-prop')||b.hito_prop||'';
+  b.hito_cierre=gv('eb-hito-cierre')||b.hito_cierre||'';
+  b.hito_venc=gv('eb-hito-venc')||b.hito_venc||'';
+  // Update tramo fields if changed
+  var ne=gv('eb-est');
+  var t=tramos.find(function(x){return x.tramo===b.tramo;});
+  if(t){
+    if(ne)t.estado=normalizeEstado(ne);
+    if(b.proxima)t.proxima=b.proxima;
+    if(b.fp)t.fp=b.fp;
+    if(b.actor)t.actor=b.actor;
+    saveTramoToDB(t);
+  }
   closeModal(); renderAll(); refreshLines(); if(selTramo)selT(selTramo);
   var ub=bitacora.find(function(x){return x.id===id;});if(ub)saveBitacoraEntryToDB(ub);
-  toast("Gestión actualizada · Guardada en base de datos");
+  toast('Gestión actualizada · Guardada en base de datos');
 }
 
 function saveNuevaRuta(){

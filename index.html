@@ -1200,7 +1200,7 @@ function renderTramoList(){
   function addRow(t, isChild){
     var idx=window._tramoCk.length;
     window._tramoCk.push(t.id);
-    var efectivo=isChild?t.estado:getTramoEfectivo(t);
+    var efectivo=t.estado||Object.keys(SC)[Object.keys(SC).length-1];
     var rColor=(routes[t.ruta]&&routes[t.ruta].color)||'#60A5FA';
     var rNombre=(routes[t.ruta]&&routes[t.ruta].nombre)?routes[t.ruta].nombre.split('–').pop():t.ruta;
     var sel=selTramo===t.id?' sel':'';
@@ -1229,7 +1229,7 @@ function renderTramoList(){
   }
 
   padres.forEach(function(t){
-    var efectivo=getTramoEfectivo(t);
+    var efectivo=t.estado||Object.keys(SC)[Object.keys(SC).length-1];
     if(fEst!=='all'&&efectivo!==fEst)return;
     addRow(t, false);
   });

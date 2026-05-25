@@ -776,10 +776,10 @@ function kpis(){
   var solopadres=tramos.filter(function(t){return !t.parent_id;});
   var tramos_kpi=solopadres;
   var km=function(a){return a.reduce(function(s,t){return s+t.km;},0);};
-  var kpiHtml='<div class="kpi acc"><div class="kpi-l">Tramos</div><div class="kpi-v">'+tramos_kpi.length+'</div><div class="kpi-s">'+km(tramos)+' km totales</div></div>';
+  var kpiHtml='<div class="kpi acc"><div class="kpi-l">Tramos</div><div class="kpi-v">'+tramos_kpi.length+'</div><div class="kpi-s">'+km(tramos_kpi)+' km totales</div></div>';
   Object.keys(SC).forEach(function(estado){
     var color=SC[estado];
-    var group=tramos_kpi.filter(function(t){return getTramoEfectivo(t)===estado;});
+    var group=tramos_kpi.filter(function(t){return (t.estado||Object.keys(SC)[Object.keys(SC).length-1])===estado;});
     kpiHtml+='<div class="kpi" style="border-color:'+color+'44"><div class="kpi-l" style="color:'+color+'">'+estado+'</div>'
       +'<div class="kpi-v" style="color:'+color+'">'+group.length+'</div>'
       +'<div class="kpi-s">'+km(group)+' km</div></div>';

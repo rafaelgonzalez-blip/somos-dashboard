@@ -3271,7 +3271,7 @@ function renderRouteSummaryCards(){
   while(container.firstChild)container.removeChild(container.firstChild);
   var rkeys=Object.keys(routes);
   console.log('[RSC] building cards for:', rkeys);
-  Object.values(routes).forEach(function(r){
+  getSortedRoutes().forEach(function(r){
     var color=r.color||'#60A5FA';
     var card=document.createElement('div');
     card.className='card';

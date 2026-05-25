@@ -786,7 +786,7 @@ function kpis(){
 }
 
 function routeSummary(elId,rid){
-  const r=tramos.filter(t=>t.ruta===rid);
+  const r=tramos.filter(t=>t.ruta===rid&&!t.parent_id&&t.tipo_elemento!=='subtramo');
   if(!r.length){document.getElementById(elId).innerHTML='<div class="empty">Sin tramos configurados</div>';return;}
   var kmTotal=r.reduce(function(s,t){return s+t.km;},0);
   var pct=0; var statCounts={};

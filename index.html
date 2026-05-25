@@ -1560,6 +1560,7 @@ function openModal(type,id,preTramo){
         <div class="fl"><label>ID interno</label><input type="text" class="inp" id="nr-id" value="${nid}"></div>
         <div class="fl"><label>Color en mapa (hex)</label><input type="text" class="inp" id="nr-c" value="#34D399" placeholder="#34D399"></div>
       </div>
+      <div class="fl"><label>Orden (1=primero)</label><input type="number" class="inp" id="nr-orden" value="${Object.keys(routes).length+1}" min="1" style="width:80px"></div>
       <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
         <button class="btn btn-p" onclick="saveNuevaRuta()">Crear ruta</button>
@@ -1756,12 +1757,14 @@ function updateBit(id){
 }
 
 function saveNuevaRuta(){
-  const n=gv("nr-n").trim(), rid=gv("nr-id").trim()||"r"+uid(), c=gv("nr-c");
-  if(!n){toast("Ingresa el nombre de la ruta","err");return;}
-  routes[rid]={id:rid,nombre:n,color:c||"#34D399"};
+  const n=gv('nr-n').trim(), rid=gv('nr-id').trim()||'r'+uid(), c=gv('nr-c');
+  if(!n){toast('Ingresa el nombre de la ruta','err');return;}
+  var ordenVal=parseInt(gv('nr-orden'));
+  var nextOrden=!isNaN(ordenVal)&&ordenVal>=1?ordenVal:(Object.keys(routes).length+1);
+  routes[rid]={id:rid,nombre:n,color:c||'#34D399',orden:nextOrden};
   saveRutaToDB(routes[rid]);
-  closeModal(); renderRutasList(); renderAll();
-  toast("Ruta creada: "+n+" · Guardada en base de datos");
+  closeModal(); renderRutasList(); renderRouteFilters(); renderAll();
+  toast('Ruta creada: '+n+' · Guardada en base de datos');
 }
 
 function saveEditRuta(rid){
@@ -2701,7 +2704,7 @@ async function kmzApply(){
       tramo: t.name,
       actor: existing?existing.actor:'Pendiente',
       km: existing?existing.km:Math.round(calcKm(t.coords)),
-      estado: normalizeEstado((keepStates&&existing)?existing.estado:Object.keys(SC)[1]||'En gestión'),
+      estado: normalizeEstado((keepStates&&existing)?existing.estado:(Object.keys(SC).indexOf('Inicio - Sin Gestión')>=0?'Inicio - Sin Gestión':Object.keys(SC)[Object.keys(SC).length-1]||'Inicio - Sin Gestión')),
       proxima: existing?existing.proxima:'',
       fp: existing?existing.fp:'',
       concesion: existing?existing.concesion:'',

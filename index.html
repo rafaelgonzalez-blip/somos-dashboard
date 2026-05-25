@@ -1335,12 +1335,10 @@ function renderRutasList(){
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div style="display:flex;align-items:center;gap:9px">
           <div style="width:13px;height:13px;border-radius:50%;background:${r.color};flex-shrink:0"></div>
-          <div><div style="font-size:12px;font-weight:600;color:#fff">${r.nombre}</div><div style="font-size:9px;color:var(--muted)">${rt.length} tramos · ${rt.reduce((s,t)=>s+t.km,0)} km</div></div>
+          <div><div style="font-size:12px;font-weight:600;color:#fff">${r.nombre}<span style="font-size:10px;color:var(--muted);margin-left:6px">#${(r.orden||0)+1}</span></div><div style="font-size:9px;color:var(--muted)">${rt.length} tramos · ${rt.reduce((s,t)=>s+t.km,0)} km</div></div>
         </div>
         <div style="display:flex;gap:5px">
           <button class="btn btn-warn btn-sm" onclick="event.stopPropagation();openModal('edit-ruta','${r.id}')">Editar</button>
-          <button class="btn btn-sm" onclick="event.stopPropagation();moveRoute('${r.id}',-1)" title="Subir">↑</button>
-          <button class="btn btn-sm" onclick="event.stopPropagation();moveRoute('${r.id}',1)" title="Bajar">↓</button>
           <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();eliminarRuta('${r.id}')">×</button>
         </div>
       </div>
@@ -1574,7 +1572,10 @@ function openModal(type,id,preTramo){
     mt.textContent="Editar ruta";
     mb.innerHTML=`<div class="ff">
       <div class="fl"><label>Nombre</label><input type="text" class="inp" id="er-n" value="${r.nombre}"></div>
-      <div class="fl"><label>Color (hex)</label><input type="text" class="inp" id="er-c" value="${r.color}"></div>
+      <div class="frow">
+        <div class="fl"><label>Color (hex)</label><input type="text" class="inp" id="er-c" value="${r.color}"></div>
+        <div class="fl"><label>Orden (1=primero)</label><input type="number" class="inp" id="er-orden" value="${r.orden!==undefined?r.orden:999}" min="1" style="width:80px"></div>
+      </div>
       <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
         <button class="btn btn-p" onclick="saveEditRuta('${id}')">Guardar</button>
@@ -1764,8 +1765,10 @@ function saveNuevaRuta(){
 }
 
 function saveEditRuta(rid){
-  routes[rid].nombre=gv("er-n"); routes[rid].color=gv("er-c");
-  closeModal(); renderRutasList(); renderAll(); if(mapInst)drawAllLines();
+  routes[rid].nombre=gv('er-n'); routes[rid].color=gv('er-c');
+  var ordenVal=parseInt(gv('er-orden'));
+  if(!isNaN(ordenVal)) routes[rid].orden=ordenVal-1; // 0-based internally
+  closeModal(); renderRutasList(); renderRouteFilters(); renderAll(); if(mapInst)drawAllLines();
   saveRutaToDB(routes[rid]);
   toast("Ruta actualizada · Guardada en base de datos");
 }

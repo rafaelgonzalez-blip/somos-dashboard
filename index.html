@@ -608,7 +608,9 @@ async function loadFromDB(){
           proxima:dt.proxima||'', fp:dt.fp||'',
           concesion:dt.concesion||'', coords:dt.coords,
           parent_id:dt.parent_id||null,
-          tipo_elemento:dt.tipo_elemento||'tramo'
+          tipo_elemento:dt.tipo_elemento||'tramo',
+          hito_rad:dt.hito_rad||'', hito_prop:dt.hito_prop||'',
+          hito_cierre:dt.hito_cierre||'', hito_venc:dt.hito_venc||''
         };
       });
     } else {
@@ -700,6 +702,8 @@ async function saveTramoToDB(t){
       km:t.km, estado:t.estado, proxima:t.proxima||'', fp:t.fp||'',
       concesion:t.concesion||'', coords:t.coords,
       parent_id:t.parent_id, tipo_elemento:t.tipo_elemento||'tramo',
+      hito_rad:t.hito_rad||'', hito_prop:t.hito_prop||'',
+      hito_cierre:t.hito_cierre||'', hito_venc:t.hito_venc||'',
       updated_at: new Date().toISOString()
     }]);
   } catch(e){ console.error('saveTramoToDB:', e); }
@@ -1380,15 +1384,19 @@ function selEditRoute(rid){
 }
 
 function eliminarRuta(rid){
-  if(!confirm("¿Eliminar la ruta y todos sus tramos? Esta acción no se puede deshacer."))return;
-  tramos=tramos.filter(t=>t.ruta!==rid);
+  if(!confirm('¿Eliminar la ruta y todos sus tramos? Esta acción no se puede deshacer.'))return;
+  // Delete from Supabase first
+  sbDelete('rutas', 'id=eq.'+rid).catch(function(e){console.warn('Error deleting ruta:',e);});
+  sbDelete('tramos', 'ruta=eq.'+rid).catch(function(e){console.warn('Error deleting tramos:',e);});
+  // Delete from memory
+  tramos=tramos.filter(function(t){return t.ruta!==rid;});
   delete routes[rid];
-  renderAll(); renderRutasList();
-  document.getElementById("tramo-editor-body").innerHTML='<div class="empty">Selecciona una ruta</div>';
-  document.getElementById("editor-title").textContent="Editar tramos de ruta";
-  document.getElementById("editor-actions").innerHTML="";
+  renderAll(); renderRutasList(); renderRouteFilters();
+  document.getElementById('tramo-editor-body').innerHTML='<div class="empty">Selecciona una ruta</div>';
+  document.getElementById('editor-title').textContent='Editar tramos de ruta';
+  document.getElementById('editor-actions').innerHTML='';
   if(mapInst)drawAllLines();
-  toast("Ruta eliminada");
+  toast('Ruta eliminada · Borrada de base de datos');
 }
 
 function qDelTramo(id){
@@ -1739,7 +1747,15 @@ function saveGestion(){
   const ne=gv("f-est");
   bitacora.unshift({id:uid(),fecha:gv("f-fecha"),tipo:gv("f-tipo"),tramo:tn,actor:gv("f-actor"),gestion,resultado:gv("f-res"),proxima:gv("f-prox"),fp:gv("f-fprox"),hito_rad:gv("f-hito-rad")||"",hito_prop:gv("f-hito-prop")||"",hito_cierre:gv("f-hito-cierre")||"",hito_venc:gv("f-hito-venc")||""});
   const t=tramos.find(x=>x.tramo===tn);
-  if(t){if(ne)t.estado=ne;if(gv("f-prox"))t.proxima=gv("f-prox");if(gv("f-fprox"))t.fp=gv("f-fprox");}
+  if(t){
+    if(ne)t.estado=normalizeEstado(ne);
+    if(gv('f-prox'))t.proxima=gv('f-prox');
+    if(gv('f-fprox'))t.fp=gv('f-fprox');
+    if(gv('f-hito-rad'))t.hito_rad=gv('f-hito-rad');
+    if(gv('f-hito-prop'))t.hito_prop=gv('f-hito-prop');
+    if(gv('f-hito-cierre'))t.hito_cierre=gv('f-hito-cierre');
+    if(gv('f-hito-venc'))t.hito_venc=gv('f-hito-venc');
+  }
   closeModal(); renderAll(); refreshLines(); if(selTramo)selT(selTramo);
   saveBitacoraEntryToDB(bitacora[0]);
   if(ne){ var t2=tramos.find(function(x){return x.tramo===tn;}); if(t2)saveTramoToDB(t2); }
@@ -3234,34 +3250,68 @@ function setEMLStep(n){
 function addDays(ds,n){var d=new Date(ds);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
 
 function renderHitos(){
-  var tbody=document.getElementById("hitos-tbody");
+  var tbody=document.getElementById('hitos-tbody');
   if(!tbody)return;
+
+  // Build hitos map from TRAMOS first (source of truth), then overlay bitacora
   var hm={};
+  // First: load from tramos table fields
+  tramos.forEach(function(t){
+    if(!t.hito_rad&&!t.hito_prop&&!t.hito_cierre&&!t.hito_venc)return;
+    hm[t.tramo]={rad:t.hito_rad||'',prop:t.hito_prop||'',cierre:t.hito_cierre||'',venc:t.hito_venc||'',id:t.id};
+  });
+  // Then overlay from bitacora (most recent wins)
   [].concat(bitacora).sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(b){
-    if(!hm[b.tramo])hm[b.tramo]={rad:"",prop:"",cierre:"",venc:""};
+    if(!hm[b.tramo])hm[b.tramo]={rad:'',prop:'',cierre:'',venc:'',id:null};
     if(b.hito_rad)hm[b.tramo].rad=b.hito_rad;
     if(b.hito_prop)hm[b.tramo].prop=b.hito_prop;
     if(b.hito_cierre)hm[b.tramo].cierre=b.hito_cierre;
     if(b.hito_venc)hm[b.tramo].venc=b.hito_venc;
   });
-  var td=today(),rows="";
-  tramos.forEach(function(t){
-    var h=hm[t.tramo];
-    if(!h||(!h.rad&&!h.prop&&!h.cierre&&!h.venc))return;
-    var rc=t.ruta==="r1"?"#60A5FA":"#A78BFA";
-    var sc=SC[t.estado]||"#94A3B8";
+
+  var td=today(),rows='';
+  // Sort tramos by earliest hito date (most urgent first)
+  var tramosConHitos=tramos.filter(function(t){return !t.parent_id;}).map(function(t){
+    var h=hm[t.tramo]||{rad:'',prop:'',cierre:'',venc:'',id:t.id};
+    var dates=[h.rad,h.prop,h.cierre,h.venc].filter(Boolean);
+    var earliest=dates.length?dates.sort()[0]:'9999-99-99';
+    return {t:t,h:h,earliest:earliest};
+  }).sort(function(a,b){return a.earliest.localeCompare(b.earliest);});
+  tramosConHitos.forEach(function(item){
+    var t=item.t,h=item.h;
+    var h=hm[t.tramo]||{rad:'',prop:'',cierre:'',venc:'',id:t.id};
+    var rc=(routes[t.ruta]&&routes[t.ruta].color)||'#60A5FA';
+    var sc=SC[t.estado]||'#94A3B8';
     var rn=(routes[t.ruta]&&routes[t.ruta].nombre)||t.ruta;
-    function cell(d){
-      if(!d)return "<td style='padding:8px 13px;text-align:center;color:var(--muted2)'>-</td>";
+    function cell(d,field){
+      var editBtn='<button onclick="editHito(\''+t.id+'\',\''+field+'\')" style="opacity:0.4;background:none;border:none;cursor:pointer;font-size:10px;margin-left:3px" title="Editar">✏</button>';
+      if(!d)return '<td style="padding:8px 13px;text-align:center;color:var(--muted2)">-'+editBtn+'</td>';
       var ov=d<td,near=!ov&&d<=addDays(td,7);
-      var c=ov?"#EF4444":near?"#F59E0B":"#10B981";
-      var bg=ov?"rgba(239,68,68,.1)":near?"rgba(245,158,11,.1)":"rgba(16,185,129,.08)";
-      var tag=ov?" [!]":near?" [~]":"";
-      return "<td style='padding:8px 13px;text-align:center'><span style='background:"+bg+";color:"+c+";padding:3px 9px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap'>"+fmt(d)+tag+"</span></td>";
+      var c=ov?'#EF4444':near?'#F59E0B':'#10B981';
+      var bg=ov?'rgba(239,68,68,.1)':near?'rgba(245,158,11,.1)':'rgba(16,185,129,.08)';
+      var tag=ov?' [!]':near?' [~]':'';
+      return '<td style="padding:8px 13px;text-align:center"><span style="background:'+bg+';color:'+c+';padding:3px 9px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap">'+fmt(d)+tag+'</span>'+editBtn+'</td>';
     }
-    rows+="<tr style='border-bottom:1px solid rgba(255,255,255,.04)'>"      +"<td style='padding:8px 13px;color:#fff;font-weight:500;white-space:nowrap'>"+t.tramo+"</td>"      +"<td style='padding:8px 13px;text-align:center'><span style='background:"+rc+"22;color:"+rc+";padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700'>"+rn+"</span></td>"      +cell(h.rad)+cell(h.prop)+cell(h.cierre)+cell(h.venc)      +"<td style='padding:8px 13px;text-align:center'><span style='background:"+sc+"22;color:"+sc+";padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700'>"+t.estado+"</span></td>"      +"</tr>";
-  });
-  tbody.innerHTML=rows||"<tr><td colspan='7' style='padding:28px;text-align:center;color:var(--muted2);font-size:11px'>Sin hitos registrados. Agrégalos al crear una gestión.</td></tr>";
+    rows+='<tr style="border-bottom:1px solid rgba(255,255,255,.04)">'
+      +'<td style="padding:8px 13px;color:#fff;font-weight:500;white-space:nowrap">'+t.tramo+'</td>'
+      +'<td style="padding:8px 13px;text-align:center"><span style="background:'+rc+'22;color:'+rc+';padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700">'+rn+'</span></td>'
+      +cell(h.rad,'hito_rad')+cell(h.prop,'hito_prop')+cell(h.cierre,'hito_cierre')+cell(h.venc,'hito_venc')
+      +'<td style="padding:8px 13px;text-align:center"><span style="background:'+sc+'22;color:'+sc+';padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700">'+t.estado+'</span></td>'
+      +'</tr>';
+  }); // end tramosConHitos.forEach
+  tbody.innerHTML=rows||'<tr><td colspan="7" style="padding:28px;text-align:center;color:var(--muted2);font-size:11px">Sin hitos registrados. Agrégalos editando un tramo o desde la bitácora.</td></tr>';
+}
+
+function editHito(tramoId, field){
+  var t=tramos.find(function(x){return x.id===tramoId;}); if(!t)return;
+  var labels={hito_rad:'Radicación',hito_prop:'Propuesta',hito_cierre:'Cierre Contrato',hito_venc:'Vencimiento'};
+  var current=t[field]||'';
+  var val=prompt('Fecha '+labels[field]+' para '+t.tramo+' (yyyy-mm-dd):',current);
+  if(val===null)return; // cancelled
+  t[field]=val;
+  saveTramoToDB(t);
+  renderHitos();
+  toast('Hito actualizado · '+labels[field]+': '+(val||'eliminado'));
 }
 
 function renderRouteSummaryCards(){

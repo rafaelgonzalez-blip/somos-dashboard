@@ -2672,14 +2672,21 @@ async function kmzApply(){
 
   // === SECOND PASS: resolve parent_ids ===
   var batchMap={};
-  // Map existing tramos (tramo name -> id)
-  tramos.forEach(function(t){ if(!t.parent_id) batchMap[t.tramo.toLowerCase()]=t.id; });
-  // Map new tramos that are tipo='tramo' (parent candidates)
-  newTramos.forEach(function(t){ if(t.tipo_elemento==='tramo') batchMap[t.tramo.toLowerCase()]=t.id; });
-  // Resolve parent_id for each subtramo
+  // Map ONLY new tramos as parent candidates (filtered by ruta to avoid cross-ruta contamination)
+  newTramos.forEach(function(t){
+    if(t.tipo_elemento==='tramo') batchMap[t.tramo.toLowerCase()+'|'+t.ruta]=t.id;
+  });
+  // Also map existing tramos of the SAME ruta only
+  var importedRutas={};
+  newTramos.forEach(function(t){importedRutas[t.ruta]=true;});
+  tramos.forEach(function(t){
+    if(!t.parent_id&&importedRutas[t.ruta]) batchMap[t.tramo.toLowerCase()+'|'+t.ruta]=t.id;
+  });
+  // Resolve parent_id for each subtramo - match by name+ruta
   newTramos.forEach(function(t){
     if(t._parentFolder){
-      t.parent_id = batchMap[t._parentFolder.toLowerCase()] || null;
+      var key=t._parentFolder.toLowerCase()+'|'+t.ruta;
+      t.parent_id = batchMap[key] || null;
     }
     delete t._parentFolder;
   });

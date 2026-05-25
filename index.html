@@ -584,7 +584,7 @@ async function loadFromDB(){
     var dbRutas = await sbGet('rutas');
     if(dbRutas && dbRutas.length > 0){
       routes = {};
-      dbRutas.forEach(function(r){ routes[r.id] = {id:r.id, nombre:r.nombre, color:r.color, orden:r.orden||999}; });
+      dbRutas.forEach(function(r){ routes[r.id] = {id:r.id, nombre:r.nombre, color:r.color, orden:(r.orden!==null&&r.orden!==undefined)?r.orden:999}; });
       console.log('[LDB] routes loaded:', Object.keys(routes));
       renderRouteSummaryCards();
       renderRouteFilters();
@@ -1307,7 +1307,7 @@ function selT(id){
 
 // ─── RUTAS ───────────────────────────────────────────────────
 function getSortedRoutes(){
-  return Object.values(routes).sort(function(a,b){return (a.orden||999)-(b.orden||999);});
+  return Object.values(routes).sort(function(a,b){var ao=(a.orden!==null&&a.orden!==undefined)?a.orden:999;var bo=(b.orden!==null&&b.orden!==undefined)?b.orden:999;return ao-bo;});
 }
 
 function moveRoute(rid, dir){
@@ -1335,7 +1335,7 @@ function renderRutasList(){
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div style="display:flex;align-items:center;gap:9px">
           <div style="width:13px;height:13px;border-radius:50%;background:${r.color};flex-shrink:0"></div>
-          <div><div style="font-size:12px;font-weight:600;color:#fff">${r.nombre}<span style="font-size:10px;color:var(--muted);margin-left:6px">#${(r.orden||0)+1}</span></div><div style="font-size:9px;color:var(--muted)">${rt.length} tramos · ${rt.reduce((s,t)=>s+t.km,0)} km</div></div>
+          <div><div style="font-size:12px;font-weight:600;color:#fff">${r.nombre}<span style="font-size:10px;color:var(--muted);margin-left:6px">#${(r.orden!==null&&r.orden!==undefined&&r.orden!==999)?r.orden:'?'}</span></div><div style="font-size:9px;color:var(--muted)">${rt.length} tramos · ${rt.reduce((s,t)=>s+t.km,0)} km</div></div>
         </div>
         <div style="display:flex;gap:5px">
           <button class="btn btn-warn btn-sm" onclick="event.stopPropagation();openModal('edit-ruta','${r.id}')">Editar</button>
@@ -1574,7 +1574,7 @@ function openModal(type,id,preTramo){
       <div class="fl"><label>Nombre</label><input type="text" class="inp" id="er-n" value="${r.nombre}"></div>
       <div class="frow">
         <div class="fl"><label>Color (hex)</label><input type="text" class="inp" id="er-c" value="${r.color}"></div>
-        <div class="fl"><label>Orden (1=primero)</label><input type="number" class="inp" id="er-orden" value="${r.orden!==undefined?r.orden:999}" min="1" style="width:80px"></div>
+        <div class="fl"><label>Orden (1=primero)</label><input type="number" class="inp" id="er-orden" value="${(r.orden!==null&&r.orden!==undefined&&r.orden!==999)?r.orden:''}" min="1" style="width:80px"></div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
@@ -1767,7 +1767,7 @@ function saveNuevaRuta(){
 function saveEditRuta(rid){
   routes[rid].nombre=gv('er-n'); routes[rid].color=gv('er-c');
   var ordenVal=parseInt(gv('er-orden'));
-  if(!isNaN(ordenVal)) routes[rid].orden=ordenVal-1; // 0-based internally
+  if(!isNaN(ordenVal)&&ordenVal>=1) routes[rid].orden=ordenVal;
   closeModal(); renderRutasList(); renderRouteFilters(); renderAll(); if(mapInst)drawAllLines();
   saveRutaToDB(routes[rid]);
   toast("Ruta actualizada · Guardada en base de datos");

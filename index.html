@@ -792,10 +792,11 @@ function routeSummary(elId,rid){
   const r=tramos.filter(t=>t.ruta===rid&&!t.parent_id&&t.tipo_elemento!=='subtramo');
   if(!r.length){document.getElementById(elId).innerHTML='<div class="empty">Sin tramos configurados</div>';return;}
   var kmTotal=r.reduce(function(s,t){return s+t.km;},0);
-  var pct=0; var statCounts={};
-  Object.keys(SC).forEach(function(e){ statCounts[e]=r.filter(function(t){return t.estado===e;}).length; });
-  var active=r.filter(function(t){return SC[t.estado];}).length;
-  pct=r.length?(active/r.length*100).toFixed(0):0;
+  var statCounts={};
+  Object.keys(SC).forEach(function(e){statCounts[e]=r.filter(function(t){return t.estado===e;}).length;});
+  var active=r.filter(function(t){return t.estado!==Object.keys(SC)[Object.keys(SC).length-1];}).length;
+  var pct=r.length?(active/r.length*100).toFixed(0):0;
+  // Stats row
   var statsHtml='<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">';
   Object.keys(SC).forEach(function(e){
     var color=SC[e];
@@ -804,11 +805,21 @@ function routeSummary(elId,rid){
       +'<div style="font-size:8px;color:var(--muted)">'+e.toLowerCase()+'</div></div>';
   });
   statsHtml+='</div>';
+  // All tramos list sorted by position in tramos array
+  var tramosList=r.map(function(t){
+    var color=SC[t.estado]||'var(--muted)';
+    var nsub=tramos.filter(function(x){return x.parent_id===t.id;}).length;
+    var subTxt=nsub>0?'<span style="font-size:8px;color:var(--muted);margin-left:4px">'+nsub+' sub</span>':'';
+    return '<div style="margin-top:5px;display:flex;justify-content:space-between;align-items:center;font-size:10px">'
+      +'<span style="color:#fff">'+t.tramo+subTxt+'</span>'
+      +'<span style="color:'+color+';font-size:8px;font-weight:700">'+t.estado+'</span>'
+      +'</div>';
+  }).join('');
   document.getElementById(elId).innerHTML=statsHtml
     +'<div style="font-size:9px;color:var(--muted);margin-bottom:4px">'+kmTotal+' km · '+r.length+' tramos</div>'
     +'<div class="pbar"><div class="pf" style="width:'+pct+'%;background:linear-gradient(90deg,var(--av),var(--acc))"></div></div>'
     +'<div style="font-size:8px;color:var(--muted);margin-top:3px">'+pct+'% activa</div>'
-    +r.filter(function(t){var last=Object.keys(SC).slice(-1)[0];return t.estado===last;}).map(function(t){return '<div style="margin-top:6px;display:flex;justify-content:space-between;font-size:10px"><span style="color:#fff">'+t.tramo+'</span><span style="color:'+SC[t.estado]+';font-size:8px;font-weight:700">⚠ '+fmt(t.fp)+'</span></div>';}).join('');
+    +tramosList;
 }
 
 function recBit(){

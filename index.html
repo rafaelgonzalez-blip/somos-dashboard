@@ -529,25 +529,29 @@ async function loadScFromSupabase(){
 
 
 function _autoSortTramos(){
-  function getParentNum(name){
-    var m=(name||'').match(/^(\d+)[\.\s_]/);
-    if(m) return parseInt(m[1],10);
-    var m2=(name||'').match(/(\d+)/);
-    if(m2) return parseInt(m2[1],10);
-    return 9999;
-  }
   function getChildNum(name){
-    // Extract sub-number after first dot: "1.10_..." -> 10, "5.3_..." -> 3
     var m=(name||'').trim().match(/^\d+\.(\d+)/);
     if(m) return parseInt(m[1],10);
     return 9999;
   }
+  function getMainNumFromChildren(parentId){
+    // Infer main tramo order from its children's N.M prefix
+    var children=tramos.filter(function(t){return t.parent_id===parentId;});
+    if(!children.length) return 9999;
+    // Get the N part from "N.M_name"
+    var m=(children[0].tramo||'').match(/^(\d+)\./);
+    return m?parseInt(m[1],10):9999;
+  }
   var parents=tramos.filter(function(t){return !t.parent_id;});
   parents.sort(function(a,b){
-    if(a.ruta!==b.ruta)return a.ruta<b.ruta?-1:1;
-    return getParentNum(a.tramo)-getParentNum(b.tramo);
+    if(a.ruta!==b.ruta) return a.ruta<b.ruta?-1:1;
+    // Try to get num from name first
+    var ma=(a.tramo||'').match(/^(\d+)[\.\s_]/);
+    var mb2=(b.tramo||'').match(/^(\d+)[\.\s_]/);
+    var na=ma?parseInt(ma[1]):getMainNumFromChildren(a.id);
+    var nb=mb2?parseInt(mb2[1]):getMainNumFromChildren(b.id);
+    return na-nb;
   });
-  // Build sorted array: each parent followed by its children sorted by sub-number
   var sorted=[];
   parents.forEach(function(p){
     sorted.push(p);
@@ -555,7 +559,6 @@ function _autoSortTramos(){
     children.sort(function(a,b){return getChildNum(a.tramo)-getChildNum(b.tramo);});
     children.forEach(function(c){sorted.push(c);});
   });
-  // Add any orphan children (no matching parent found)
   tramos.filter(function(t){return t.parent_id&&!parents.find(function(p){return p.id===t.parent_id;});})
     .forEach(function(t){sorted.push(t);});
   tramos=sorted;

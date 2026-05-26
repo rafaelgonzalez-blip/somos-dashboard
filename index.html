@@ -3284,7 +3284,7 @@ function renderHitos(){
     var sc=SC[t.estado]||'#94A3B8';
     var rn=(routes[t.ruta]&&routes[t.ruta].nombre)||t.ruta;
     function cell(d,field){
-      var editBtn='<button onclick="editHito(\''+t.id+'\',\''+field+'\')" style="opacity:0.4;background:none;border:none;cursor:pointer;font-size:10px;margin-left:3px" title="Editar">✏</button>';
+      var editBtn='<button data-tid="'+t.id+'" onclick="editHito(this.dataset.tid)" style="opacity:0.5;background:none;border:none;cursor:pointer;font-size:10px;margin-left:3px" title="Editar">✏</button>';
       if(!d)return '<td style="padding:8px 13px;text-align:center;color:var(--muted2)">-'+editBtn+'</td>';
       var ov=d<td,near=!ov&&d<=addDays(td,7);
       var c=ov?'#EF4444':near?'#F59E0B':'#10B981';
@@ -3302,16 +3302,51 @@ function renderHitos(){
   tbody.innerHTML=rows||'<tr><td colspan="7" style="padding:28px;text-align:center;color:var(--muted2);font-size:11px">Sin hitos registrados. Agrégalos editando un tramo o desde la bitácora.</td></tr>';
 }
 
-function editHito(tramoId, field){
+function editHito(tramoId){
   var t=tramos.find(function(x){return x.id===tramoId;}); if(!t)return;
-  var labels={hito_rad:'Radicación',hito_prop:'Propuesta',hito_cierre:'Cierre Contrato',hito_venc:'Vencimiento'};
-  var current=t[field]||'';
-  var val=prompt('Fecha '+labels[field]+' para '+t.tramo+' (yyyy-mm-dd):',current);
-  if(val===null)return; // cancelled
-  t[field]=val;
+  var mt=document.getElementById('modal-title');
+  var mb=document.getElementById('modal-body');
+  mt.textContent='Hitos: '+t.tramo;
+  var html='<div class="ff">'
+    +'<div class="frow">'
+    +'<div class="fl"><label>Radicación</label><input type="date" class="inp" id="h-rad" value="'+(t.hito_rad||'')+'"></div>'
+    +'<div class="fl"><label>Propuesta</label><input type="date" class="inp" id="h-prop" value="'+(t.hito_prop||'')+'"></div>'
+    +'</div>'
+    +'<div class="frow">'
+    +'<div class="fl"><label>Cierre Contrato</label><input type="date" class="inp" id="h-cierre" value="'+(t.hito_cierre||'')+'"></div>'
+    +'<div class="fl"><label>Vencimiento</label><input type="date" class="inp" id="h-venc" value="'+(t.hito_venc||'')+'"></div>'
+    +'</div>'
+    +'<div style="display:flex;justify-content:space-between;gap:8px;margin-top:12px">'
+    +'<button class="btn btn-sm" id="h-clear-btn" style="color:#EF4444;border-color:#EF4444">🗑 Limpiar todo</button>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button class="btn btn-g" onclick="closeModal()">Cancelar</button>'
+    +'<button class="btn btn-p" id="h-save-btn">Guardar</button>'
+    +'</div></div></div>';
+  mb.innerHTML=html;
+  document.getElementById('h-save-btn').onclick=function(){saveHitos(tramoId);};
+  document.getElementById('h-clear-btn').onclick=function(){clearHitos(tramoId);};
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function saveHitos(tramoId){
+  var t=tramos.find(function(x){return x.id===tramoId;}); if(!t)return;
+  t.hito_rad=gv('h-rad')||'';
+  t.hito_prop=gv('h-prop')||'';
+  t.hito_cierre=gv('h-cierre')||'';
+  t.hito_venc=gv('h-venc')||'';
+  closeModal();
   saveTramoToDB(t);
   renderHitos();
-  toast('Hito actualizado · '+labels[field]+': '+(val||'eliminado'));
+  toast('Hitos actualizados');
+}
+
+function clearHitos(tramoId){
+  var t=tramos.find(function(x){return x.id===tramoId;}); if(!t)return;
+  t.hito_rad=''; t.hito_prop=''; t.hito_cierre=''; t.hito_venc='';
+  closeModal();
+  saveTramoToDB(t);
+  renderHitos();
+  toast('Hitos eliminados');
 }
 
 function renderRouteSummaryCards(){

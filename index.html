@@ -321,9 +321,16 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
               </label>
             </div>
           </div>
-          <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button class="btn btn-g btn-sm" onclick="kmzReset()">Cancelar</button>
-            <button class="btn btn-p" onclick="kmzApply()">Aplicar y sincronizar mapa</button>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:10px;color:var(--muted);font-weight:600">MODO:</span>
+              <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px"><input type="radio" name="kmz-mode" value="add" checked id="kmz-mode-add"> &#43; Agregar</label>
+              <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px"><input type="radio" name="kmz-mode" value="replace" id="kmz-mode-replace"> &#8635; Reemplazar</label>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-g btn-sm" onclick="kmzReset()">Cancelar</button>
+              <button class="btn btn-p" onclick="kmzApply()">Aplicar y sincronizar mapa</button>
+            </div>
           </div>
         </div>
         <div id="kmz-panel-3" style="display:none;text-align:center;padding:24px">
@@ -731,7 +738,7 @@ const KMZ_PUNTOS=[];
 // Data
 
 // ─── DATA ───────────────────────────────────────────────────
-var SC={Avanzado:"#10B981","En gestión":"#F59E0B","Crítico":"#EF4444"};
+var SC={"Acuerdo Cerrado":"#10B981","Negociación":"#60A5FA","Radicado":"#8B5CF6","En proceso de Radicación":"#F59E0B","Sin respuesta":"#EF4444","Inicio - Sin Gestión":"#991B1B"};
 var HITOS=[{key:"hito_1",label:"Radicación",orden:1},{key:"hito_2",label:"Propuesta",orden:2},{key:"hito_3",label:"Cierre Contrato",orden:3},{key:"hito_4",label:"Vencimiento",orden:4}];
 try{var _sc=localStorage.getItem('somos_sc');if(_sc)SC=JSON.parse(_sc);}catch(e){}
 
@@ -2794,24 +2801,21 @@ async function kmzApply(){
       console.log('[KMZ] Patch complete');
     }
 
-    // Only delete tramos from the SAME routes as the imported KMZ
-    // This preserves tramos from other routes
-    var importedRoutes={};
-    newTramos.forEach(function(t){ importedRoutes[t.ruta]=true; });
-    var newIds=newTramos.map(function(t){return t.id;});
-    var toDelete=tramos.filter(function(t){
-      // Only consider deleting if it's in one of the imported routes
-      if(!importedRoutes[t.ruta]) return false;
-      // Don't delete if it's in the new batch
-      if(newIds.includes(t.id)) return false;
-      // Don't delete tramos from other routes
-      return true;
-    });
-    await Promise.all(toDelete.map(function(t){return sbDelete('tramos',t.id).catch(function(){});}));
-
-    // Update local state - merge new tramos with existing ones from other routes
-    var otherRouteTramos=tramos.filter(function(t){return !importedRoutes[t.ruta];});
-    tramos=otherRouteTramos.concat(newTramos);
+    // Import mode: 'add' (additive) or 'replace' (update existing by name)
+    var modeEl=document.querySelector('input[name="kmz-mode"]:checked');
+    var importMode=modeEl?modeEl.value:'add';
+    if(importMode==='replace'){
+      var updatedTramos=tramos.filter(function(t){
+        return !newTramos.some(function(n){return n.tramo===t.tramo&&n.ruta===t.ruta;});
+      });
+      tramos=updatedTramos.concat(newTramos);
+      console.log('[KMZ] Replace: updated '+newTramos.length+' tramos');
+    } else {
+      var existingKeys=tramos.map(function(t){return t.tramo+'|'+t.ruta;});
+      var trulyNew=newTramos.filter(function(n){return existingKeys.indexOf(n.tramo+'|'+n.ruta)<0;});
+      tramos=tramos.concat(trulyNew);
+      console.log('[KMZ] Add: '+trulyNew.length+' new, skipped '+(newTramos.length-trulyNew.length)+' existing');
+    }
 
     // Save puntos to Supabase if any detected
     var newPuntos=kmzParsed.puntos.map(function(p){

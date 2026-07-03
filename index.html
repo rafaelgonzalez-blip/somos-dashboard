@@ -2805,16 +2805,30 @@ async function kmzApply(){
     var modeEl=document.querySelector('input[name="kmz-mode"]:checked');
     var importMode=modeEl?modeEl.value:'add';
     if(importMode==='replace'){
+      // Find tramos being replaced (same name+ruta) and delete from Supabase
+      var toReplace=tramos.filter(function(t){
+        return newTramos.some(function(n){return n.tramo===t.tramo&&n.ruta===t.ruta;});
+      });
+      if(toReplace.length>0){
+        await Promise.all(toReplace.map(function(t){
+          return sbDelete('tramos',t.id).catch(function(e){console.warn('delete error:',e);});
+        }));
+        console.log('[KMZ] Replace: deleted '+toReplace.length+' old tramos from DB');
+      }
+      // Update memory: remove old, add new
       var updatedTramos=tramos.filter(function(t){
         return !newTramos.some(function(n){return n.tramo===t.tramo&&n.ruta===t.ruta;});
       });
       tramos=updatedTramos.concat(newTramos);
-      console.log('[KMZ] Replace: updated '+newTramos.length+' tramos');
+      console.log('[KMZ] Replace: inserted '+newTramos.length+' updated tramos');
     } else {
+      // Add mode: only add tramos that don't already exist (by name+ruta)
       var existingKeys=tramos.map(function(t){return t.tramo+'|'+t.ruta;});
       var trulyNew=newTramos.filter(function(n){return existingKeys.indexOf(n.tramo+'|'+n.ruta)<0;});
       tramos=tramos.concat(trulyNew);
-      console.log('[KMZ] Add: '+trulyNew.length+' new, skipped '+(newTramos.length-trulyNew.length)+' existing');
+      // Only upsert truly new ones to DB
+      newTramos=trulyNew;
+      console.log('[KMZ] Add: '+trulyNew.length+' new tramos added');
     }
 
     // Save puntos to Supabase if any detected
@@ -2882,7 +2896,7 @@ async function kmzApply(){
       newTramos.length+' tramos en el mapa · '
       +kept+' estados conservados · '
       +added+' tramos nuevos · '
-      +toDelete.length+' tramos eliminados · '
+      +'0 tramos eliminados · '
       +newPuntos.length+' puntos de interes actualizados';
     toast('KMZ actualizado: '+newTramos.length+' tramos + '+newPuntos.length+' puntos');
     if(mapInst){drawAllLines();drawPuntos();renderMapSide();renderLayerControls();}

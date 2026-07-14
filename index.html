@@ -2848,7 +2848,8 @@ async function kmzApply(){
     if(newPuntos.length>0){
       // Update local cache immediately
       if(!window._dbPuntos)window._dbPuntos=[];
-      var importedRutaKeys=Object.keys(importedRoutes||{});
+      var _impRoutes={};newTramos.forEach(function(t){_impRoutes[t.ruta]=true;});
+      var importedRutaKeys=Object.keys(_impRoutes);
       window._dbPuntos=window._dbPuntos.filter(function(p){return importedRutaKeys.indexOf(p.ruta)<0;});
       window._dbPuntos=window._dbPuntos.concat(newPuntos);
       // Try to save puntos - table may not exist yet, handle gracefully

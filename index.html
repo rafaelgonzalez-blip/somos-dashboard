@@ -217,7 +217,9 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
           </div>
           <div style="margin-top:7px;padding-top:7px;border-top:1px solid rgba(255,255,255,.1)">
             <div class="map-legend-t">Referencia ANI (SIG oficial)</div>
-            <div class="leg-r"><span style="width:22px;height:0;border-top:3px dashed #FBBF24;display:inline-block;margin-right:3px"></span>Concesi&#243;n ANI</div>
+            <div class="leg-r"><span style="width:22px;height:0;border-top:3px dashed #FBBF24;display:inline-block;margin-right:3px"></span>Concesi&#243;n carretera</div>
+            <div class="leg-r"><span style="width:22px;height:0;border-top:3px dashed #A78BFA;display:inline-block;margin-right:3px"></span>Concesi&#243;n f&#233;rrea</div>
+            <div class="leg-r"><span style="width:22px;height:0;border-top:3px dashed #EF4444;display:inline-block;margin-right:3px"></span>Importado (UPME/archivo)</div>
           </div>
         </div>
         <div class="map-side" id="map-side">
@@ -356,16 +358,38 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
         <span style="font-size:9px;background:rgba(245,158,11,.15);color:var(--eg);border:1px solid rgba(245,158,11,.3);padding:2px 9px;border-radius:4px;font-weight:700">sig.ani.gov.co</span>
       </div>
       <div class="card-b">
-        <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">Busca una concesi&#243;n vial por nombre o sigla directamente en la capa p&#250;blica de ANI (<code>SigAni/ConcesionesCarreteras</code>) y trae su trazado oficial como tramo(s) nuevos. No reemplaza tus tramos KMZ existentes &#8212; se importan aparte y los asignas a la ruta que quieras.</p>
+        <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">Busca una concesi&#243;n (vial o f&#233;rrea) directamente en la capa p&#250;blica de ANI y trae su trazado oficial como tramo(s) nuevos. No reemplaza tus tramos KMZ existentes &#8212; se importan aparte y los asignas a la ruta que quieras.</p>
         <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
-          <input class="inp" id="ani-search-q" placeholder="Ej: VINUS, Autopistas del Caribe, Ruta del Mar, C&#243;rdoba–Sucre..." style="flex:1;min-width:220px" onkeydown="if(event.key==='Enter')aniSearch()">
+          <select class="inp" id="ani-type" style="width:auto" onchange="aniTypeChanged()">
+            <option value="carretera">&#128739; Concesiones carreteras</option>
+            <option value="ferrea">&#128646; Concesiones f&#233;rreas</option>
+          </select>
+          <input class="inp" id="ani-search-q" placeholder="Ej: VINUS, Autopistas del Caribe, Ruta del Mar..." style="flex:1;min-width:220px" onkeydown="if(event.key==='Enter')aniSearch()">
           <button class="btn btn-p btn-sm" onclick="aniSearch()">&#128269; Buscar en ANI</button>
           <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);cursor:pointer;white-space:nowrap">
-            <input type="checkbox" id="ani-layer-toggle" onchange="toggleAniLayer(this.checked)" style="accent-color:#F59E0B"> Ver todas las concesiones ANI en el mapa
+            <input type="checkbox" id="ani-layer-toggle" onchange="toggleAniLayer(this.checked)" style="accent-color:#F59E0B"> Ver todas en el mapa
           </label>
         </div>
         <div id="ani-search-status" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
         <div id="ani-search-results" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="card-h">
+        <span class="card-t">&#9889; Redes de alta tensi&#243;n (UPME)</span>
+        <span style="font-size:9px;background:rgba(239,68,68,.13);color:var(--cr);border:1px solid rgba(239,68,68,.3);padding:2px 9px;border-radius:4px;font-weight:700">requiere archivo</span>
+      </div>
+      <div class="card-b">
+        <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">El visor de UPME (Sistema de Transmisi&#243;n Nacional, <code>sig.upme.gov.co</code>) usa un servicio <code>geo.upme.gov.co/.../SISTEMA_DE_TRANSMISI&Oacute;N_MIL1</code> que exige un token de su portal &#8212; a diferencia de ANI, no responde consultas anónimas desde otra p&#225;gina, as&#237; que no se puede conectar en vivo igual que arriba. La v&#237;a confiable: descarga la capa de l&#237;neas de transmisi&#243;n desde el visor de UPME (bot&#243;n de descarga/exportar del mapa, o solicit&#225;ndola a UPME) como <b style="color:#fff">GeoJSON, KML/KMZ o Shapefile</b>, y súbela aqu&#237;.</p>
+        <input type="file" id="upme-input" accept=".geojson,.json,.kml,.kmz,.zip" style="display:none">
+        <label for="upme-input" class="drop-zone" id="upme-drop-zone" style="display:block;cursor:pointer">
+          <div style="font-size:36px;margin-bottom:8px">&#9889;</div>
+          <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:4px">Sube el archivo exportado de UPME (.geojson, .kml/.kmz)</div>
+          <div style="font-size:10px;color:var(--muted2)">Se importa como tramo(s) de referencia, igual que el importador ANI</div>
+        </label>
+        <div id="upme-upload-status" style="font-size:11px;color:var(--muted);margin-top:8px"></div>
+        <div id="upme-search-results" style="display:flex;flex-direction:column;gap:8px;margin-top:8px"></div>
       </div>
     </div>
   </div>
@@ -1493,7 +1517,7 @@ function sw(name){
   if(name==="mapa")setTimeout(function(){if(!mapInst)initMap();else{mapInst.invalidateSize();drawAllLines();drawPuntos();}},100);
   if(name==="tramos"){renderTramoList();buildEstadoFilters();}
   if(name==="bitacora")renderBitList();
-  if(name==="rutas"){renderRutasList();if(editingRoute)selEditRoute(editingRoute);setTimeout(setupKMZDropZone,50);}
+  if(name==="rutas"){renderRutasList();if(editingRoute)selEditRoute(editingRoute);setTimeout(setupKMZDropZone,50);setTimeout(setupUpmeDropZone,50);}
 }
 
 // ─── MODAL ───────────────────────────────────────────────────
@@ -3103,12 +3127,40 @@ function doFusionarRuta(sourceId){
   toast(moved.length+' tramo(s) movidos a "'+target.nombre+'" · "'+source.nombre+'" eliminada');
 }
 
-// ─── INTEGRACIÓN ANI (sig.ani.gov.co) — SigAni/ConcesionesCarreteras ──
-// Servicio público ArcGIS Server (v10.6) de la Agencia Nacional de Infraestructura.
-// No expone CORS, así que se consulta vía JSONP (soportado nativamente por ArcGIS REST
+// ─── INTEGRACIÓN ANI (sig.ani.gov.co) — SigAni/ConcesionesCarreteras + ConcesionesFerreas ──
+// Servicios públicos ArcGIS Server (v10.6) de la Agencia Nacional de Infraestructura.
+// No exponen CORS, así que se consultan vía JSONP (soportado nativamente por ArcGIS REST
 // cuando se agrega el parámetro callback). outSR=4326 pide la geometría ya en lat/lng WGS84,
 // evitando reproyectar manualmente desde el CRS interno del servidor.
-const ANI_QUERY_URL='https://sig.ani.gov.co/arcgissrv/rest/services/SigAni/ConcesionesCarreteras/FeatureServer/0/query';
+const ANI_LAYERS={
+  carretera:{
+    label:'concesiones carreteras',
+    url:'https://sig.ani.gov.co/arcgissrv/rest/services/SigAni/ConcesionesCarreteras/FeatureServer/0/query',
+    nameField:'NOMBRE', searchFields:['NOMBRE','SIGLA'],
+    outFields:'NOMBRE,SIGLA,GEN,OLA_4G,ESTADO,ID_MT',
+    subtitle:function(a){return [a.SIGLA,a.GEN?('Gen. '+a.GEN):null,a.OLA_4G,a.ESTADO].filter(Boolean).join(' · ');},
+    concesion:function(a){return a.SIGLA||a.NOMBRE||'';},
+    color:'#FBBF24'
+  },
+  ferrea:{
+    label:'concesiones férreas',
+    url:'https://sig.ani.gov.co/arcgissrv/rest/services/SigAni/ConcesionesFerreas/MapServer/0/query',
+    nameField:'CONCESION', searchFields:['CONCESION','ADMIN'],
+    outFields:'CONCESION,ADMIN,TIPO_CONTR,CONTRATO,CCNARIO,COD_PR_IRE',
+    subtitle:function(a){return [a.ADMIN,a.TIPO_CONTR,a.CONTRATO].filter(Boolean).join(' · ');},
+    concesion:function(a){return a.CONCESION||'';},
+    color:'#A78BFA'
+  }
+};
+var aniActiveType='carretera';
+function aniTypeChanged(){
+  aniActiveType=document.getElementById('ani-type').value;
+  var status=document.getElementById('ani-search-status'); if(status)status.textContent='';
+  var resultsEl=document.getElementById('ani-search-results'); if(resultsEl)resultsEl.innerHTML='';
+  window._aniSearchResults=[];
+  var chk=document.getElementById('ani-layer-toggle');
+  if(chk&&chk.checked){ hideAllAniLayers(); window._aniLayerWantedType=aniActiveType; showAniLayer(); }
+}
 
 function arcgisJsonp(baseUrl,params){
   return new Promise(function(resolve,reject){
@@ -3129,11 +3181,11 @@ function arcgisJsonp(baseUrl,params){
   });
 }
 
-function aniQuery(where,outFields,returnGeometry){
-  return arcgisJsonp(ANI_QUERY_URL,{
+function aniQuery(where,cfg){
+  return arcgisJsonp(cfg.url,{
     where: where||'1=1',
-    outFields: outFields||'NOMBRE,SIGLA,GEN,OLA_4G,ESTADO,ID_MT',
-    returnGeometry: returnGeometry===false?'false':'true',
+    outFields: cfg.outFields,
+    returnGeometry:'true',
     outSR:'4326',
     geometryPrecision:'5',
     f:'json'
@@ -3170,28 +3222,29 @@ function aniRutaSelectOptions(){
 }
 
 function aniSearch(){
+  var cfg=ANI_LAYERS[aniActiveType];
   var qEl=document.getElementById('ani-search-q');
   var term=(qEl&&qEl.value||'').trim();
   var status=document.getElementById('ani-search-status');
   var resultsEl=document.getElementById('ani-search-results');
-  if(!term){status.textContent='Escribe un nombre o sigla de concesión (ej: VINUS, Ruta del Mar, Autopistas del Caribe).';return;}
-  status.textContent='Consultando sig.ani.gov.co…';
+  if(!term){status.textContent='Escribe un nombre para buscar entre las '+cfg.label+' (ej: VINUS, Ruta del Mar).';return;}
+  status.textContent='Consultando sig.ani.gov.co ('+cfg.label+')…';
   resultsEl.innerHTML='';
   var esc=term.toUpperCase().replace(/'/g,"''");
-  var where="UPPER(NOMBRE) LIKE '%"+esc+"%' OR UPPER(SIGLA) LIKE '%"+esc+"%'";
-  aniQuery(where,'NOMBRE,SIGLA,GEN,OLA_4G,ESTADO,ID_MT',true).then(function(data){
+  var where=cfg.searchFields.map(function(fld){return "UPPER("+fld+") LIKE '%"+esc+"%'";}).join(' OR ');
+  aniQuery(where,cfg).then(function(data){
     var feats=(data&&data.features)||[];
     window._aniSearchResults=feats;
-    if(!feats.length){ status.textContent='Sin resultados en ANI para "'+term+'". Prueba con otro nombre o la sigla exacta de la concesión.'; return; }
-    status.textContent=feats.length+' concesión(es) encontrada(s) en ANI.';
+    if(!feats.length){ status.textContent='Sin resultados para "'+term+'" entre las '+cfg.label+'. Prueba con otro nombre o sigla.'; return; }
+    status.textContent=feats.length+' resultado(s) encontrado(s).';
     resultsEl.innerHTML=feats.map(function(f,i){
       var a=f.attributes||{};
       var parts=aniFeatureToParts(f);
       var km=Math.round(parts.reduce(function(s,p){return s+polylineKm(p);},0));
       return '<div class="ti-item" style="cursor:default">'
         +'<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">'
-        +'<div><div class="ti-n">'+(a.NOMBRE||'Sin nombre')+'</div>'
-        +'<div class="ti-m">'+[a.SIGLA,a.GEN?('Gen. '+a.GEN):null,a.OLA_4G,a.ESTADO].filter(Boolean).join(' · ')+(parts.length?' · ~'+km+' km · '+parts.length+' tramo(s)':' · sin geometría')+'</div></div>'
+        +'<div><div class="ti-n">'+(a[cfg.nameField]||'Sin nombre')+'</div>'
+        +'<div class="ti-m">'+cfg.subtitle(a)+(parts.length?' · ~'+km+' km · '+parts.length+' tramo(s)':' · sin geometría')+'</div></div>'
         +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
         +'<select class="inp" id="ani-r-'+i+'" style="width:auto;font-size:10px;padding:3px 7px;height:auto">'+aniRutaSelectOptions()+'</select>'
         +'<button class="btn btn-g btn-sm" onclick="aniPreview('+i+')" '+(parts.length?'':'disabled')+'>👁 Ver</button>'
@@ -3205,9 +3258,10 @@ function aniSearch(){
 }
 
 function aniPreview(i){
+  var cfg=ANI_LAYERS[aniActiveType];
   var f=(window._aniSearchResults||[])[i]; if(!f)return;
   var parts=aniFeatureToParts(f);
-  if(!parts.length){toast('Esta concesión no trae geometría para previsualizar','err');return;}
+  if(!parts.length){toast('Este registro no trae geometría para previsualizar','err');return;}
   sw('mapa');
   setTimeout(function(){
     if(!mapInst)initMap();
@@ -3215,24 +3269,26 @@ function aniPreview(i){
     window._aniPreviewLayer=L.layerGroup().addTo(mapInst);
     var allPts=[];
     parts.forEach(function(c){
-      L.polyline(c,{color:'#FBBF24',weight:6,opacity:0.95,dashArray:'2,8',lineCap:'round'}).addTo(window._aniPreviewLayer);
+      L.polyline(c,{color:cfg.color,weight:6,opacity:0.95,dashArray:'2,8',lineCap:'round'}).addTo(window._aniPreviewLayer);
       allPts=allPts.concat(c);
     });
     if(allPts.length){ var b=L.latLngBounds(allPts); if(b.isValid())mapInst.fitBounds(b,{padding:[40,40]}); }
-    toast('Vista previa de "'+(f.attributes&&f.attributes.NOMBRE||'')+'" · en amarillo punteado');
+    var a=f.attributes||{};
+    toast('Vista previa de "'+(a[cfg.nameField]||'')+'"');
   },120);
 }
 
 function aniImport(i){
+  var cfg=ANI_LAYERS[aniActiveType];
   var f=(window._aniSearchResults||[])[i]; if(!f)return;
   var a=f.attributes||{};
   var parts=aniFeatureToParts(f);
-  if(!parts.length){toast('Esta concesión no trae geometría para importar','err');return;}
+  if(!parts.length){toast('Este registro no trae geometría para importar','err');return;}
   var sel=document.getElementById('ani-r-'+i);
   var rutaVal=sel?sel.value:'';
   if(!rutaVal){toast('Elige a qué ruta asignar el tramo importado','err');return;}
   function doImport(rutaId){
-    var nombreBase=a.NOMBRE||a.SIGLA||'Concesión ANI';
+    var nombreBase=a[cfg.nameField]||'Concesión ANI';
     var nuevos=parts.map(function(coords,idx){
       return {
         id: uid(),
@@ -3243,7 +3299,7 @@ function aniImport(i){
         km: Math.round(polylineKm(coords)),
         proxima: 'Verificar trazado importado de ANI (SIG oficial) contra info propia',
         fp: '',
-        concesion: a.SIGLA||a.NOMBRE||'',
+        concesion: cfg.concesion(a),
         coords: coords,
         parent_id: null,
         tipo_elemento: 'tramo'
@@ -3260,38 +3316,181 @@ function aniImport(i){
   else{ doImport(rutaVal); }
 }
 
-// Capa de referencia: dibuja TODAS las concesiones ANI sobre el mapa (solo lectura, no toca Supabase)
+// Capa de referencia: dibuja TODAS las concesiones ANI del tipo activo sobre el mapa (solo lectura, no toca Supabase)
+window._aniLayerGroups={};
 function toggleAniLayer(on){
-  window._aniLayerWanted=!!on;
-  if(!mapInst){ if(on)sw('mapa'); return; }
-  if(on) showAniLayer(); else hideAniLayer();
+  if(!on){ window._aniLayerWanted=false; hideAllAniLayers(); return; }
+  window._aniLayerWanted=true; window._aniLayerWantedType=aniActiveType;
+  if(!mapInst){ sw('mapa'); return; }
+  showAniLayer();
 }
-function hideAniLayer(){
-  if(window._aniLayerGroup){ try{mapInst.removeLayer(window._aniLayerGroup);}catch(e){} }
+function hideAllAniLayers(){
+  Object.keys(window._aniLayerGroups).forEach(function(t){
+    var g=window._aniLayerGroups[t]; if(g&&mapInst){try{mapInst.removeLayer(g);}catch(e){}}
+  });
 }
 function showAniLayer(){
-  if(!mapInst)return;
-  if(window._aniLayerGroup){ try{mapInst.addLayer(window._aniLayerGroup);}catch(e){} return; }
+  if(!mapInst||!window._aniLayerWanted)return;
+  var type=window._aniLayerWantedType||aniActiveType;
+  var cfg=ANI_LAYERS[type];
+  if(window._aniLayerGroups[type]){ try{mapInst.addLayer(window._aniLayerGroups[type]);}catch(e){} return; }
   var status=document.getElementById('ani-search-status');
-  if(status)status.textContent='Cargando capa completa de concesiones ANI…';
-  aniQuery('1=1','NOMBRE,SIGLA,GEN,OLA_4G,ESTADO',true).then(function(data){
+  if(status)status.textContent='Cargando capa completa de '+cfg.label+'…';
+  aniQuery('1=1',cfg).then(function(data){
     var feats=(data&&data.features)||[];
-    window._aniLayerGroup=L.layerGroup().addTo(mapInst);
+    var grp=L.layerGroup().addTo(mapInst);
+    window._aniLayerGroups[type]=grp;
     feats.forEach(function(f){
       var a=f.attributes||{};
       aniFeatureToParts(f).forEach(function(coords){
-        var line=L.polyline(coords,{color:'#FBBF24',weight:3,opacity:0.75,dashArray:'6,6',lineCap:'round'});
-        line.bindPopup('<b>'+(a.NOMBRE||'Concesión ANI')+'</b><br><small>'+[a.SIGLA,a.GEN?('Gen. '+a.GEN):null,a.ESTADO].filter(Boolean).join(' · ')+'</small><br><small style="color:#888">Fuente: sig.ani.gov.co</small>',{maxWidth:220});
-        line.addTo(window._aniLayerGroup);
+        var line=L.polyline(coords,{color:cfg.color,weight:3,opacity:0.75,dashArray:'6,6',lineCap:'round'});
+        line.bindPopup('<b>'+(a[cfg.nameField]||'Concesión ANI')+'</b><br><small>'+cfg.subtitle(a)+'</small><br><small style="color:#888">Fuente: sig.ani.gov.co</small>',{maxWidth:220});
+        line.addTo(grp);
       });
     });
-    if(status)status.textContent=feats.length+' concesión(es) ANI cargadas como capa de referencia.';
+    if(status)status.textContent=feats.length+' '+cfg.label+' cargada(s) como capa de referencia.';
   }).catch(function(err){
     console.error('[ANI layer]',err);
-    if(status)status.innerHTML='<span style="color:var(--cr)">No se pudo cargar la capa ANI: '+err.message+'</span>';
+    if(status)status.innerHTML='<span style="color:var(--cr)">No se pudo cargar la capa: '+err.message+'</span>';
     var chk=document.getElementById('ani-layer-toggle'); if(chk)chk.checked=false;
     window._aniLayerWanted=false;
   });
+}
+
+// ─── IMPORTADOR GENÉRICO DE ARCHIVO (UPME u otra fuente sin API pública anónima) ──
+// El servicio de UPME (geo.upme.gov.co/.../SISTEMA_DE_TRANSMISIÓN_MIL1) exige un token de su
+// portal (a diferencia de ANI) y no responde consultas anónimas desde otra página, así que en
+// vez de JSONP se ofrece este importador de archivo: acepta el GeoJSON/KML/KMZ que se descargue
+// desde el visor de UPME (o cualquier otra fuente) y lo trata igual que un resultado de ANI.
+function setupUpmeDropZone(){
+  var inp=document.getElementById('upme-input');
+  if(!inp||inp._upmeReady)return;
+  inp._upmeReady=true;
+  inp.addEventListener('change',function(e){ if(e.target.files&&e.target.files[0])handleUpmeFile(e.target.files[0]); });
+}
+
+function handleUpmeFile(file){
+  var status=document.getElementById('upme-upload-status');
+  status.textContent='Leyendo '+file.name+'…'; status.style.color='var(--muted)';
+  var name=file.name.toLowerCase();
+  if(name.endsWith('.geojson')||name.endsWith('.json')){
+    file.text().then(function(txt){
+      try{ upmeSetResults(geojsonToUpmeFeatures(JSON.parse(txt))); }
+      catch(e){ status.textContent='Error leyendo GeoJSON: '+e.message; status.style.color='var(--cr)'; }
+    });
+  } else if(name.endsWith('.kml')){
+    file.text().then(function(txt){
+      try{ upmeSetResults(kmlParsedToUpmeFeatures(parseKMLString(txt))); }
+      catch(e){ status.textContent='Error leyendo KML: '+e.message; status.style.color='var(--cr)'; }
+    });
+  } else if(name.endsWith('.kmz')){
+    file.arrayBuffer().then(function(buf){
+      function go(){
+        JSZip.loadAsync(buf).then(function(zip){
+          var kmlFile=null;
+          zip.forEach(function(path,f){ if(path.toLowerCase().endsWith('.kml')&&!kmlFile)kmlFile=f; });
+          if(!kmlFile){ status.textContent='No se encontró KML dentro del KMZ'; status.style.color='var(--cr)'; return; }
+          return kmlFile.async('string').then(function(kmlStr){ upmeSetResults(kmlParsedToUpmeFeatures(parseKMLString(kmlStr))); });
+        }).catch(function(err){ status.textContent='Error abriendo KMZ: '+err.message; status.style.color='var(--cr)'; });
+      }
+      if(typeof JSZip==='undefined'){
+        var script=document.createElement('script');
+        script.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+        script.onload=go;
+        script.onerror=function(){status.textContent='Error cargando librería ZIP.';status.style.color='var(--cr)';};
+        document.head.appendChild(script);
+      } else go();
+    });
+  } else {
+    status.textContent='Formato no soportado. Usa .geojson, .kml o .kmz';
+    status.style.color='var(--cr)';
+  }
+}
+
+function geojsonToUpmeFeatures(gj){
+  var feats=(gj.type==='FeatureCollection')?(gj.features||[]):(gj.type==='Feature'?[gj]:[]);
+  var out=[];
+  feats.forEach(function(f){
+    var g=f.geometry; if(!g)return;
+    var lines=[];
+    if(g.type==='LineString') lines=[g.coordinates];
+    else if(g.type==='MultiLineString') lines=g.coordinates;
+    else return;
+    var parts=lines.map(function(line){
+      return line.map(function(pt){return [pt[1],pt[0]];}).filter(function(p){return p[0]>=1&&p[0]<=12&&p[1]>=-80&&p[1]<=-65;});
+    }).filter(function(p){return p.length>1;});
+    if(!parts.length)return;
+    var props=f.properties||{};
+    var nombre=props.NOMBRE||props.Nombre||props.nombre||props.NAME||props.Name||props.name||props.CIRCUITO||props.LINEA||'Red UPME';
+    out.push({nombre:nombre,parts:parts});
+  });
+  return out;
+}
+
+function kmlParsedToUpmeFeatures(parsed){
+  var out=[];
+  (parsed.tramos||[]).forEach(function(t){
+    if(t.coords&&t.coords.length>1) out.push({nombre:t.name||t.tramo||'Red UPME',parts:[t.coords]});
+  });
+  return out;
+}
+
+function upmeSetResults(feats){
+  window._upmeResults=feats;
+  var status=document.getElementById('upme-upload-status');
+  var resultsEl=document.getElementById('upme-search-results');
+  if(!feats.length){ status.textContent='No se encontraron trazados (líneas) en el archivo.'; status.style.color='var(--cr)'; resultsEl.innerHTML=''; return; }
+  status.textContent=feats.length+' trazado(s) encontrado(s) en el archivo.'; status.style.color='var(--muted)';
+  resultsEl.innerHTML=feats.map(function(f,i){
+    var km=Math.round(f.parts.reduce(function(s,p){return s+polylineKm(p);},0));
+    return '<div class="ti-item" style="cursor:default">'
+      +'<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">'
+      +'<div><div class="ti-n">'+f.nombre+'</div><div class="ti-m">~'+km+' km · '+f.parts.length+' tramo(s)</div></div>'
+      +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+      +'<select class="inp" id="upme-r-'+i+'" style="width:auto;font-size:10px;padding:3px 7px;height:auto">'+aniRutaSelectOptions()+'</select>'
+      +'<button class="btn btn-g btn-sm" onclick="upmePreview('+i+')">👁 Ver</button>'
+      +'<button class="btn btn-p btn-sm" onclick="upmeImport('+i+')">⬇ Importar</button>'
+      +'</div></div></div>';
+  }).join('');
+}
+
+function upmePreview(i){
+  var f=(window._upmeResults||[])[i]; if(!f)return;
+  sw('mapa');
+  setTimeout(function(){
+    if(!mapInst)initMap();
+    if(window._aniPreviewLayer){try{window._aniPreviewLayer.remove();}catch(e){}}
+    window._aniPreviewLayer=L.layerGroup().addTo(mapInst);
+    var allPts=[];
+    f.parts.forEach(function(c){ L.polyline(c,{color:'#EF4444',weight:5,opacity:0.95,dashArray:'2,8',lineCap:'round'}).addTo(window._aniPreviewLayer); allPts=allPts.concat(c); });
+    if(allPts.length){var b=L.latLngBounds(allPts); if(b.isValid())mapInst.fitBounds(b,{padding:[40,40]});}
+    toast('Vista previa de "'+f.nombre+'"');
+  },120);
+}
+
+function upmeImport(i){
+  var f=(window._upmeResults||[])[i]; if(!f)return;
+  var sel=document.getElementById('upme-r-'+i);
+  var rutaVal=sel?sel.value:'';
+  if(!rutaVal){toast('Elige a qué ruta asignar el tramo importado','err');return;}
+  function doImport(rutaId){
+    var nuevos=f.parts.map(function(coords,idx){
+      return {
+        id:uid(), tramo: f.parts.length>1?(f.nombre+' — Tramo '+(idx+1)+'/'+f.parts.length):f.nombre,
+        ruta:rutaId, estado:'Inicio - Sin Gestión', actor:'UPME',
+        km:Math.round(polylineKm(coords)), proxima:'Verificar trazado importado de UPME contra info propia', fp:'',
+        concesion:'UPME', coords:coords, parent_id:null, tipo_elemento:'tramo'
+      };
+    });
+    tramos=tramos.concat(nuevos);
+    sbUpsert('tramos',nuevos).catch(function(e){console.warn('sbUpsert UPME import:',e); toast('Importado localmente, pero falló el guardado en base de datos: '+e.message,'err');});
+    renderAll(); renderRutasList(); renderRouteFilters();
+    if(mapInst)drawAllLines();
+    if(editingRoute===rutaId)selEditRoute(rutaId);
+    toast(nuevos.length+' tramo(s) de "'+f.nombre+'" importados desde UPME a "'+(routes[rutaId]?routes[rutaId].nombre:rutaId)+'"');
+  }
+  if(rutaVal==='__new__'){ kmzPromptNewRuta(function(newId){ doImport(newId); }); }
+  else{ doImport(rutaVal); }
 }
 
 function setupDropZone(){

@@ -216,10 +216,11 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
             <div class="leg-r"><span style="width:9px;height:9px;border-radius:50%;background:#F59E0B;display:inline-block;margin-right:3px"></span>Obst&#225;culo</div>
           </div>
           <div style="margin-top:7px;padding-top:7px;border-top:1px solid rgba(255,255,255,.1)">
-            <div class="map-legend-t">Referencia ANI (SIG oficial)</div>
+            <div class="map-legend-t">Referencia ANI / UPME (SIG oficial)</div>
             <div class="leg-r"><span style="width:22px;height:0;border-top:3px dashed #FBBF24;display:inline-block;margin-right:3px"></span>Concesi&#243;n carretera</div>
             <div class="leg-r"><span style="width:22px;height:0;border-top:3px dashed #A78BFA;display:inline-block;margin-right:3px"></span>Concesi&#243;n f&#233;rrea</div>
-            <div class="leg-r"><span style="width:22px;height:0;border-top:3px dashed #EF4444;display:inline-block;margin-right:3px"></span>Importado (UPME/archivo)</div>
+            <div class="leg-r"><span style="width:22px;height:0;border-top:3px dashed #22D3EE;display:inline-block;margin-right:3px"></span>L&#237;nea transmisi&#243;n (UPME)</div>
+            <div class="leg-r"><span style="width:22px;height:0;border-top:3px dashed #EF4444;display:inline-block;margin-right:3px"></span>Importado (archivo)</div>
           </div>
         </div>
         <div class="map-side" id="map-side">
@@ -354,18 +355,19 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
 
     <div class="card" style="margin-top:14px">
       <div class="card-h">
-        <span class="card-t">&#128752; Importar desde ANI (SIG oficial)</span>
-        <span style="font-size:9px;background:rgba(245,158,11,.15);color:var(--eg);border:1px solid rgba(245,158,11,.3);padding:2px 9px;border-radius:4px;font-weight:700">sig.ani.gov.co</span>
+        <span class="card-t">&#128752; Importar desde ANI / UPME (SIG oficial)</span>
+        <span style="font-size:9px;background:rgba(245,158,11,.15);color:var(--eg);border:1px solid rgba(245,158,11,.3);padding:2px 9px;border-radius:4px;font-weight:700">servicios p&#250;blicos</span>
       </div>
       <div class="card-b">
-        <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">Busca una concesi&#243;n (vial o f&#233;rrea) directamente en la capa p&#250;blica de ANI y trae su trazado oficial como tramo(s) nuevos. No reemplaza tus tramos KMZ existentes &#8212; se importan aparte y los asignas a la ruta que quieras.</p>
+        <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">Busca un registro (concesi&#243;n vial/f&#233;rrea de ANI, o l&#237;nea de transmisi&#243;n de UPME) directamente en la capa p&#250;blica correspondiente y trae su trazado oficial como tramo(s) nuevos. No reemplaza tus tramos KMZ existentes &#8212; se importan aparte y los asignas a la ruta que quieras.</p>
         <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
           <select class="inp" id="ani-type" style="width:auto" onchange="aniTypeChanged()">
-            <option value="carretera">&#128739; Concesiones carreteras</option>
-            <option value="ferrea">&#128646; Concesiones f&#233;rreas</option>
+            <option value="carretera">&#128739; Concesiones carreteras (ANI)</option>
+            <option value="ferrea">&#128646; Concesiones f&#233;rreas (ANI)</option>
+            <option value="upme_lineas">&#9889; L&#237;neas de transmisi&#243;n (UPME)</option>
           </select>
-          <input class="inp" id="ani-search-q" placeholder="Ej: VINUS, Autopistas del Caribe, Ruta del Mar..." style="flex:1;min-width:220px" onkeydown="if(event.key==='Enter')aniSearch()">
-          <button class="btn btn-p btn-sm" onclick="aniSearch()">&#128269; Buscar en ANI</button>
+          <input class="inp" id="ani-search-q" placeholder="Ej: VINUS, Ruta del Mar, San Carlos, Esmeralda..." style="flex:1;min-width:220px" onkeydown="if(event.key==='Enter')aniSearch()">
+          <button class="btn btn-p btn-sm" onclick="aniSearch()">&#128269; Buscar</button>
           <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);cursor:pointer;white-space:nowrap">
             <input type="checkbox" id="ani-layer-toggle" onchange="toggleAniLayer(this.checked)" style="accent-color:#F59E0B"> Ver todas en el mapa
           </label>
@@ -377,16 +379,16 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
 
     <div class="card" style="margin-top:14px">
       <div class="card-h">
-        <span class="card-t">&#9889; Redes de alta tensi&#243;n (UPME)</span>
-        <span style="font-size:9px;background:rgba(239,68,68,.13);color:var(--cr);border:1px solid rgba(239,68,68,.3);padding:2px 9px;border-radius:4px;font-weight:700">requiere archivo</span>
+        <span class="card-t">&#9889; Importar archivo (UPME u otra fuente)</span>
+        <span style="font-size:9px;background:rgba(59,130,246,.13);color:var(--acc);border:1px solid rgba(59,130,246,.3);padding:2px 9px;border-radius:4px;font-weight:700">opcional</span>
       </div>
       <div class="card-b">
-        <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">El visor de UPME (Sistema de Transmisi&#243;n Nacional, <code>sig.upme.gov.co</code>) usa un servicio <code>geo.upme.gov.co/.../SISTEMA_DE_TRANSMISI&Oacute;N_MIL1</code> que exige un token de su portal &#8212; a diferencia de ANI, no responde consultas anónimas desde otra p&#225;gina, as&#237; que no se puede conectar en vivo igual que arriba. La v&#237;a confiable: descarga la capa de l&#237;neas de transmisi&#243;n desde el visor de UPME (bot&#243;n de descarga/exportar del mapa, o solicit&#225;ndola a UPME) como <b style="color:#fff">GeoJSON, KML/KMZ o Shapefile</b>, y súbela aqu&#237;.</p>
+        <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">Las l&#237;neas de transmisi&#243;n de UPME ya se buscan e importan en vivo arriba. Usa esto solo para casos que el buscador no cubre &#8212; por ejemplo subestaciones, u otro archivo GeoJSON/KML/KMZ que te compartan (de UPME o de otra fuente).</p>
         <input type="file" id="upme-input" accept=".geojson,.json,.kml,.kmz,.zip" style="display:none">
         <label for="upme-input" class="drop-zone" id="upme-drop-zone" style="display:block;cursor:pointer">
           <div style="font-size:36px;margin-bottom:8px">&#9889;</div>
-          <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:4px">Sube el archivo exportado de UPME (.geojson, .kml/.kmz)</div>
-          <div style="font-size:10px;color:var(--muted2)">Se importa como tramo(s) de referencia, igual que el importador ANI</div>
+          <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:4px">Sube un archivo (.geojson, .kml/.kmz)</div>
+          <div style="font-size:10px;color:var(--muted2)">Se importa como tramo(s) de referencia, igual que el buscador de arriba</div>
         </label>
         <div id="upme-upload-status" style="font-size:11px;color:var(--muted);margin-top:8px"></div>
         <div id="upme-search-results" style="display:flex;flex-direction:column;gap:8px;margin-top:8px"></div>
@@ -3140,7 +3142,7 @@ const ANI_LAYERS={
     outFields:'NOMBRE,SIGLA,GEN,OLA_4G,ESTADO,ID_MT',
     subtitle:function(a){return [a.SIGLA,a.GEN?('Gen. '+a.GEN):null,a.OLA_4G,a.ESTADO].filter(Boolean).join(' · ');},
     concesion:function(a){return a.SIGLA||a.NOMBRE||'';},
-    color:'#FBBF24'
+    color:'#FBBF24', actor:'ANI'
   },
   ferrea:{
     label:'concesiones férreas',
@@ -3149,7 +3151,18 @@ const ANI_LAYERS={
     outFields:'CONCESION,ADMIN,TIPO_CONTR,CONTRATO,CCNARIO,COD_PR_IRE',
     subtitle:function(a){return [a.ADMIN,a.TIPO_CONTR,a.CONTRATO].filter(Boolean).join(' · ');},
     concesion:function(a){return a.CONCESION||'';},
-    color:'#A78BFA'
+    color:'#A78BFA', actor:'ANI'
+  },
+  // UPME sí es público y anónimo (a diferencia del visor de mapviewer que exige login):
+  // Capas_EnergiaElectrica/Sistema_transmision_lineas_construidas, confirmado con datos reales.
+  upme_lineas:{
+    label:'líneas de transmisión (UPME)',
+    url:'https://geo.upme.gov.co/server/rest/services/Capas_EnergiaElectrica/Sistema_transmision_lineas_construidas/FeatureServer/17/query',
+    nameField:'nombre_trazado', searchFields:['nombre_trazado','nombre_subestacion_inicio','nombre_subestacion_fin'],
+    outFields:'nombre_trazado,sistema,tension,nivel_tension_circuito,longitud_tramo_km,nombre_subestacion_inicio,nombre_subestacion_fin,vigencia',
+    subtitle:function(a){return [a.sistema,a.tension?(a.tension+' kV'):null,(a.nombre_subestacion_inicio&&a.nombre_subestacion_fin)?(a.nombre_subestacion_inicio+' → '+a.nombre_subestacion_fin):null,a.vigencia].filter(Boolean).join(' · ');},
+    concesion:function(a){return 'UPME'+(a.sistema?(' · '+a.sistema):'');},
+    color:'#22D3EE', actor:'UPME'
   }
 };
 var aniActiveType='carretera';
@@ -3206,7 +3219,7 @@ function polylineKm(coords){
 // path a [lat,lng] (formato que usa el resto de la app) y filtramos ruido fuera de Colombia.
 function aniFeatureToParts(feature){
   var paths=(feature.geometry&&feature.geometry.paths)||[];
-  return paths.map(function(path){
+  var parts=paths.map(function(path){
     var coords=[];
     for(var i=0;i<path.length;i++){
       var lng=path[i][0],lat=path[i][1];
@@ -3214,6 +3227,11 @@ function aniFeatureToParts(feature){
     }
     return coords;
   }).filter(function(c){return c.length>1;});
+  // Algunas capas (p. ej. UPME) traen fragmentos degenerados de pocos metros junto al trazado
+  // real (artefactos de digitalización cerca de subestaciones) — se descartan para no llenar
+  // la lista de tramos con micro-segmentos sin sentido, salvo que sea la única geometría.
+  var real=parts.filter(function(c){return polylineKm(c)>=0.3;});
+  return real.length?real:parts;
 }
 function aniRutaSelectOptions(){
   return '<option value="">— elegir ruta —</option>'
@@ -3288,16 +3306,17 @@ function aniImport(i){
   var rutaVal=sel?sel.value:'';
   if(!rutaVal){toast('Elige a qué ruta asignar el tramo importado','err');return;}
   function doImport(rutaId){
-    var nombreBase=a[cfg.nameField]||'Concesión ANI';
+    var nombreBase=a[cfg.nameField]||'Registro importado';
+    var srcActor=cfg.actor||'ANI';
     var nuevos=parts.map(function(coords,idx){
       return {
         id: uid(),
         tramo: parts.length>1?(nombreBase+' — Tramo '+(idx+1)+'/'+parts.length):nombreBase,
         ruta: rutaId,
         estado: 'Inicio - Sin Gestión',
-        actor: 'ANI',
+        actor: srcActor,
         km: Math.round(polylineKm(coords)),
-        proxima: 'Verificar trazado importado de ANI (SIG oficial) contra info propia',
+        proxima: 'Verificar trazado importado de '+srcActor+' (SIG oficial) contra info propia',
         fp: '',
         concesion: cfg.concesion(a),
         coords: coords,
@@ -3310,7 +3329,7 @@ function aniImport(i){
     renderAll(); renderRutasList(); renderRouteFilters();
     if(mapInst)drawAllLines();
     if(editingRoute===rutaId)selEditRoute(rutaId);
-    toast(nuevos.length+' tramo(s) de "'+nombreBase+'" importados desde ANI a "'+(routes[rutaId]?routes[rutaId].nombre:rutaId)+'"');
+    toast(nuevos.length+' tramo(s) de "'+nombreBase+'" importados desde '+srcActor+' a "'+(routes[rutaId]?routes[rutaId].nombre:rutaId)+'"');
   }
   if(rutaVal==='__new__'){ kmzPromptNewRuta(function(newId){ doImport(newId); }); }
   else{ doImport(rutaVal); }

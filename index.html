@@ -220,6 +220,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
             <div class="leg-r"><span style="width:22px;height:0;border-top:3px dashed #FBBF24;display:inline-block;margin-right:3px"></span>Concesi&#243;n carretera</div>
             <div class="leg-r"><span style="width:22px;height:0;border-top:3px dashed #A78BFA;display:inline-block;margin-right:3px"></span>Concesi&#243;n f&#233;rrea</div>
             <div class="leg-r"><span style="width:22px;height:0;border-top:3px dashed #22D3EE;display:inline-block;margin-right:3px"></span>L&#237;nea transmisi&#243;n (UPME)</div>
+            <div class="leg-r"><span style="width:9px;height:9px;border-radius:50%;background:#F472B6;display:inline-block;margin-right:3px;border:1px solid #fff"></span>Subestaci&#243;n (UPME)</div>
             <div class="leg-r"><span style="width:22px;height:0;border-top:3px dashed #EF4444;display:inline-block;margin-right:3px"></span>Importado (archivo)</div>
           </div>
         </div>
@@ -365,6 +366,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
             <option value="carretera">&#128739; Concesiones carreteras (ANI)</option>
             <option value="ferrea">&#128646; Concesiones f&#233;rreas (ANI)</option>
             <option value="upme_lineas">&#9889; L&#237;neas de transmisi&#243;n (UPME)</option>
+            <option value="upme_subestaciones">&#127760; Subestaciones (UPME)</option>
           </select>
           <input class="inp" id="ani-search-q" placeholder="Ej: VINUS, Ruta del Mar, San Carlos, Esmeralda..." style="flex:1;min-width:220px" onkeydown="if(event.key==='Enter')aniSearch()">
           <button class="btn btn-p btn-sm" onclick="aniSearch()">&#128269; Buscar</button>
@@ -3163,6 +3165,17 @@ const ANI_LAYERS={
     subtitle:function(a){return [a.sistema,a.tension?(a.tension+' kV'):null,(a.nombre_subestacion_inicio&&a.nombre_subestacion_fin)?(a.nombre_subestacion_inicio+' → '+a.nombre_subestacion_fin):null,a.vigencia].filter(Boolean).join(' · ');},
     concesion:function(a){return 'UPME'+(a.sistema?(' · '+a.sistema):'');},
     color:'#22D3EE', actor:'UPME'
+  },
+  // Misma instancia de ArcGIS Server que las líneas (geo.upme.gov.co), capa 18, también pública
+  // y anónima — confirmado con datos reales (geometría esriGeometryPoint: {x,y}).
+  upme_subestaciones:{
+    label:'subestaciones (UPME)',
+    url:'https://geo.upme.gov.co/server/rest/services/Capas_EnergiaElectrica/sistema_transmision_subestaciones_construidas/FeatureServer/18/query',
+    nameField:'nombre_subestacion', searchFields:['nombre_subestacion','municipio','departamento'],
+    outFields:'nombre_subestacion,tipo_subestacion,configuracion,tension,sistema,departamento,municipio,nombre_propietario,vigencia,fecha_operacion',
+    subtitle:function(a){return [a.tipo_subestacion,a.tension?(a.tension+' kV'):null,a.municipio,a.departamento].filter(Boolean).join(' · ');},
+    concesion:function(a){return 'UPME'+(a.nombre_propietario?(' · '+a.nombre_propietario):'');},
+    color:'#F472B6', actor:'UPME', geomType:'point', puntoTipo:'Subestación UPME'
   }
 };
 var aniActiveType='carretera';
@@ -3233,6 +3246,14 @@ function aniFeatureToParts(feature){
   var real=parts.filter(function(c){return polylineKm(c)>=0.3;});
   return real.length?real:parts;
 }
+// Para capas de geometría puntual (p. ej. subestaciones UPME): Esri devuelve geometry={x,y}.
+function aniFeatureToPoint(feature){
+  var g=feature.geometry;
+  if(!g||typeof g.x!=='number'||typeof g.y!=='number')return null;
+  var lat=g.y,lng=g.x;
+  if(lat<1||lat>12||lng<-80||lng>-65)return null;
+  return {lat:Math.round(lat*1e6)/1e6,lng:Math.round(lng*1e6)/1e6};
+}
 function aniRutaSelectOptions(){
   return '<option value="">— elegir ruta —</option>'
     +getSortedRoutes().map(function(r){return '<option value="'+r.id+'">'+r.nombre+'</option>';}).join('')
@@ -3257,16 +3278,26 @@ function aniSearch(){
     status.textContent=feats.length+' resultado(s) encontrado(s).';
     resultsEl.innerHTML=feats.map(function(f,i){
       var a=f.attributes||{};
-      var parts=aniFeatureToParts(f);
-      var km=Math.round(parts.reduce(function(s,p){return s+polylineKm(p);},0));
+      var isPoint=cfg.geomType==='point';
+      var metaExtra, hasGeom;
+      if(isPoint){
+        var pt=aniFeatureToPoint(f);
+        hasGeom=!!pt;
+        metaExtra=hasGeom?' · punto':' · sin coordenadas';
+      }else{
+        var parts=aniFeatureToParts(f);
+        var km=Math.round(parts.reduce(function(s,p){return s+polylineKm(p);},0));
+        hasGeom=parts.length>0;
+        metaExtra=hasGeom?' · ~'+km+' km · '+parts.length+' tramo(s)':' · sin geometría';
+      }
       return '<div class="ti-item" style="cursor:default">'
         +'<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">'
         +'<div><div class="ti-n">'+(a[cfg.nameField]||'Sin nombre')+'</div>'
-        +'<div class="ti-m">'+cfg.subtitle(a)+(parts.length?' · ~'+km+' km · '+parts.length+' tramo(s)':' · sin geometría')+'</div></div>'
+        +'<div class="ti-m">'+cfg.subtitle(a)+metaExtra+'</div></div>'
         +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
         +'<select class="inp" id="ani-r-'+i+'" style="width:auto;font-size:10px;padding:3px 7px;height:auto">'+aniRutaSelectOptions()+'</select>'
-        +'<button class="btn btn-g btn-sm" onclick="aniPreview('+i+')" '+(parts.length?'':'disabled')+'>👁 Ver</button>'
-        +'<button class="btn btn-p btn-sm" onclick="aniImport('+i+')" '+(parts.length?'':'disabled')+'>⬇ Importar</button>'
+        +'<button class="btn btn-g btn-sm" onclick="aniPreview('+i+')" '+(hasGeom?'':'disabled')+'>👁 Ver</button>'
+        +'<button class="btn btn-p btn-sm" onclick="aniImport('+i+')" '+(hasGeom?'':'disabled')+'>⬇ Importar</button>'
         +'</div></div></div>';
     }).join('');
   }).catch(function(err){
@@ -3278,36 +3309,91 @@ function aniSearch(){
 function aniPreview(i){
   var cfg=ANI_LAYERS[aniActiveType];
   var f=(window._aniSearchResults||[])[i]; if(!f)return;
-  var parts=aniFeatureToParts(f);
-  if(!parts.length){toast('Este registro no trae geometría para previsualizar','err');return;}
+  var a=f.attributes||{};
   sw('mapa');
   setTimeout(function(){
     if(!mapInst)initMap();
     if(window._aniPreviewLayer){try{window._aniPreviewLayer.remove();}catch(e){}}
     window._aniPreviewLayer=L.layerGroup().addTo(mapInst);
+    if(cfg.geomType==='point'){
+      var pt=aniFeatureToPoint(f);
+      if(!pt){toast('Este registro no trae coordenadas para previsualizar','err');return;}
+      var marker=L.circleMarker([pt.lat,pt.lng],{radius:9,color:'#fff',weight:2,fillColor:cfg.color,fillOpacity:0.95}).addTo(window._aniPreviewLayer);
+      marker.bindPopup(aniBuildImportPopupHtml(f,cfg),{maxWidth:240}).openPopup();
+      mapInst.setView([pt.lat,pt.lng],13);
+      toast('Vista previa de "'+(a[cfg.nameField]||'')+'"');
+      return;
+    }
+    var parts=aniFeatureToParts(f);
+    if(!parts.length){toast('Este registro no trae geometría para previsualizar','err');return;}
     var allPts=[];
     parts.forEach(function(c){
-      L.polyline(c,{color:cfg.color,weight:6,opacity:0.95,dashArray:'2,8',lineCap:'round'}).addTo(window._aniPreviewLayer);
+      var line=L.polyline(c,{color:cfg.color,weight:6,opacity:0.95,dashArray:'2,8',lineCap:'round'}).addTo(window._aniPreviewLayer);
+      line.bindPopup(aniBuildImportPopupHtml(f,cfg),{maxWidth:240});
       allPts=allPts.concat(c);
     });
     if(allPts.length){ var b=L.latLngBounds(allPts); if(b.isValid())mapInst.fitBounds(b,{padding:[40,40]}); }
-    var a=f.attributes||{};
-    toast('Vista previa de "'+(a[cfg.nameField]||'')+'"');
+    toast('Vista previa de "'+(a[cfg.nameField]||'')+'" · clic en la línea para importarla directamente');
   },120);
 }
 
-function aniImport(i){
-  var cfg=ANI_LAYERS[aniActiveType];
-  var f=(window._aniSearchResults||[])[i]; if(!f)return;
-  var a=f.attributes||{};
-  var parts=aniFeatureToParts(f);
-  if(!parts.length){toast('Este registro no trae geometría para importar','err');return;}
-  var sel=document.getElementById('ani-r-'+i);
+// ─── Importación directa desde un popup del mapa (clic en línea/punto previsualizado o en la
+// capa completa "Ver todas en el mapa") — comparte el mismo core que el botón "Importar" de la
+// lista de resultados, vía aniImportFeature().
+window._aniPopupSeq=0;
+window._aniPopupFeatures={};
+function aniBuildImportPopupHtml(feature,cfg){
+  var pid=++window._aniPopupSeq;
+  window._aniPopupFeatures[pid]={feature:feature,cfg:cfg};
+  var a=feature.attributes||{};
+  var nombre=a[cfg.nameField]||'Sin nombre';
+  var fuente=(cfg.actor==='UPME')?'geo.upme.gov.co':'sig.ani.gov.co';
+  return '<div style="min-width:210px">'
+    +'<b>'+nombre+'</b><br><small>'+cfg.subtitle(a)+'</small><br>'
+    +'<small style="color:#888">Fuente: '+fuente+'</small>'
+    +'<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;align-items:center">'
+    +'<select class="inp" id="ani-pop-r-'+pid+'" style="width:auto;font-size:10px;padding:3px 6px;height:auto">'+aniRutaSelectOptions()+'</select>'
+    +'<button class="btn btn-p btn-sm" onclick="aniImportPopup('+pid+')">⬇ Importar aquí</button>'
+    +'</div></div>';
+}
+function aniImportPopup(pid){
+  var entry=window._aniPopupFeatures[pid]; if(!entry)return;
+  var sel=document.getElementById('ani-pop-r-'+pid);
   var rutaVal=sel?sel.value:'';
-  if(!rutaVal){toast('Elige a qué ruta asignar el tramo importado','err');return;}
+  if(!rutaVal){toast('Elige a qué ruta asignar','err');return;}
+  function afterRuta(rutaId){
+    aniImportFeature(entry.feature,entry.cfg,rutaId);
+    if(mapInst)mapInst.closePopup();
+  }
+  if(rutaVal==='__new__'){ kmzPromptNewRuta(function(newId){afterRuta(newId);}); }
+  else{ afterRuta(rutaVal); }
+}
+
+// Core de importación compartido: crea tramo(s) (líneas) o un punto (subestaciones) según
+// cfg.geomType. Usado tanto por aniImport() (botón de la lista) como por aniImportPopup() (clic
+// en el mapa).
+function aniImportFeature(f,cfg,rutaVal){
+  var a=f.attributes||{};
   function doImport(rutaId){
     var nombreBase=a[cfg.nameField]||'Registro importado';
     var srcActor=cfg.actor||'ANI';
+    if(cfg.geomType==='point'){
+      var pt=aniFeatureToPoint(f);
+      if(!pt){toast('Este registro no trae coordenadas para importar','err');return;}
+      var nuevo={
+        id: uid(), nombre: nombreBase, tipo: cfg.puntoTipo||'Punto', label: cfg.puntoTipo||'Punto',
+        lat: pt.lat, lng: pt.lng, ruta: rutaId, actor: srcActor, concesion: cfg.concesion(a),
+        color: cfg.color||'#94A3B8'
+      };
+      if(!window._dbPuntos)window._dbPuntos=[];
+      window._dbPuntos.push(nuevo);
+      sbUpsert('puntos',[nuevo]).catch(function(e){console.warn('sbUpsert punto import:',e); toast('Importado localmente, pero falló el guardado en base de datos: '+e.message,'err');});
+      drawPuntos();
+      toast('"'+nombreBase+'" importada desde '+srcActor+' a "'+(routes[rutaId]?routes[rutaId].nombre:rutaId)+'"');
+      return;
+    }
+    var parts=aniFeatureToParts(f);
+    if(!parts.length){toast('Este registro no trae geometría para importar','err');return;}
     var nuevos=parts.map(function(coords,idx){
       return {
         id: uid(),
@@ -3335,6 +3421,15 @@ function aniImport(i){
   else{ doImport(rutaVal); }
 }
 
+function aniImport(i){
+  var cfg=ANI_LAYERS[aniActiveType];
+  var f=(window._aniSearchResults||[])[i]; if(!f)return;
+  var sel=document.getElementById('ani-r-'+i);
+  var rutaVal=sel?sel.value:'';
+  if(!rutaVal){toast('Elige a qué ruta asignar el registro importado','err');return;}
+  aniImportFeature(f,cfg,rutaVal);
+}
+
 // Capa de referencia: dibuja TODAS las concesiones ANI del tipo activo sobre el mapa (solo lectura, no toca Supabase)
 window._aniLayerGroups={};
 function toggleAniLayer(on){
@@ -3360,14 +3455,21 @@ function showAniLayer(){
     var grp=L.layerGroup().addTo(mapInst);
     window._aniLayerGroups[type]=grp;
     feats.forEach(function(f){
-      var a=f.attributes||{};
+      if(cfg.geomType==='point'){
+        var pt=aniFeatureToPoint(f);
+        if(!pt)return;
+        var marker=L.circleMarker([pt.lat,pt.lng],{radius:6,color:'#fff',weight:1.5,fillColor:cfg.color,fillOpacity:0.85});
+        marker.bindPopup(aniBuildImportPopupHtml(f,cfg),{maxWidth:240});
+        marker.addTo(grp);
+        return;
+      }
       aniFeatureToParts(f).forEach(function(coords){
         var line=L.polyline(coords,{color:cfg.color,weight:3,opacity:0.75,dashArray:'6,6',lineCap:'round'});
-        line.bindPopup('<b>'+(a[cfg.nameField]||'Concesión ANI')+'</b><br><small>'+cfg.subtitle(a)+'</small><br><small style="color:#888">Fuente: sig.ani.gov.co</small>',{maxWidth:220});
+        line.bindPopup(aniBuildImportPopupHtml(f,cfg),{maxWidth:240});
         line.addTo(grp);
       });
     });
-    if(status)status.textContent=feats.length+' '+cfg.label+' cargada(s) como capa de referencia.';
+    if(status)status.textContent=feats.length+' '+cfg.label+' cargada(s) como capa de referencia · clic en cada una para importarla.';
   }).catch(function(err){
     console.error('[ANI layer]',err);
     if(status)status.innerHTML='<span style="color:var(--cr)">No se pudo cargar la capa: '+err.message+'</span>';

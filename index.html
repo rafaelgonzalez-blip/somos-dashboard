@@ -215,6 +215,10 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
             <div class="leg-r"><span style="width:9px;height:9px;border-radius:50%;background:#10B981;display:inline-block;margin-right:3px"></span>Puente</div>
             <div class="leg-r"><span style="width:9px;height:9px;border-radius:50%;background:#F59E0B;display:inline-block;margin-right:3px"></span>Obst&#225;culo</div>
           </div>
+          <div style="margin-top:7px;padding-top:7px;border-top:1px solid rgba(255,255,255,.1)">
+            <div class="map-legend-t">Referencia ANI (SIG oficial)</div>
+            <div class="leg-r"><span style="width:22px;height:0;border-top:3px dashed #FBBF24;display:inline-block;margin-right:3px"></span>Concesi&#243;n ANI</div>
+          </div>
         </div>
         <div class="map-side" id="map-side">
           <div class="ms-t">Tramos KMZ</div>
@@ -343,6 +347,25 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
           <div style="font-size:11px;color:var(--muted)" id="kmz-done-detail"></div>
           <button class="btn btn-g btn-sm" style="margin-top:14px" onclick="kmzReset()">Subir otro KMZ</button>
         </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="card-h">
+        <span class="card-t">&#128752; Importar desde ANI (SIG oficial)</span>
+        <span style="font-size:9px;background:rgba(245,158,11,.15);color:var(--eg);border:1px solid rgba(245,158,11,.3);padding:2px 9px;border-radius:4px;font-weight:700">sig.ani.gov.co</span>
+      </div>
+      <div class="card-b">
+        <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">Busca una concesi&#243;n vial por nombre o sigla directamente en la capa p&#250;blica de ANI (<code>SigAni/ConcesionesCarreteras</code>) y trae su trazado oficial como tramo(s) nuevos. No reemplaza tus tramos KMZ existentes &#8212; se importan aparte y los asignas a la ruta que quieras.</p>
+        <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+          <input class="inp" id="ani-search-q" placeholder="Ej: VINUS, Autopistas del Caribe, Ruta del Mar, C&#243;rdoba–Sucre..." style="flex:1;min-width:220px" onkeydown="if(event.key==='Enter')aniSearch()">
+          <button class="btn btn-p btn-sm" onclick="aniSearch()">&#128269; Buscar en ANI</button>
+          <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);cursor:pointer;white-space:nowrap">
+            <input type="checkbox" id="ani-layer-toggle" onchange="toggleAniLayer(this.checked)" style="accent-color:#F59E0B"> Ver todas las concesiones ANI en el mapa
+          </label>
+        </div>
+        <div id="ani-search-status" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
+        <div id="ani-search-results" style="display:flex;flex-direction:column;gap:8px"></div>
       </div>
     </div>
   </div>
@@ -907,6 +930,7 @@ function initMap(){
   renderLayerControls();
   renderMapLegend();
   renderMapLegend();
+  if(window._aniLayerWanted)showAniLayer();
   setTimeout(function(){
     drawPuntos();
     try{
@@ -1360,8 +1384,11 @@ function renderRutasList(){
           <div style="width:13px;height:13px;border-radius:50%;background:${r.color};flex-shrink:0"></div>
           <div><div style="font-size:12px;font-weight:600;color:#fff">${r.nombre}<span style="font-size:10px;color:var(--muted);margin-left:6px">#${(r.orden!==null&&r.orden!==undefined&&r.orden!==999)?r.orden:'?'}</span></div><div style="font-size:9px;color:var(--muted)">${rt.length} tramos · ${rt.reduce((s,t)=>s+t.km,0)} km</div></div>
         </div>
-        <div style="display:flex;gap:5px">
+        <div style="display:flex;gap:5px;align-items:center">
+          <button class="btn btn-g btn-sm" title="Subir orden" onclick="event.stopPropagation();moveRoute('${r.id}',-1)">↑</button>
+          <button class="btn btn-g btn-sm" title="Bajar orden" onclick="event.stopPropagation();moveRoute('${r.id}',1)">↓</button>
           <button class="btn btn-warn btn-sm" onclick="event.stopPropagation();openModal('edit-ruta','${r.id}')">Editar</button>
+          <button class="btn btn-g btn-sm" title="Fusionar esta ruta con otra" onclick="event.stopPropagation();openModal('fusionar-ruta','${r.id}')">⇄ Fusionar</button>
           <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();eliminarRuta('${r.id}')">×</button>
         </div>
       </div>
@@ -1607,6 +1634,26 @@ function openModal(type,id,preTramo){
       <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
         <button class="btn btn-p" onclick="saveEditRuta('${id}')">Guardar</button>
+      </div>
+    </div>`;
+  }
+
+  else if(type==="fusionar-ruta"){
+    const r=routes[id]; if(!r)return;
+    const rt=tramos.filter(t=>t.ruta===id);
+    const otras=Object.values(routes).filter(x=>x.id!==id);
+    mt.textContent="Fusionar ruta: "+r.nombre;
+    mb.innerHTML=`<div class="ff">
+      <p style="font-size:11px;color:var(--muted);line-height:1.7">Mueve los <b style="color:#fff">${rt.length} tramo(s)</b> de "<b style="color:#fff">${r.nombre}</b>" hacia otra ruta ya existente, y luego elimina "${r.nombre}". &Uacute;sala cuando dos rutas result&#243;n ser en realidad el mismo corredor, o cuando replanteaste c&#243;mo agrupar los tramos.</p>
+      <div class="fl"><label>Fusionar hacia</label>
+        <select class="inp" id="fr-target">
+          <option value="">— Selecciona ruta destino —</option>
+          ${otras.map(o=>`<option value="${o.id}">${o.nombre}</option>`).join("")||'<option value="" disabled>No hay otra ruta configurada</option>'}
+        </select>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
+        <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-danger" onclick="doFusionarRuta('${id}')">Fusionar y eliminar "${r.nombre}"</button>
       </div>
     </div>`;
   }
@@ -3035,6 +3082,216 @@ function kmzPromptNewRuta(callback){
   renderRouteFilters();
   toast('Ruta "'+nombre+'" creada · Guardada en base de datos');
   if(callback) callback(newId);
+}
+
+// ─── FUSIÓN DE RUTAS (reorganizar rutas replanteadas) ─────────
+function doFusionarRuta(sourceId){
+  var targetId=gv('fr-target');
+  if(!targetId){toast('Selecciona la ruta destino','err');return;}
+  if(targetId===sourceId){toast('Elige una ruta distinta a la de origen','err');return;}
+  var source=routes[sourceId], target=routes[targetId];
+  if(!source||!target)return;
+  var moved=tramos.filter(function(t){return t.ruta===sourceId;});
+  moved.forEach(function(t){ t.ruta=targetId; sbPatch('tramos',t.id,{ruta:targetId}).catch(function(e){console.warn('sbPatch fusion:',e);}); });
+  sbDelete('rutas',sourceId).catch(function(e){console.warn('Error eliminando ruta fusionada:',e);});
+  delete routes[sourceId];
+  editingRoute=(editingRoute===sourceId)?targetId:editingRoute;
+  closeModal();
+  renderAll(); renderRutasList(); renderRouteFilters();
+  if(mapInst)drawAllLines();
+  if(editingRoute)selEditRoute(editingRoute);
+  toast(moved.length+' tramo(s) movidos a "'+target.nombre+'" · "'+source.nombre+'" eliminada');
+}
+
+// ─── INTEGRACIÓN ANI (sig.ani.gov.co) — SigAni/ConcesionesCarreteras ──
+// Servicio público ArcGIS Server (v10.6) de la Agencia Nacional de Infraestructura.
+// No expone CORS, así que se consulta vía JSONP (soportado nativamente por ArcGIS REST
+// cuando se agrega el parámetro callback). outSR=4326 pide la geometría ya en lat/lng WGS84,
+// evitando reproyectar manualmente desde el CRS interno del servidor.
+const ANI_QUERY_URL='https://sig.ani.gov.co/arcgissrv/rest/services/SigAni/ConcesionesCarreteras/FeatureServer/0/query';
+
+function arcgisJsonp(baseUrl,params){
+  return new Promise(function(resolve,reject){
+    var cbName='_ani_cb_'+Date.now()+'_'+Math.floor(Math.random()*1e6);
+    var qs=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);}).join('&');
+    var script=document.createElement('script');
+    var done=false;
+    var timer=setTimeout(function(){ if(done)return; done=true; cleanup(); reject(new Error('Tiempo de espera agotado consultando sig.ani.gov.co (revisa tu conexión).')); },20000);
+    function cleanup(){ clearTimeout(timer); try{delete window[cbName];}catch(e){window[cbName]=undefined;} if(script.parentNode)script.parentNode.removeChild(script); }
+    window[cbName]=function(data){
+      if(done)return; done=true; cleanup();
+      if(data&&data.error){reject(new Error('ANI: '+(data.error.message||JSON.stringify(data.error))));return;}
+      resolve(data);
+    };
+    script.onerror=function(){ if(done)return; done=true; cleanup(); reject(new Error('No se pudo contactar el servicio de ANI (red bloqueada o CORS).')); };
+    script.src=baseUrl+'?'+qs+'&callback='+cbName;
+    document.body.appendChild(script);
+  });
+}
+
+function aniQuery(where,outFields,returnGeometry){
+  return arcgisJsonp(ANI_QUERY_URL,{
+    where: where||'1=1',
+    outFields: outFields||'NOMBRE,SIGLA,GEN,OLA_4G,ESTADO,ID_MT',
+    returnGeometry: returnGeometry===false?'false':'true',
+    outSR:'4326',
+    geometryPrecision:'5',
+    f:'json'
+  });
+}
+
+function haversineKm(a,b){
+  var R=6371,dLat=(b[0]-a[0])*Math.PI/180,dLng=(b[1]-a[1])*Math.PI/180;
+  var la1=a[0]*Math.PI/180,la2=b[0]*Math.PI/180;
+  var h=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(la1)*Math.cos(la2)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));
+}
+function polylineKm(coords){
+  var km=0; for(var i=1;i<coords.length;i++)km+=haversineKm(coords[i-1],coords[i]);
+  return km;
+}
+// Esri devuelve geometry.paths=[[ [lng,lat], ... ], ...] (por outSR=4326). Convertimos cada
+// path a [lat,lng] (formato que usa el resto de la app) y filtramos ruido fuera de Colombia.
+function aniFeatureToParts(feature){
+  var paths=(feature.geometry&&feature.geometry.paths)||[];
+  return paths.map(function(path){
+    var coords=[];
+    for(var i=0;i<path.length;i++){
+      var lng=path[i][0],lat=path[i][1];
+      if(lat>=1&&lat<=12&&lng>=-80&&lng<=-65) coords.push([Math.round(lat*1e6)/1e6,Math.round(lng*1e6)/1e6]);
+    }
+    return coords;
+  }).filter(function(c){return c.length>1;});
+}
+function aniRutaSelectOptions(){
+  return '<option value="">— elegir ruta —</option>'
+    +getSortedRoutes().map(function(r){return '<option value="'+r.id+'">'+r.nombre+'</option>';}).join('')
+    +'<option value="__new__">+ Nueva ruta…</option>';
+}
+
+function aniSearch(){
+  var qEl=document.getElementById('ani-search-q');
+  var term=(qEl&&qEl.value||'').trim();
+  var status=document.getElementById('ani-search-status');
+  var resultsEl=document.getElementById('ani-search-results');
+  if(!term){status.textContent='Escribe un nombre o sigla de concesión (ej: VINUS, Ruta del Mar, Autopistas del Caribe).';return;}
+  status.textContent='Consultando sig.ani.gov.co…';
+  resultsEl.innerHTML='';
+  var esc=term.toUpperCase().replace(/'/g,"''");
+  var where="UPPER(NOMBRE) LIKE '%"+esc+"%' OR UPPER(SIGLA) LIKE '%"+esc+"%'";
+  aniQuery(where,'NOMBRE,SIGLA,GEN,OLA_4G,ESTADO,ID_MT',true).then(function(data){
+    var feats=(data&&data.features)||[];
+    window._aniSearchResults=feats;
+    if(!feats.length){ status.textContent='Sin resultados en ANI para "'+term+'". Prueba con otro nombre o la sigla exacta de la concesión.'; return; }
+    status.textContent=feats.length+' concesión(es) encontrada(s) en ANI.';
+    resultsEl.innerHTML=feats.map(function(f,i){
+      var a=f.attributes||{};
+      var parts=aniFeatureToParts(f);
+      var km=Math.round(parts.reduce(function(s,p){return s+polylineKm(p);},0));
+      return '<div class="ti-item" style="cursor:default">'
+        +'<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">'
+        +'<div><div class="ti-n">'+(a.NOMBRE||'Sin nombre')+'</div>'
+        +'<div class="ti-m">'+[a.SIGLA,a.GEN?('Gen. '+a.GEN):null,a.OLA_4G,a.ESTADO].filter(Boolean).join(' · ')+(parts.length?' · ~'+km+' km · '+parts.length+' tramo(s)':' · sin geometría')+'</div></div>'
+        +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+        +'<select class="inp" id="ani-r-'+i+'" style="width:auto;font-size:10px;padding:3px 7px;height:auto">'+aniRutaSelectOptions()+'</select>'
+        +'<button class="btn btn-g btn-sm" onclick="aniPreview('+i+')" '+(parts.length?'':'disabled')+'>👁 Ver</button>'
+        +'<button class="btn btn-p btn-sm" onclick="aniImport('+i+')" '+(parts.length?'':'disabled')+'>⬇ Importar</button>'
+        +'</div></div></div>';
+    }).join('');
+  }).catch(function(err){
+    console.error('[ANI search]',err);
+    status.innerHTML='<span style="color:var(--cr)">No se pudo consultar ANI: '+err.message+'. Si el navegador está bloqueando la petición (CORS), avísame para revisar una vía alterna.</span>';
+  });
+}
+
+function aniPreview(i){
+  var f=(window._aniSearchResults||[])[i]; if(!f)return;
+  var parts=aniFeatureToParts(f);
+  if(!parts.length){toast('Esta concesión no trae geometría para previsualizar','err');return;}
+  sw('mapa');
+  setTimeout(function(){
+    if(!mapInst)initMap();
+    if(window._aniPreviewLayer){try{window._aniPreviewLayer.remove();}catch(e){}}
+    window._aniPreviewLayer=L.layerGroup().addTo(mapInst);
+    var allPts=[];
+    parts.forEach(function(c){
+      L.polyline(c,{color:'#FBBF24',weight:6,opacity:0.95,dashArray:'2,8',lineCap:'round'}).addTo(window._aniPreviewLayer);
+      allPts=allPts.concat(c);
+    });
+    if(allPts.length){ var b=L.latLngBounds(allPts); if(b.isValid())mapInst.fitBounds(b,{padding:[40,40]}); }
+    toast('Vista previa de "'+(f.attributes&&f.attributes.NOMBRE||'')+'" · en amarillo punteado');
+  },120);
+}
+
+function aniImport(i){
+  var f=(window._aniSearchResults||[])[i]; if(!f)return;
+  var a=f.attributes||{};
+  var parts=aniFeatureToParts(f);
+  if(!parts.length){toast('Esta concesión no trae geometría para importar','err');return;}
+  var sel=document.getElementById('ani-r-'+i);
+  var rutaVal=sel?sel.value:'';
+  if(!rutaVal){toast('Elige a qué ruta asignar el tramo importado','err');return;}
+  function doImport(rutaId){
+    var nombreBase=a.NOMBRE||a.SIGLA||'Concesión ANI';
+    var nuevos=parts.map(function(coords,idx){
+      return {
+        id: uid(),
+        tramo: parts.length>1?(nombreBase+' — Tramo '+(idx+1)+'/'+parts.length):nombreBase,
+        ruta: rutaId,
+        estado: 'Inicio - Sin Gestión',
+        actor: 'ANI',
+        km: Math.round(polylineKm(coords)),
+        proxima: 'Verificar trazado importado de ANI (SIG oficial) contra info propia',
+        fp: '',
+        concesion: a.SIGLA||a.NOMBRE||'',
+        coords: coords,
+        parent_id: null,
+        tipo_elemento: 'tramo'
+      };
+    });
+    tramos=tramos.concat(nuevos);
+    sbUpsert('tramos',nuevos).catch(function(e){console.warn('sbUpsert ANI import:',e); toast('Importado localmente, pero falló el guardado en base de datos: '+e.message,'err');});
+    renderAll(); renderRutasList(); renderRouteFilters();
+    if(mapInst)drawAllLines();
+    if(editingRoute===rutaId)selEditRoute(rutaId);
+    toast(nuevos.length+' tramo(s) de "'+nombreBase+'" importados desde ANI a "'+(routes[rutaId]?routes[rutaId].nombre:rutaId)+'"');
+  }
+  if(rutaVal==='__new__'){ kmzPromptNewRuta(function(newId){ doImport(newId); }); }
+  else{ doImport(rutaVal); }
+}
+
+// Capa de referencia: dibuja TODAS las concesiones ANI sobre el mapa (solo lectura, no toca Supabase)
+function toggleAniLayer(on){
+  window._aniLayerWanted=!!on;
+  if(!mapInst){ if(on)sw('mapa'); return; }
+  if(on) showAniLayer(); else hideAniLayer();
+}
+function hideAniLayer(){
+  if(window._aniLayerGroup){ try{mapInst.removeLayer(window._aniLayerGroup);}catch(e){} }
+}
+function showAniLayer(){
+  if(!mapInst)return;
+  if(window._aniLayerGroup){ try{mapInst.addLayer(window._aniLayerGroup);}catch(e){} return; }
+  var status=document.getElementById('ani-search-status');
+  if(status)status.textContent='Cargando capa completa de concesiones ANI…';
+  aniQuery('1=1','NOMBRE,SIGLA,GEN,OLA_4G,ESTADO',true).then(function(data){
+    var feats=(data&&data.features)||[];
+    window._aniLayerGroup=L.layerGroup().addTo(mapInst);
+    feats.forEach(function(f){
+      var a=f.attributes||{};
+      aniFeatureToParts(f).forEach(function(coords){
+        var line=L.polyline(coords,{color:'#FBBF24',weight:3,opacity:0.75,dashArray:'6,6',lineCap:'round'});
+        line.bindPopup('<b>'+(a.NOMBRE||'Concesión ANI')+'</b><br><small>'+[a.SIGLA,a.GEN?('Gen. '+a.GEN):null,a.ESTADO].filter(Boolean).join(' · ')+'</small><br><small style="color:#888">Fuente: sig.ani.gov.co</small>',{maxWidth:220});
+        line.addTo(window._aniLayerGroup);
+      });
+    });
+    if(status)status.textContent=feats.length+' concesión(es) ANI cargadas como capa de referencia.';
+  }).catch(function(err){
+    console.error('[ANI layer]',err);
+    if(status)status.innerHTML='<span style="color:var(--cr)">No se pudo cargar la capa ANI: '+err.message+'</span>';
+    var chk=document.getElementById('ani-layer-toggle'); if(chk)chk.checked=false;
+    window._aniLayerWanted=false;
+  });
 }
 
 function setupDropZone(){

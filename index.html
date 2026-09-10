@@ -994,7 +994,39 @@ function buildPopup(t){
     +'<b>Km:</b> '+t.km+' km<br>'
     +'<b>Proxima:</b> '+(t.proxima||'-')+'</span>';
   if(lb)h+='<br><br><span style="font-size:10px;color:#555"><b>Ultima gestion ('+fmt(lb.fecha)+'):</b><br>'+lb.gestion+'</span>';
+  h+='<div style="margin-top:8px;padding-top:8px;border-top:1px solid #ddd;display:flex;gap:4px;flex-wrap:wrap;align-items:center">'
+    +'<select class="inp" id="tp-r-'+t.id+'" style="width:auto;font-size:10px;padding:3px 6px;height:auto;color:#111">'+tramoRutaSelectOptions(t.ruta)+'</select>'
+    +'<button class="btn btn-g btn-sm" style="font-size:10px" onclick="moverTramoDesdeMapa(\''+t.id+'\')">&#8618; Mover</button>'
+    +'<button class="btn btn-danger btn-sm" style="font-size:10px" onclick="qDelTramo(\''+t.id+'\')">&#128465; Eliminar</button>'
+    +'</div>';
   return h+'</div>';
+}
+// Opciones de ruta para el popup del mapa (reasignar un tramo existente, sea de KMZ, manual o
+// importado de ANI/UPME). currentId queda pre-seleccionado para que "Mover" solo actúe si se
+// elige una ruta distinta.
+function tramoRutaSelectOptions(currentId){
+  return getSortedRoutes().map(function(r){return '<option value="'+r.id+'"'+(r.id===currentId?' selected':'')+'>'+r.nombre+'</option>';}).join('')
+    +'<option value="__new__">+ Nueva ruta…</option>';
+}
+// Reasigna un tramo cualquiera (KMZ, manual o importado de ANI/UPME) a otra ruta directamente
+// desde su popup en el mapa — comparte el mismo guardado (sbPatch) que el editor de tramos.
+function moverTramoDesdeMapa(tramoId){
+  var t=tramos.find(function(x){return x.id===tramoId;}); if(!t)return;
+  var sel=document.getElementById('tp-r-'+tramoId);
+  var rutaVal=sel?sel.value:'';
+  if(!rutaVal){toast('Elige una ruta de destino','err');return;}
+  if(rutaVal===t.ruta){toast('Ese tramo ya pertenece a esa ruta','err');return;}
+  function afterRuta(rutaId){
+    var oldRutaId=t.ruta;
+    t.ruta=rutaId;
+    sbPatch('tramos',t.id,{ruta:rutaId}).catch(function(e){console.warn('sbPatch mover tramo:',e); toast('Movido localmente, pero falló el guardado en base de datos: '+e.message,'err');});
+    renderAll(); renderRutasList(); renderRouteFilters();
+    if(mapInst){drawAllLines(); try{mapInst.closePopup();}catch(e){}}
+    if(editingRoute===oldRutaId||editingRoute===rutaId)selEditRoute(editingRoute);
+    toast('Tramo "'+t.tramo+'" movido a "'+(routes[rutaId]?routes[rutaId].nombre:rutaId)+'"');
+  }
+  if(rutaVal==='__new__'){ kmzPromptNewRuta(function(newId){afterRuta(newId);}); }
+  else{ afterRuta(rutaVal); }
 }
 function setMapDetail(level){
   mapDetailLevel=level;
@@ -1030,7 +1062,7 @@ function drawAllLines(){
             if(!child.coords||child.coords.length<2)return;
             try{
               var cl=L.polyline(child.coords,lineOpts).addTo(mapInst);
-              cl.bindPopup(buildPopup(t),{maxWidth:280});
+              cl.bindPopup(buildPopup(child),{maxWidth:280});
               cl.on('click',function(){hlSide(t.id);});
               mapLines[child.id]=cl;
             }catch(e){}
@@ -1460,10 +1492,11 @@ function eliminarRuta(rid){
 }
 
 function qDelTramo(id){
-  if(!confirm("¿Eliminar este tramo?"))return;
+  var t=tramos.find(x=>x.id===id);
+  if(!confirm("¿Eliminar el tramo"+(t?' "'+t.tramo+'"':'')+"? Esta acción no se puede deshacer."))return;
   tramos=tramos.filter(t=>t.id!==id);
   if(editingRoute)selEditRoute(editingRoute);
-  renderAll(); if(mapInst)drawAllLines();
+  renderAll(); if(mapInst){drawAllLines(); try{mapInst.closePopup();}catch(e){}}
   sbDelete('tramos',id).catch(function(){});
   toast("Tramo eliminado");
 }

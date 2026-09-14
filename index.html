@@ -514,11 +514,31 @@ function sbHeaders(){
   };
 }
 
+// Supabase/PostgREST limita cada petición sin rango explícito a un máximo de filas (1000 por
+// defecto) y devuelve 206 Partial Content con el resto simplemente omitido — SIN avisar de
+// ningún error. Confirmado en vivo: la tabla "tramos" ya tiene 2549 filas y "puntos" 3651, así
+// que una sola petición sin paginar se estaba quedando corta en silencio (todo lo importado por
+// KMZ se guardaba bien, pero al recargar la página sólo volvían las primeras ~1000 filas de la
+// tabla completa — el resto seguía a salvo en la base de datos, sólo no se traía de vuelta).
+// Por eso sbGet ahora pagina con el header Range hasta agotar la tabla.
 async function sbGet(table, params){
-  var url = SB_URL + '/rest/v1/' + table + (params ? '?' + params : '');
-  var r = await fetch(url, {headers: sbHeaders()});
-  if(!r.ok) throw new Error('sbGet ' + table + ': ' + r.status);
-  return r.json();
+  var baseUrl = SB_URL + '/rest/v1/' + table + (params ? '?' + params : '');
+  var pageSize = 1000;
+  var all = [];
+  var offset = 0;
+  while(true){
+    var r = await fetch(baseUrl, {
+      headers: Object.assign({}, sbHeaders(), {'Range-Unit':'items','Range': offset+'-'+(offset+pageSize-1)})
+    });
+    if(!r.ok && r.status!==206) throw new Error('sbGet ' + table + ': ' + r.status);
+    var batch = await r.json();
+    if(!Array.isArray(batch)||!batch.length) break;
+    all = all.concat(batch);
+    if(batch.length<pageSize) break; // última página (parcial o exacta)
+    offset += pageSize;
+    if(offset>500000) break; // válvula de seguridad ante un bucle inesperado
+  }
+  return all;
 }
 
 async function sbUpsert(table, data){

@@ -549,6 +549,17 @@ async function sbDelete(table, id){
   if(!r.ok) throw new Error('sbDelete ' + table + ': ' + r.status);
   return true;
 }
+// Para borrar por un filtro distinto a "id=eq.<id>" (p. ej. "ruta=eq.<rid>"). sbDelete() siempre
+// filtra por id — usarlo con otra cosa (como antes hacía eliminarRuta) arma un filtro inválido
+// que no borra nada en Supabase, aunque la fila desaparezca localmente hasta el próximo reload.
+async function sbDeleteWhere(table, whereClause){
+  var r = await fetch(SB_URL + '/rest/v1/' + table + '?' + whereClause, {
+    method: 'DELETE',
+    headers: sbHeaders()
+  });
+  if(!r.ok) throw new Error('sbDeleteWhere ' + table + ': ' + r.status);
+  return true;
+}
 
 // ─── CARGA INICIAL DESDE SUPABASE ─────────────────────────
 var dbLoaded = false;
@@ -814,6 +825,16 @@ var kmzParsed={tramos:[],puntos:[],capas:[]};
 const fmt=d=>d?d.split("-").reverse().join("/"):"-";
 const today=()=>new Date().toISOString().slice(0,10);
 const uid=()=>"id"+Date.now()+Math.random().toString(36).slice(2,7);
+// ID sugerido para una ruta nueva ("r1","r2"...). NUNCA usar solo Object.keys(routes).length+1:
+// en cuanto se borra o se crea con ID manual una sola ruta, ese conteo deja de coincidir con el
+// próximo número "r#" realmente libre y puede sugerir un ID que YA existe — al guardar, eso
+// sobrescribe silenciosamente esa ruta existente (y hereda todos sus tramos). Este helper busca
+// el primer "r#" que de verdad no esté en uso.
+function nextFreeRutaId(){
+  var n=Object.keys(routes).length+1;
+  while(routes['r'+n])n++;
+  return 'r'+n;
+}
 function sb(e){
   var color=SC[e]||'#94A3B8';
   return '<span style="background:'+color+'22;color:'+color+';border:1px solid '+color+'44;'
@@ -997,6 +1018,7 @@ function buildPopup(t){
   h+='<div style="margin-top:8px;padding-top:8px;border-top:1px solid #ddd;display:flex;gap:4px;flex-wrap:wrap;align-items:center">'
     +'<select class="inp" id="tp-r-'+t.id+'" style="width:auto;font-size:10px;padding:3px 6px;height:auto;color:#111">'+tramoRutaSelectOptions(t.ruta)+'</select>'
     +'<button class="btn btn-g btn-sm" style="font-size:10px" onclick="moverTramoDesdeMapa(\''+t.id+'\')">&#8618; Mover</button>'
+    +'<button class="btn btn-warn btn-sm" style="font-size:10px" onclick="openModal(\'edit-tramo\',\''+t.id+'\')">&#9998; Editar</button>'
     +'<button class="btn btn-danger btn-sm" style="font-size:10px" onclick="qDelTramo(\''+t.id+'\')">&#128465; Eliminar</button>'
     +'</div>';
   return h+'</div>';
@@ -1477,9 +1499,10 @@ function selEditRoute(rid){
 
 function eliminarRuta(rid){
   if(!confirm('¿Eliminar la ruta y todos sus tramos? Esta acción no se puede deshacer.'))return;
-  // Delete from Supabase first
-  sbDelete('rutas', 'id=eq.'+rid).catch(function(e){console.warn('Error deleting ruta:',e);});
-  sbDelete('tramos', 'ruta=eq.'+rid).catch(function(e){console.warn('Error deleting tramos:',e);});
+  // Delete from Supabase first (sbDeleteWhere: sbDelete() sólo sabe filtrar por id, y aquí
+  // necesitamos borrar TODOS los tramos cuyo campo "ruta" apunte a esta ruta)
+  sbDeleteWhere('rutas', 'id=eq.'+encodeURIComponent(rid)).catch(function(e){console.warn('Error deleting ruta:',e);});
+  sbDeleteWhere('tramos', 'ruta=eq.'+encodeURIComponent(rid)).catch(function(e){console.warn('Error deleting tramos:',e);});
   // Delete from memory
   tramos=tramos.filter(function(t){return t.ruta!==rid;});
   delete routes[rid];
@@ -1668,7 +1691,7 @@ function openModal(type,id,preTramo){
 
   else if(type==="nueva-ruta"){
     mt.textContent="Nueva ruta";
-    const nid="r"+(Object.keys(routes).length+1);
+    const nid=nextFreeRutaId();
     mb.innerHTML=`<div class="ff">
       <div class="fl"><label>Nombre de la ruta</label><input type="text" class="inp" id="nr-n" placeholder="Ej: Medellín–Cali"></div>
       <div class="frow">
@@ -1900,8 +1923,17 @@ function updateBit(id){
 }
 
 function saveNuevaRuta(){
-  const n=gv('nr-n').trim(), rid=gv('nr-id').trim()||'r'+uid(), c=gv('nr-c');
+  const n=gv('nr-n').trim(), rid=gv('nr-id').trim()||nextFreeRutaId(), c=gv('nr-c');
   if(!n){toast('Ingresa el nombre de la ruta','err');return;}
+  // Nunca crear silenciosamente encima de una ruta que ya existe con ese ID: eso la sobrescribe
+  // (nombre/color) y hereda TODOS sus tramos ya guardados, apareciendo como si "se cargaran
+  // automáticamente tramos de otra ruta" en la que se acaba de crear.
+  if(routes[rid]){
+    toast('Ya existe una ruta con el ID "'+rid+'" ("'+routes[rid].nombre+'"). Cambia el ID interno o edita esa ruta desde su tarjeta en vez de crear una nueva.','err');
+    return;
+  }
+  var dup=Object.values(routes).find(function(r){return r.nombre.trim().toLowerCase()===n.toLowerCase();});
+  if(dup&&!confirm('Ya existe una ruta llamada "'+dup.nombre+'" (ID '+dup.id+'). ¿Seguro que quieres crear otra ruta distinta con el mismo nombre?'))return;
   var ordenVal=parseInt(gv('nr-orden'));
   var nextOrden=!isNaN(ordenVal)&&ordenVal>=1?ordenVal:(Object.keys(routes).length+1);
   routes[rid]={id:rid,nombre:n,color:c||'#34D399',orden:nextOrden};
@@ -3135,8 +3167,10 @@ function kmzPromptNewRuta(callback){
   var nombre=window.prompt('Nombre de la nueva ruta (ej: Medellín–Cali):');
   if(!nombre||!nombre.trim()){toast('Nombre requerido','err');return;}
   nombre=nombre.trim();
+  var dup=Object.values(routes).find(function(r){return r.nombre.trim().toLowerCase()===nombre.toLowerCase();});
+  if(dup&&!confirm('Ya existe una ruta llamada "'+dup.nombre+'". ¿Crear otra ruta distinta con el mismo nombre de todas formas?'))return;
   var colors=['#34D399','#F59E0B','#EF4444','#A78BFA','#FB923C','#38BDF8'];
-  var newId='r'+(Object.keys(routes).length+1);
+  var newId=nextFreeRutaId();
   var color=colors[Object.keys(routes).length%colors.length];
   routes[newId]={id:newId,nombre:nombre,color:color};
   saveRutaToDB(routes[newId]);

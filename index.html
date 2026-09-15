@@ -2666,9 +2666,19 @@ function parseKMLString(kmlStr){
     getAllPM(kml).forEach(function(pm){
       if(pm.indexOf('<LineString>')<0)return;
       var pname=getTag(pm,'name')||'Tramo importado';
-      var c=parseCoords(getTag(pm,'coordinates'));
-      if(c.length<2)return;
-      result.tramos.push({name:pname,coords:c,folder:pname,tipo_elemento:'tramo',parentFolder:null,ruta:tmRuta});
+      // A Placemark can be a MultiGeometry containing several independent
+      // LineStrings (several <coordinates> blocks). getTag() only returns the
+      // FIRST match, which silently dropped every LineString after the first
+      // one. Extract ALL <coordinates> blocks and emit one tramo per block so
+      // nothing from the KMZ gets lost.
+      var coordBlocks=[],coordRe=/<coordinates>([\s\S]*?)<\/coordinates>/g,ccM;
+      while((ccM=coordRe.exec(pm))!==null)coordBlocks.push(ccM[1]);
+      coordBlocks.forEach(function(block,idx){
+        var c=parseCoords(block);
+        if(c.length<2)return;
+        var nm=coordBlocks.length>1?(pname+' (segmento '+(idx+1)+')'):pname;
+        result.tramos.push({name:nm,coords:c,folder:pname,tipo_elemento:'tramo',parentFolder:null,ruta:tmRuta});
+      });
     });
   } else {
     mainNums.forEach(function(num){

@@ -2996,6 +2996,22 @@ async function kmzApply(){
       console.log('[KMZ] Add: '+trulyNew.length+' new tramos added');
     }
 
+    // Ruta por defecto para los puntos importados. ANTES esto siempre caía en el fallback fijo
+    // 'r1' de la línea de abajo, sin importar qué ruta hubiera elegido el usuario en el asistente
+    // — porque los puntos casi nunca traen su propio "ruta" al parsear el KML (p.ruta suele venir
+    // vacío). Resultado real confirmado en producción: los ~3650 puntos de TODOS los KMZ importados
+    // hasta ahora quedaron mal archivados bajo la ruta r1. Ahora se usa, en orden: el selector
+    // global de ruta del asistente ("Asignar todos a"), o si no, la ruta más frecuente entre los
+    // tramos que sí se acaban de importar en este mismo lote.
+    var puntosRutaDefault=(function(){
+      var selEl=document.getElementById('kmz-ruta-assign');
+      if(selEl&&selEl.value&&selEl.value!=='__new__'&&routes[selEl.value])return selEl.value;
+      var counts={};
+      newTramos.forEach(function(t){counts[t.ruta]=(counts[t.ruta]||0)+1;});
+      var best=null,bestN=0;
+      Object.keys(counts).forEach(function(r){if(counts[r]>bestN){best=r;bestN=counts[r];}});
+      return (best&&routes[best])?best:(Object.keys(routes)[0]||'r1');
+    })();
     // Save puntos to Supabase if any detected
     var newPuntos=kmzParsed.puntos.map(function(p){
       return {
@@ -3004,7 +3020,7 @@ async function kmzApply(){
         tipo: p.tipo||'Marcador',
         lat: p.lat,
         lng: p.lng,
-        ruta: p.ruta||'r1',
+        ruta: (p.ruta&&routes[p.ruta])?p.ruta:puntosRutaDefault,
         label: p.tipo||'Marcador',
         color: '#94A3B8'
       };

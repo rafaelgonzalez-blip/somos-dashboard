@@ -2663,23 +2663,82 @@ function parseKMLString(kmlStr){
   if(mainNums.length===0){
     // Fallback: simple KMZ
     setStatus('Modo simple...');
+
+    // A Placemark (or a malformed pseudo-Placemark, see below) can be a
+    // MultiGeometry containing several independent LineStrings/coordinate
+    // blocks. Some GIS export tools (ArcGIS/QGIS shapefile→KML) break one
+    // real line into MANY tiny 2-point LineStrings back-to-back instead of
+    // one continuous line. To avoid flooding the route list with hundreds
+    // of 2-point fragments (and to avoid silently dropping anything after
+    // the first block, which is what happened before), chain all the
+    // coordinate blocks of one container end-to-end into as few continuous
+    // polylines as possible before creating tramos from them.
+    function chainCoordBlocks(coordBlocks){
+      // NOTE: must NOT be coordBlocks.map(parseCoords) — Array.map passes
+      // (value, index, array) to its callback, and parseCoords's 2nd param
+      // is a maxPts truncation limit, so the block's index would silently
+      // become its point cap (e.g. index 2 → keep only 2 points).
+      var segs=coordBlocks.map(function(b){return parseCoords(b);}).filter(function(s){return s.length>=2;});
+      var tol=0.0005; // ~50m
+      function close(a,b){return Math.abs(a[0]-b[0])<tol&&Math.abs(a[1]-b[1])<tol;}
+      var remaining=segs.slice(), paths=[];
+      while(remaining.length){
+        var path=remaining.shift().slice();
+        var changed=true;
+        while(changed){
+          changed=false;
+          for(var i=0;i<remaining.length;i++){
+            var s=remaining[i];
+            if(close(path[path.length-1],s[0])){path=path.concat(s.slice(1));remaining.splice(i,1);changed=true;break;}
+            if(close(path[path.length-1],s[s.length-1])){path=path.concat(s.slice(0,-1).reverse());remaining.splice(i,1);changed=true;break;}
+            if(close(path[0],s[s.length-1])){path=s.slice(0,-1).concat(path);remaining.splice(i,1);changed=true;break;}
+            if(close(path[0],s[0])){path=s.slice(1).reverse().concat(path);remaining.splice(i,1);changed=true;break;}
+          }
+        }
+        paths.push(path);
+      }
+      return paths;
+    }
+
+    function emitGeomContainer(pm,pname){
+      var coordBlocks=[],coordRe=/<coordinates>([\s\S]*?)<\/coordinates>/g,ccM;
+      while((ccM=coordRe.exec(pm))!==null)coordBlocks.push(ccM[1]);
+      if(!coordBlocks.length)return;
+      var paths=chainCoordBlocks(coordBlocks);
+      paths.forEach(function(c,idx){
+        if(c.length<2)return;
+        var nm=paths.length>1?(pname+' (segmento '+(idx+1)+')'):pname;
+        result.tramos.push({name:nm,coords:c,folder:pname,tipo_elemento:'tramo',parentFolder:null,ruta:tmRuta});
+      });
+    }
+
     getAllPM(kml).forEach(function(pm){
       if(pm.indexOf('<LineString>')<0)return;
       var pname=getTag(pm,'name')||'Tramo importado';
-      // A Placemark can be a MultiGeometry containing several independent
-      // LineStrings (several <coordinates> blocks). getTag() only returns the
-      // FIRST match, which silently dropped every LineString after the first
-      // one. Extract ALL <coordinates> blocks and emit one tramo per block so
-      // nothing from the KMZ gets lost.
-      var coordBlocks=[],coordRe=/<coordinates>([\s\S]*?)<\/coordinates>/g,ccM;
-      while((ccM=coordRe.exec(pm))!==null)coordBlocks.push(ccM[1]);
-      coordBlocks.forEach(function(block,idx){
-        var c=parseCoords(block);
-        if(c.length<2)return;
-        var nm=coordBlocks.length>1?(pname+' (segmento '+(idx+1)+')'):pname;
-        result.tramos.push({name:nm,coords:c,folder:pname,tipo_elemento:'tramo',parentFolder:null,ruta:tmRuta});
-      });
+      emitGeomContainer(pm,pname);
     });
+
+    // Some KMZ export tools (shapefile→KML conversions) produce malformed
+    // "pseudo-Placemarks": the geometry sits inside a non-standard tag named
+    // after the source layer/table (e.g. <S_CO_ISA_Circuito_ISIISISD>)
+    // instead of <Placemark>. Google Earth is lenient and still renders
+    // these, but any strict Placemark-based parser (including the one
+    // above) silently skips them. Detect these and import them too instead
+    // of losing that geometry.
+    var KNOWN_KML_TAGS=/^(Document|Folder|Placemark|Style|StyleMap|Schema|SchemaData|ExtendedData|MultiGeometry|LineString|Point|Polygon|LinearRing|outerBoundaryIs|innerBoundaryIs|coordinates|name|description|styleUrl|LineStyle|PolyStyle|IconStyle|BalloonStyle|ListStyle|snippet|Snippet|open|visibility|kml|NetworkLink|Link|LookAt|Camera|TimeSpan|TimeStamp|ScreenOverlay|GroundOverlay|Icon|tessellate|altitudeMode|SimpleData|SimpleField|Data|value|key|href|color|width|scale|hotSpot|address|phoneNumber|Region|LatLonAltBox|Lod|gx:Track|gx:coord|when|drawOrder|fill|outline|colorMode)$/i;
+    var tagRe=/<([A-Za-z_][\w]*)>/g,tM,seenIdx={};
+    while((tM=tagRe.exec(kml))!==null){
+      var tag=tM[1];
+      if(KNOWN_KML_TAGS.test(tag))continue;
+      if(seenIdx[tM.index])continue;
+      var closeTag='</'+tag+'>',closeIdx=kml.indexOf(closeTag,tM.index);
+      if(closeIdx<0)continue;
+      var block=kml.substring(tM.index,closeIdx+closeTag.length);
+      seenIdx[tM.index]=true;
+      if(block.indexOf('<LineString>')<0&&block.indexOf('<MultiGeometry>')<0)continue;
+      var bname=getTag(block,'name')||('Tramo importado ('+tag+')');
+      emitGeomContainer(block,bname);
+    }
   } else {
     mainNums.forEach(function(num){
       var mt=mainTramos[num];

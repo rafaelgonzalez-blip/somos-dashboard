@@ -175,11 +175,24 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
     <div class="card">
       <div class="card-h">
         <span class="card-t">Seguimiento de hitos por tramo</span>
-        <span style="font-size:9px;color:var(--muted)">Alimentado desde bitacora</span> <button onclick="openHitosConfig()" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-size:9px;padding:2px 8px;margin-left:8px">&#9881; Configurar</button>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
+          <button class="fb active" id="hv-gantt" onclick="setHitosView('gantt')">&#128197; Línea de tiempo</button>
+          <button class="fb" id="hv-table" onclick="setHitosView('table')">&#9776; Tabla</button>
+          <button onclick="openHitosConfig()" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-size:9px;padding:2px 8px;margin-left:4px">&#9881; Configurar</button>
+        </div>
       </div>
-      <div style="overflow-x:auto">
+      <div style="padding:9px 14px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Rutas:</span>
+        <div id="hitos-route-filters" style="display:contents"></div>
+        <span style="width:1px;height:16px;background:var(--border);margin:0 2px"></span>
+        <button class="fb" id="hitos-tramo-picker-btn" onclick="openHitosTramoPicker()">Elegir tramos&hellip;</button>
+        <label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--muted);cursor:pointer;margin-left:4px">
+          <input type="checkbox" id="hitos-inc-sub" onchange="toggleHitosIncSub(this.checked)" style="accent-color:var(--acc)"> Incluir subtramos
+        </label>
+      </div>
+      <div id="hitos-gantt-wrap"></div>
+      <div id="hitos-table-wrap" style="overflow-x:auto;display:none">
         <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:680px">
-          <thead id="hitos-thead"></thead>
           <thead id="hitos-thead"></thead><tbody id="hitos-tbody"></tbody>
         </table>
       </div>
@@ -824,7 +837,15 @@ const KMZ_PUNTOS=[];
 
 // ─── DATA ───────────────────────────────────────────────────
 var SC={"Acuerdo Cerrado":"#10B981","Negociación":"#60A5FA","Radicado":"#8B5CF6","En proceso de Radicación":"#F59E0B","Sin respuesta":"#EF4444","Inicio - Sin Gestión":"#991B1B"};
-var HITOS=[{key:"hito_1",label:"Radicación",orden:1},{key:"hito_2",label:"Propuesta",orden:2},{key:"hito_3",label:"Cierre Contrato",orden:3},{key:"hito_4",label:"Vencimiento",orden:4}];
+var HITOS=[
+  {key:"hito_1",label:"Identificación de dueños/administradores",orden:1},
+  {key:"hito_2",label:"Ductos / hilos de fibra existentes",orden:2},
+  {key:"hito_3",label:"Autorización a relevamiento",orden:3},
+  {key:"hito_4",label:"Paquete de radicación",orden:4},
+  {key:"hito_5",label:"Radicado",orden:5},
+  {key:"hito_6",label:"Mesas técnicas y modificaciones",orden:6},
+  {key:"hito_7",label:"Permiso aprobado",orden:7}
+];
 try{var _sc=localStorage.getItem('somos_sc');if(_sc)SC=JSON.parse(_sc);}catch(e){}
 
 var tramos=KMZ_TRAMOS.map(function(t){var r=Object.assign({},t);r.estado=normalizeEstado(r.estado);return r;});
@@ -854,6 +875,17 @@ function saveOverviewHiddenRoutes(){
   try{localStorage.setItem('somos_overview_hidden_routes',JSON.stringify(Array.from(overviewHiddenRoutes)));}catch(e){}
 }
 function mapRouteVisible(rutaId){ return mapFiltSet.size===0||mapFiltSet.has(rutaId); }
+
+// ── Tarjeta "Seguimiento de hitos por tramo" (tab Resumen) ──────────────
+// Vista: tabla clásica o línea de tiempo tipo Gantt.
+var hitosViewMode='gantt'; // 'gantt' | 'table'
+// Selección múltiple de rutas visibles en la línea de hitos. Vacío = todas.
+var hitosRouteFilter=new Set();
+// Selección explícita de tramos/subtramos a mostrar. Vacío = todos los de las rutas visibles.
+var hitosTramoFilter=new Set();
+// Si se incluyen subtramos en la línea de tiempo (por defecto solo tramos padre).
+var hitosIncludeSub=false;
+function hitosRouteVisible(rutaId){ return hitosRouteFilter.size===0||hitosRouteFilter.has(rutaId); }
 var mapInst=null, mapLines={};
 var emlFiles=[], emlResults=[], emlImported=[];
 var kmzParsed={tramos:[],puntos:[],capas:[]};
@@ -4044,30 +4076,164 @@ function setEMLStep(n){
 // ─── RENDER ALL ──────────────────────────────────────────────
 function addDays(ds,n){var d=new Date(ds);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
 
+// ── Vista/filtros de la tarjeta de hitos ─────────────────────
+function setHitosView(mode){
+  hitosViewMode=mode;
+  var gb=document.getElementById('hv-gantt'), tb=document.getElementById('hv-table');
+  if(gb)gb.classList.toggle('active',mode==='gantt');
+  if(tb)tb.classList.toggle('active',mode==='table');
+  var gw=document.getElementById('hitos-gantt-wrap'), tw=document.getElementById('hitos-table-wrap');
+  if(gw)gw.style.display=(mode==='gantt')?'':'none';
+  if(tw)tw.style.display=(mode==='table')?'':'none';
+  renderHitos();
+}
+function renderHitosRouteFilters(){
+  var container=document.getElementById('hitos-route-filters');
+  if(!container)return;
+  while(container.firstChild)container.removeChild(container.firstChild);
+  var allBtn=document.createElement('button');
+  allBtn.className='fb'+(hitosRouteFilter.size===0?' active':'');
+  allBtn.textContent='Todas las rutas';
+  allBtn.onclick=function(){
+    hitosRouteFilter.clear();
+    renderHitosRouteFilters();
+    renderHitos();
+  };
+  container.appendChild(allBtn);
+  getSortedRoutes().forEach(function(r){
+    var active=hitosRouteFilter.size===0||hitosRouteFilter.has(r.id);
+    var color=r.color||'#60A5FA';
+    var btn=document.createElement('button');
+    btn.className='fb'+(active?' active':'');
+    btn.style.cssText=active?('border-color:'+color+';color:'+color):'';
+    btn.textContent=r.nombre;
+    btn.onclick=function(){
+      if(hitosRouteFilter.has(r.id))hitosRouteFilter.delete(r.id);
+      else hitosRouteFilter.add(r.id);
+      renderHitosRouteFilters();
+      renderHitos();
+    };
+    container.appendChild(btn);
+  });
+}
+function toggleHitosIncSub(checked){
+  hitosIncludeSub=checked;
+  renderHitos();
+}
+// Tramos candidatos según el filtro de rutas y si se incluyen subtramos.
+function getHitosCandidateTramos(){
+  return tramos.filter(function(t){
+    if(!hitosRouteVisible(t.ruta))return false;
+    var isSub=!!(t.parent_id||t.tipo_elemento==='subtramo');
+    if(isSub&&!hitosIncludeSub)return false;
+    return true;
+  });
+}
+// Tramos realmente visibles: candidatos + selección explícita del picker (si hay una activa).
+function getHitosVisibleTramos(){
+  var cand=getHitosCandidateTramos();
+  if(hitosTramoFilter===null)return cand;
+  return cand.filter(function(t){return hitosTramoFilter.has(t.id);});
+}
+function updateHitosTramoPickerLabel(){
+  var btn=document.getElementById('hitos-tramo-picker-btn');
+  if(!btn)return;
+  if(hitosTramoFilter===null){
+    btn.textContent='Elegir tramos…';
+    btn.classList.remove('active');
+  }else{
+    var n=hitosTramoFilter.size;
+    btn.textContent=n+(n===1?' tramo seleccionado':' tramos seleccionados');
+    btn.classList.add('active');
+  }
+}
+function openHitosTramoPicker(){
+  var mt=document.getElementById('modal-title');
+  var mb=document.getElementById('modal-body');
+  mt.textContent='Elegir tramos a mostrar';
+  var cand=getHitosCandidateTramos();
+  var byRoute={};
+  cand.forEach(function(t){ (byRoute[t.ruta]=byRoute[t.ruta]||[]).push(t); });
+  var html='<div class="ff"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">'+cand.length+' tramo(s) disponibles según el filtro de rutas actual'+(hitosIncludeSub?' (incluye subtramos)':'')+'.</div>';
+  if(!cand.length){
+    html+='<div style="padding:20px;text-align:center;color:var(--muted2);font-size:11px">No hay tramos disponibles con el filtro de rutas actual.</div>';
+  }else{
+    html+='<div style="margin-bottom:8px"><button class="btn btn-sm" id="htp-all-btn">Seleccionar todos</button></div>';
+    html+='<div style="max-height:340px;overflow-y:auto">';
+    getSortedRoutes().forEach(function(r){
+      var list=byRoute[r.id];
+      if(!list||!list.length)return;
+      list.sort(function(a,b){return (a.tramo||'').localeCompare(b.tramo||'');});
+      html+='<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:'+(r.color||'#60A5FA')+';text-transform:uppercase;margin-bottom:4px">'+escapeHtml(r.nombre)+'</div>';
+      list.forEach(function(t){
+        var checked=(hitosTramoFilter===null)||hitosTramoFilter.has(t.id);
+        var isSub=!!(t.parent_id||t.tipo_elemento==='subtramo');
+        html+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 0 3px'+(isSub?' 16px':' 0')+';cursor:pointer'+(isSub?';color:var(--muted)':'')+'">'
+          +'<input type="checkbox" class="htp-chk" data-id="'+t.id+'"'+(checked?' checked':'')+' style="accent-color:'+(r.color||'#60A5FA')+'">'
+          +(isSub?'&#8627; ':'')+escapeHtml(t.tramo)+'</label>';
+      });
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+  html+='<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn btn-p" onclick="closeModal()">Cerrar</button></div></div>';
+  mb.innerHTML=html;
+  var allBtn=document.getElementById('htp-all-btn');
+  if(allBtn)allBtn.onclick=function(){
+    hitosTramoFilter=null;
+    updateHitosTramoPickerLabel();
+    renderHitos();
+    openHitosTramoPicker();
+  };
+  Array.prototype.forEach.call(mb.querySelectorAll('.htp-chk'),function(chk){
+    chk.onchange=function(){
+      var id=chk.dataset.id;
+      if(hitosTramoFilter===null)hitosTramoFilter=new Set(cand.map(function(t){return t.id;}));
+      if(chk.checked)hitosTramoFilter.add(id); else hitosTramoFilter.delete(id);
+      if(hitosTramoFilter.size===cand.length)hitosTramoFilter=null;
+      updateHitosTramoPickerLabel();
+      renderHitos();
+    };
+  });
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+// ── Renderizado principal (despacha a tabla o línea de tiempo) ──
 function renderHitos(){
+  renderHitosRouteFilters();
+  updateHitosTramoPickerLabel();
+  if(hitosViewMode==='table')renderHitosTable();
+  else renderHitosGantt();
+}
+
+function renderHitosTable(){
   var tbody=document.getElementById('hitos-tbody');
   var thead=document.getElementById('hitos-thead');
   if(!tbody)return;
   var cols=HITOS.slice().sort(function(a,b){return a.orden-b.orden;});
   if(thead){
     var thh='<tr><th style="padding:8px 13px;text-align:left;color:var(--muted);font-size:9px;text-transform:uppercase">Tramo</th><th style="padding:8px 13px;text-align:center;color:var(--muted);font-size:9px;text-transform:uppercase">Ruta</th>';
-    cols.forEach(function(h){thh+='<th style="padding:8px 13px;text-align:center;color:var(--muted);font-size:9px;text-transform:uppercase">'+h.label+'</th>';});
+    cols.forEach(function(h){thh+='<th style="padding:8px 13px;text-align:center;color:var(--muted);font-size:9px;text-transform:uppercase">'+escapeHtml(h.label)+'</th>';});
     thh+='<th style="padding:8px 13px;text-align:center;color:var(--muted);font-size:9px;text-transform:uppercase">Estado</th></tr>';
     thead.innerHTML=thh;
   }
+  var visible=getHitosVisibleTramos();
+  var visNames={}; visible.forEach(function(t){visNames[t.tramo]=true;});
   var hm={};
   tramos.forEach(function(t){
+    if(!visNames[t.tramo])return;
     var hasAny=cols.some(function(h){return t[h.key];});
     if(!hasAny)return;
     hm[t.tramo]={id:t.id};
     cols.forEach(function(h){hm[t.tramo][h.key]=t[h.key]||'';});
   });
   [].concat(bitacora).sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(b){
+    if(!visNames[b.tramo])return;
     if(!hm[b.tramo]){hm[b.tramo]={id:null};cols.forEach(function(h){hm[b.tramo][h.key]='';});}
     cols.forEach(function(h){if(b[h.key])hm[b.tramo][h.key]=b[h.key];});
   });
   var td=today();
-  var sorted=tramos.filter(function(t){return !t.parent_id;}).map(function(t){
+  var sorted=visible.map(function(t){
     var h=hm[t.tramo]||{id:t.id};
     var dates=cols.map(function(c){return h[c.key]||'';}).filter(Boolean);
     return {t:t,h:h,earliest:dates.length?dates.sort()[0]:'9999'};
@@ -4086,9 +4252,124 @@ function renderHitos(){
     var rc=(routes[t.ruta]&&routes[t.ruta].color)||'#60A5FA';
     var sc2=SC[t.estado]||'#94A3B8';
     var rn=(routes[t.ruta]&&routes[t.ruta].nombre)||t.ruta;
-    rows+='<tr style="border-bottom:1px solid rgba(255,255,255,.04)"><td style="padding:8px 13px;color:#fff;font-weight:500;white-space:nowrap">'+t.tramo+'</td><td style="padding:8px 13px;text-align:center"><span style="background:'+rc+'22;color:'+rc+';padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700">'+rn+'</span></td>'+cols.map(function(col){return cell(h[col.key]||'',t.id);}).join('')+'<td style="padding:8px 13px;text-align:center"><span style="background:'+sc2+'22;color:'+sc2+';padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700">'+t.estado+'</span></td></tr>';
+    rows+='<tr style="border-bottom:1px solid rgba(255,255,255,.04)"><td style="padding:8px 13px;color:#fff;font-weight:500;white-space:nowrap">'+escapeHtml(t.tramo)+'</td><td style="padding:8px 13px;text-align:center"><span style="background:'+rc+'22;color:'+rc+';padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700">'+escapeHtml(rn)+'</span></td>'+cols.map(function(col){return cell(h[col.key]||'',t.id);}).join('')+'<td style="padding:8px 13px;text-align:center"><span style="background:'+sc2+'22;color:'+sc2+';padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700">'+escapeHtml(t.estado)+'</span></td></tr>';
   });
-  tbody.innerHTML=rows||'<tr><td colspan="'+(cols.length+3)+'" style="padding:28px;text-align:center;color:var(--muted2)">Sin hitos.</td></tr>';
+  tbody.innerHTML=rows||'<tr><td colspan="'+(cols.length+3)+'" style="padding:28px;text-align:center;color:var(--muted2)">Sin tramos que coincidan con los filtros.</td></tr>';
+}
+
+// Línea de tiempo tipo Gantt: una fila por tramo, un eje temporal compartido,
+// círculos para hitos alcanzados (verde = estado "logrado"), línea que conecta
+// los hitos alcanzados de cada tramo, y un rombo para la próxima acción
+// planeada (t.fp / t.proxima) coloreado igual que el resto de la app
+// (rojo=vencida, ámbar=vence pronto, azul=planeada). El color de ruta se usa
+// solo para identificar la fila (punto junto al nombre), nunca para el estado.
+var MAX_GANTT_ROWS=150;
+function renderHitosGantt(){
+  var wrap=document.getElementById('hitos-gantt-wrap');
+  if(!wrap)return;
+  var C_AV='#10B981', C_EG='#F59E0B', C_CR='#EF4444', C_ACC='#3B82F6', C_BG='#0A1628', C_BORDER='#253352', C_MUTED='#7a95bb';
+  var cols=HITOS.slice().sort(function(a,b){return a.orden-b.orden;});
+  var visible=getHitosVisibleTramos().slice().sort(function(a,b){
+    var ra=(routes[a.ruta]&&routes[a.ruta].orden)||999, rb=(routes[b.ruta]&&routes[b.ruta].orden)||999;
+    if(ra!==rb)return ra-rb;
+    return (a.tramo||'').localeCompare(b.tramo||'');
+  });
+  if(!visible.length){
+    wrap.innerHTML='<div style="padding:28px;text-align:center;color:var(--muted2);font-size:11px">Sin tramos que coincidan con los filtros seleccionados.</div>';
+    return;
+  }
+  if(visible.length>MAX_GANTT_ROWS){
+    wrap.innerHTML='<div style="padding:28px;text-align:center;color:var(--muted2);font-size:11px">'+visible.length+' tramos coinciden con el filtro actual &#8212; son demasiados para mostrar en la línea de tiempo.<br>Usa el filtro de rutas o "Elegir tramos&hellip;" para mostrar como máximo '+MAX_GANTT_ROWS+' a la vez.</div>';
+    return;
+  }
+
+  var td=today();
+  var allDates=[td];
+  visible.forEach(function(t){
+    cols.forEach(function(h){ if(t[h.key])allDates.push(t[h.key]); });
+    if(t.fp)allDates.push(t.fp);
+  });
+  var minD=allDates.reduce(function(m,d){return d<m?d:m;});
+  var maxD=allDates.reduce(function(m,d){return d>m?d:m;});
+  var minMs=new Date(minD).getTime(), maxMs=new Date(maxD).getTime();
+  var span=Math.max(maxMs-minMs,30*86400000);
+  var padMs=Math.max(span*0.08,14*86400000);
+  minMs-=padMs; maxMs+=padMs;
+
+  var ROW_H=32, HEADER_H=30, LABEL_W=210;
+  var plotW=Math.max(700,Math.min(4200,Math.round((maxMs-minMs)/86400000*3.2)));
+  var H=HEADER_H+visible.length*ROW_H+8;
+
+  function x(ds){ var ms=new Date(ds).getTime(); return Math.round((ms-minMs)/(maxMs-minMs)*plotW); }
+
+  var gridSvg='', gridLabels='';
+  var cursor=new Date(minMs); cursor.setDate(1);
+  var monthNames=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  var safety=0;
+  while(cursor.getTime()<=maxMs&&safety<120){
+    safety++;
+    var cx=Math.round((cursor.getTime()-minMs)/(maxMs-minMs)*plotW);
+    if(cx>=0&&cx<=plotW){
+      gridSvg+='<line x1="'+cx+'" y1="'+HEADER_H+'" x2="'+cx+'" y2="'+H+'" stroke="'+C_BORDER+'" stroke-width="1" opacity=".6"/>';
+      gridLabels+='<text x="'+(cx+4)+'" y="18" font-size="9" fill="'+C_MUTED+'">'+monthNames[cursor.getMonth()]+' '+cursor.getFullYear()+'</text>';
+    }
+    cursor.setMonth(cursor.getMonth()+1);
+  }
+  var hoyX=x(td);
+  var hoyLine='<line x1="'+hoyX+'" y1="'+HEADER_H+'" x2="'+hoyX+'" y2="'+H+'" stroke="'+C_ACC+'" stroke-width="1.5" stroke-dasharray="3,3" opacity=".85"/>'
+    +'<text x="'+(hoyX+4)+'" y="'+(HEADER_H-4)+'" font-size="9" fill="'+C_ACC+'" font-weight="700">HOY</text>';
+
+  var rowsSvg='', labelRows='';
+  visible.forEach(function(t,idx){
+    var y0=HEADER_H+idx*ROW_H, yc=y0+ROW_H/2;
+    var rc=(routes[t.ruta]&&routes[t.ruta].color)||'#60A5FA';
+    var isSub=!!(t.parent_id||t.tipo_elemento==='subtramo');
+    var stripe=idx%2===1?'<rect x="0" y="'+y0+'" width="'+plotW+'" height="'+ROW_H+'" fill="#fff" opacity=".02"/>':'';
+    var pts=[];
+    cols.forEach(function(h){ if(t[h.key]) pts.push({label:h.label,date:t[h.key],x:x(t[h.key])}); });
+    var line='', circles='';
+    if(pts.length>1){
+      var d='M '+pts.map(function(p){return p.x+' '+yc;}).join(' L ');
+      line='<path d="'+d+'" fill="none" stroke="'+C_AV+'" stroke-width="2" opacity=".45"/>';
+    }
+    pts.forEach(function(p){
+      circles+='<circle cx="'+p.x+'" cy="'+yc+'" r="5" fill="'+C_AV+'" stroke="'+C_BG+'" stroke-width="1.5" style="cursor:pointer" onclick="editHito(\''+t.id+'\')"><title>'+escapeHtml(p.label)+': '+fmt(p.date)+'</title></circle>';
+    });
+    var fpMark='';
+    if(t.fp){
+      var ov=t.fp<td, near=!ov&&t.fp<=addDays(td,7);
+      var fc=ov?C_CR:near?C_EG:C_ACC;
+      var fx=x(t.fp);
+      var d2='M '+fx+' '+(yc-6)+' L '+(fx+6)+' '+yc+' L '+fx+' '+(yc+6)+' L '+(fx-6)+' '+yc+' Z';
+      fpMark='<path d="'+d2+'" fill="'+fc+'" stroke="'+C_BG+'" stroke-width="1.5" style="cursor:pointer" onclick="editHito(\''+t.id+'\')"><title>Próxima acción: '+escapeHtml(t.proxima||'(sin descripción)')+' &#8212; '+fmt(t.fp)+(ov?' (VENCIDA)':near?' (vence pronto)':'')+'</title></path>';
+    }
+    var noData='';
+    if(!pts.length&&!t.fp){
+      noData='<text x="8" y="'+(yc+3)+'" font-size="9" fill="'+C_MUTED+'">Sin datos de hitos</text>';
+    }
+    rowsSvg+='<g>'+stripe+line+circles+fpMark+noData+'</g>';
+
+    var rn=(routes[t.ruta]&&routes[t.ruta].nombre)||t.ruta;
+    labelRows+='<div onclick="editHito(\''+t.id+'\')" title="'+escapeHtml(t.tramo)+' ('+escapeHtml(rn)+') — click para editar hitos" style="height:'+ROW_H+'px;display:flex;align-items:center;gap:6px;padding:0 8px 0 '+(isSub?'22px':'8px')+';cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);box-sizing:border-box">'
+      +'<span style="width:7px;height:7px;border-radius:50%;background:'+rc+';flex:0 0 auto"></span>'
+      +'<span style="font-size:10px;color:'+(isSub?'var(--muted)':'#fff')+';font-weight:'+(isSub?'400':'500')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(isSub?'&#8627; ':'')+escapeHtml(t.tramo)+'</span>'
+      +'</div>';
+  });
+
+  var html='<div style="display:flex;overflow-x:auto;position:relative">'
+    +'<div style="position:sticky;left:0;z-index:2;background:var(--card);flex:0 0 '+LABEL_W+'px;border-right:1px solid var(--border);padding-top:'+HEADER_H+'px">'+labelRows+'</div>'
+    +'<svg width="'+plotW+'" height="'+H+'" style="display:block;flex:0 0 auto">'
+    +gridSvg+gridLabels+hoyLine+rowsSvg
+    +'</svg>'
+    +'</div>'
+    +'<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:8px 14px;border-top:1px solid var(--border);font-size:9px;color:var(--muted)">'
+    +'<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:'+C_AV+';display:inline-block"></span> Hito alcanzado</span>'
+    +'<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;background:'+C_ACC+';display:inline-block;transform:rotate(45deg)"></span> Próxima acción planeada</span>'
+    +'<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;background:'+C_EG+';display:inline-block;transform:rotate(45deg)"></span> Vence pronto (&#8804;7 días)</span>'
+    +'<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;background:'+C_CR+';display:inline-block;transform:rotate(45deg)"></span> Vencida</span>'
+    +'<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:0;border-top:1.5px dashed '+C_ACC+';display:inline-block"></span> Hoy</span>'
+    +'</div>';
+  wrap.innerHTML=html;
 }
 
 function editHito(tramoId){

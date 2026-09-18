@@ -612,6 +612,8 @@ async function saveScToSupabase(){
 }
 async function saveHitosConfig(){try{await sbUpsert("puntos",[{id:"__hitos_config__",nombre:"HITOS_CONFIG",tipo:"__config__",lat:0,lng:0,label:JSON.stringify(HITOS)}]);}catch(e){}}
 async function loadHitosConfig(){try{var rows=await sbGet("puntos","id=eq.__hitos_config__");if(rows&&rows.length&&rows[0].label){var p=JSON.parse(rows[0].label);if(p&&p.length)return p;}}catch(e){}return null;}
+async function saveHerenciaConfig(){try{await sbUpsert("puntos",[{id:"__herencia_config__",nombre:"HERENCIA_CONFIG",tipo:"__config__",lat:0,lng:0,label:JSON.stringify(HERENCIA)}]);}catch(e){}}
+async function loadHerenciaConfig(){try{var rows=await sbGet("puntos","id=eq.__herencia_config__");if(rows&&rows.length&&rows[0].label){var p=JSON.parse(rows[0].label);if(p&&typeof p==='object')return {ruta:p.ruta||{},heredar:p.heredar||{}};}}catch(e){}return null;}
 
 
 async function loadScFromSupabase(){
@@ -665,6 +667,7 @@ function _autoSortTramos(){
 async function loadFromDB(){
   console.log('[LDB] starting...');
   var dbHITOS=await loadHitosConfig();if(dbHITOS&&dbHITOS.length)HITOS=dbHITOS;
+  var dbHER=await loadHerenciaConfig();if(dbHER)HERENCIA=dbHER;
   // Load SC (estados) - priority: Supabase > localStorage > hardcoded defaults
   var dbSC=await loadScFromSupabase();
   if(dbSC){
@@ -806,6 +809,97 @@ async function saveTramoToDB(t){
   } catch(e){ console.error('saveTramoToDB:', e); }
 }
 
+// ── Herencia de estado/hitos: resolución y cascada ───────────────────────
+function esSubtramo(t){ return !!(t&&(t.parent_id||t.tipo_elemento==='subtramo')); }
+function getHerenciaFlags(tramoId){ return HERENCIA.heredar[tramoId]||{estado:false,hitos:false}; }
+function setHerenciaFlags(tramoId,flags){
+  HERENCIA.heredar[tramoId]=Object.assign({},getHerenciaFlags(tramoId),flags);
+  saveHerenciaConfig();
+}
+// Origen del que un tramo/subtramo puede heredar: su ruta (si es tramo principal)
+// o su tramo padre (si es subtramo). Devuelve null si no hay origen disponible.
+function getOrigenHerencia(t){
+  if(!t)return null;
+  if(esSubtramo(t)){
+    var padre=tramos.find(function(x){return x.id===t.parent_id;});
+    return padre?{tipo:'tramo',obj:padre}:null;
+  }
+  return t.ruta&&routes[t.ruta]?{tipo:'ruta',obj:routes[t.ruta]}:null;
+}
+function origenEstadoActual(origen){
+  if(!origen)return '';
+  if(origen.tipo==='ruta')return (HERENCIA.ruta[origen.obj.id]&&HERENCIA.ruta[origen.obj.id].estado)||'';
+  return origen.obj.estado||'';
+}
+function origenHitoActual(origen,key){
+  if(!origen)return '';
+  if(origen.tipo==='ruta')return (HERENCIA.ruta[origen.obj.id]&&HERENCIA.ruta[origen.obj.id][key])||'';
+  return origen.obj[key]||'';
+}
+// Trae ahora mismo el estado/hitos del origen hacia este tramo (sin esperar a la próxima cascada).
+// No guarda en Supabase por sí sola — quien la llama decide cuándo guardar.
+function pullHerenciaAhora(t,{estado,hitos}={}){
+  var origen=getOrigenHerencia(t);
+  if(!origen)return;
+  if(estado){ var e=origenEstadoActual(origen); if(e)t.estado=e; }
+  if(hitos){ HITOS.forEach(function(h){ var v=origenHitoActual(origen,h.key); if(v)t[h.key]=v; }); }
+}
+// Empuja el estado/hitos ACTUALES de una ruta hacia sus tramos principales que hereden,
+// y de ahí recursivamente hacia los subtramos que a su vez hereden.
+function cascadeDesdeRuta(rutaId,{estado,hitos}={estado:true,hitos:true}){
+  var hijos=tramos.filter(function(t){return t.ruta===rutaId&&!esSubtramo(t);});
+  hijos.forEach(function(t){
+    var flags=getHerenciaFlags(t.id);
+    var cambio=false;
+    if(estado&&flags.estado){ var e=(HERENCIA.ruta[rutaId]&&HERENCIA.ruta[rutaId].estado)||''; if(e&&t.estado!==e){t.estado=e;cambio=true;} }
+    if(hitos&&flags.hitos){ HITOS.forEach(function(h){ var v=(HERENCIA.ruta[rutaId]&&HERENCIA.ruta[rutaId][h.key])||''; if(v&&t[h.key]!==v){t[h.key]=v;cambio=true;} }); }
+    if(cambio)saveTramoToDB(t);
+    cascadeDesdeTramo(t.id,{estado:estado,hitos:hitos}); // por si este tramo tiene subtramos que heredan de él
+  });
+}
+// Empuja el estado/hitos ACTUALES de un tramo (los que tenga en este momento, sean
+// propios o heredados) hacia sus subtramos que hereden de él.
+function cascadeDesdeTramo(tramoId,{estado,hitos}={estado:true,hitos:true}){
+  var padre=tramos.find(function(x){return x.id===tramoId;}); if(!padre)return;
+  var hijos=tramos.filter(function(t){return t.parent_id===tramoId;});
+  hijos.forEach(function(sub){
+    var flags=getHerenciaFlags(sub.id);
+    var cambio=false;
+    if(estado&&flags.estado&&padre.estado&&sub.estado!==padre.estado){sub.estado=padre.estado;cambio=true;}
+    if(hitos&&flags.hitos){ HITOS.forEach(function(h){ var v=padre[h.key]||''; if(v&&sub[h.key]!==v){sub[h.key]=v;cambio=true;} }); }
+    if(cambio)saveTramoToDB(sub);
+  });
+}
+
+function saveRutaDefaults(rid){
+  var r=routes[rid]; if(!r)return;
+  var estado=gv('rd-estado');
+  var vals={}; if(estado)vals.estado=estado;
+  HITOS.forEach(function(h){var v=gv('rd-'+h.key); if(v)vals[h.key]=v;});
+  HERENCIA.ruta[rid]=vals;
+  var bulkEstado=document.getElementById('rd-bulk-estado'), bulkHitos=document.getElementById('rd-bulk-hitos');
+  var hijos=tramos.filter(function(t){return t.ruta===rid&&!esSubtramo(t);});
+  if(bulkEstado&&bulkEstado.checked)hijos.forEach(function(t){setHerenciaFlags(t.id,{estado:true});});
+  if(bulkHitos&&bulkHitos.checked)hijos.forEach(function(t){setHerenciaFlags(t.id,{hitos:true});});
+  saveHerenciaConfig();
+  cascadeDesdeRuta(rid,{estado:true,hitos:true});
+  closeModal(); renderAll(); if(mapInst)drawAllLines(); if(editingRoute)selEditRoute(editingRoute);
+  toast('Valores por defecto guardados y aplicados a "'+r.nombre+'"');
+}
+
+// Activa de un click "heredar estado + hitos" en todos los subtramos de un tramo,
+// y de inmediato les copia los valores actuales del tramo padre (no espera al próximo cambio).
+function bulkHeredarSubtramos(tramoId){
+  var padre=tramos.find(function(x){return x.id===tramoId;}); if(!padre)return;
+  var hijos=tramos.filter(function(t){return t.parent_id===tramoId;});
+  if(!hijos.length){toast('Este tramo no tiene subtramos','err');return;}
+  if(!confirm('¿Activar herencia de estado e hitos en los '+hijos.length+' subtramos de "'+padre.tramo+'"? Van a mostrar el mismo estado e hitos que el tramo padre a partir de ahora.'))return;
+  hijos.forEach(function(t){ setHerenciaFlags(t.id,{estado:true,hitos:true}); });
+  cascadeDesdeTramo(tramoId,{estado:true,hitos:true});
+  renderAll(); if(editingRoute)selEditRoute(editingRoute); if(mapInst)drawAllLines();
+  toast('Herencia activada en '+hijos.length+' subtramos de "'+padre.tramo+'"');
+}
+
 async function saveBitacoraEntryToDB(b){
   try{
     await sbUpsert('bitacora', [{
@@ -848,6 +942,15 @@ var HITOS=[
 ];
 try{var _sc=localStorage.getItem('somos_sc');if(_sc)SC=JSON.parse(_sc);}catch(e){}
 
+// ── Herencia de estado/hitos: ruta → tramos, tramo → subtramos ──────────
+// No hay columnas nuevas en Supabase para esto (ni en "tramos" ni en "rutas"),
+// así que se guarda igual que HITOS: una fila sintética en "puntos"
+// (id:"__herencia_config__"). Estructura:
+//   HERENCIA.ruta[rutaId]    = {estado:"...", hito_1:"...", ...}  (valores por defecto de la ruta)
+//   HERENCIA.heredar[tramoId] = {estado:true/false, hitos:true/false}  (si ESE tramo/subtramo sigue a su origen)
+// El origen de un tramo sin parent_id es su ruta; el de un subtramo es su tramo padre.
+var HERENCIA={ruta:{}, heredar:{}};
+
 var tramos=KMZ_TRAMOS.map(function(t){var r=Object.assign({},t);r.estado=normalizeEstado(r.estado);return r;});
 var routes={};
 
@@ -881,8 +984,10 @@ function mapRouteVisible(rutaId){ return mapFiltSet.size===0||mapFiltSet.has(rut
 var hitosViewMode='gantt'; // 'gantt' | 'table'
 // Selección múltiple de rutas visibles en la línea de hitos. Vacío = todas.
 var hitosRouteFilter=new Set();
-// Selección explícita de tramos/subtramos a mostrar. Vacío = todos los de las rutas visibles.
-var hitosTramoFilter=new Set();
+// Selección explícita de tramos/subtramos a mostrar. null = todos los de las rutas visibles
+// (no usar un Set vacío para "todos": un Set vacío se usa para representar la selección real
+// de "ningún tramo" cuando el usuario los deselecciona uno por uno desde "Elegir tramos…").
+var hitosTramoFilter=null;
 // Si se incluyen subtramos en la línea de tiempo (por defecto solo tramos padre).
 var hitosIncludeSub=false;
 function hitosRouteVisible(rutaId){ return hitosRouteFilter.size===0||hitosRouteFilter.has(rutaId); }
@@ -1563,19 +1668,25 @@ function selEditRoute(rid){
   editingRoute=rid;
   const r=routes[rid]; if(!r)return;
   document.getElementById("editor-title").textContent="Tramos: "+r.nombre;
-  document.getElementById("editor-actions").innerHTML=`<button class="btn btn-sm" onclick="sortTramos()" title="Ordenar tramos por numeral">⇅ Ordenar</button> <button class="btn btn-p btn-sm" onclick="openModal('nuevo-tramo','${rid}')">+ Agregar tramo</button>`;
+  document.getElementById("editor-actions").innerHTML=`<button class="btn btn-sm" onclick="sortTramos()" title="Ordenar tramos por numeral">⇅ Ordenar</button> <button class="btn btn-sm" onclick="openModal('ruta-defaults','${rid}')" title="Estado/hitos por defecto para los tramos que hereden de esta ruta">⇩ Valores por defecto</button> <button class="btn btn-p btn-sm" onclick="openModal('nuevo-tramo','${rid}')">+ Agregar tramo</button>`;
   const rt=tramos.filter(t=>t.ruta===rid);
   document.getElementById("tramo-editor-body").innerHTML=`<div style="max-height:380px;overflow-y:auto" class="sc">${
-    rt.map(t=>`<div class="tramo-edit-row">
+    rt.map(t=>{
+      var isSub=esSubtramo(t);
+      var fH=getHerenciaFlags(t.id);
+      var nSub=isSub?0:tramos.filter(function(x){return x.parent_id===t.id;}).length;
+      var herB=(fH.estado||fH.hitos)?'<span title="Hereda: '+(fH.estado?'estado ':'')+(fH.hitos?'hitos':'')+'" style="font-size:8px;font-weight:700;color:var(--acc);border:1px solid var(--acc);border-radius:4px;padding:1px 5px">⇩ HEREDA</span>':'';
+      return `<div class="tramo-edit-row"${isSub?' style="margin-left:18px;opacity:.9"':''}>
       <div style="width:5px;height:36px;border-radius:3px;background:${SC[t.estado]};flex-shrink:0"></div>
-      <div style="flex:1"><div style="font-size:12px;color:#fff">${t.tramo}</div><div style="font-size:9px;color:var(--muted)">${t.actor} · ${t.km} km · ${t.estado}</div></div>
+      <div style="flex:1"><div style="font-size:12px;color:#fff">${isSub?'&#8627; ':''}${t.tramo} ${herB}</div><div style="font-size:9px;color:var(--muted)">${t.actor} · ${t.km} km · ${t.estado}${nSub?' · '+nSub+' subtramo(s)':''}</div></div>
       <div style="display:flex;gap:4px;flex-wrap:wrap">
         ${sb(t.estado)}
         <button class="btn btn-warn btn-sm" onclick="openModal('edit-tramo','${t.id}')">Editar</button>
         <button class="btn btn-warn btn-sm" onclick="openModal('nuevo-tramo','${t.ruta}','${t.id}')">+ Sub</button>
+        ${nSub?'<button class="btn btn-g btn-sm" onclick="bulkHeredarSubtramos(\''+t.id+'\')" title="Activar herencia de estado e hitos en todos sus subtramos">⇩ Subtramos heredan</button>':''}
         <button class="btn btn-danger btn-sm" onclick="qDelTramo('${t.id}')">×</button>
       </div>
-    </div>`).join("")||'<div class="empty">Sin tramos en esta ruta</div>'}</div>`;
+    </div>`;}).join("")||'<div class="empty">Sin tramos en esta ruta</div>'}</div>`;
 }
 
 function eliminarRuta(rid){
@@ -1803,6 +1914,31 @@ function openModal(type,id,preTramo){
     </div>`;
   }
 
+  else if(type==="ruta-defaults"){
+    const r=routes[id]; if(!r)return;
+    var def=HERENCIA.ruta[id]||{};
+    var cols=HITOS.slice().sort(function(a,b){return a.orden-b.orden;});
+    var hijos=tramos.filter(function(t){return t.ruta===id&&!esSubtramo(t);});
+    var nHeredanEstado=hijos.filter(function(t){return getHerenciaFlags(t.id).estado;}).length;
+    var nHeredanHitos=hijos.filter(function(t){return getHerenciaFlags(t.id).hitos;}).length;
+    mt.textContent="Valores por defecto: "+r.nombre;
+    var fh='<div class="ff">';
+    fh+='<p style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:2px">Estos valores solo se aplican a los tramos de esta ruta que tengan marcado "Heredar" (ver el checkbox en Editar tramo / Hitos de cada tramo, o actívalo aquí para todos de una vez).</p>';
+    fh+='<div class="fl"><label>Estado por defecto de la ruta</label><select class="inp" id="rd-estado"><option value="">(sin definir)</option>'+Object.keys(SC).map(function(e){return '<option value="'+e+'"'+(def.estado===e?' selected':'')+'>'+e+'</option>';}).join('')+'</select></div>';
+    fh+='<div class="sec-tag">Hitos por defecto de la ruta</div>';
+    for(var ri=0;ri<cols.length;ri+=2){
+      fh+='<div class="frow"><div class="fl"><label>'+cols[ri].label+'</label><input type="date" class="inp" id="rd-'+cols[ri].key+'" value="'+(def[cols[ri].key]||'')+'"></div>';
+      if(ri+1<cols.length)fh+='<div class="fl"><label>'+cols[ri+1].label+'</label><input type="date" class="inp" id="rd-'+cols[ri+1].key+'" value="'+(def[cols[ri+1].key]||'')+'"></div>';
+      fh+='</div>';
+    }
+    fh+='<div class="sec-tag">Aplicar a los '+hijos.length+' tramos principales de esta ruta</div>';
+    fh+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="checkbox" id="rd-bulk-estado" style="accent-color:var(--acc)"> Activar "Heredar estado" en los tramos que aún no lo tengan ('+(hijos.length-nHeredanEstado)+' de '+hijos.length+')</label>';
+    fh+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="checkbox" id="rd-bulk-hitos" style="accent-color:var(--acc)"> Activar "Heredar hitos" en los tramos que aún no lo tengan ('+(hijos.length-nHeredanHitos)+' de '+hijos.length+')</label>';
+    fh+='<div style="display:flex;justify-content:flex-end;gap:7px;margin-top:10px"><button class="btn btn-g" onclick="closeModal()">Cancelar</button><button class="btn btn-p" onclick="saveRutaDefaults(\''+id+'\')">Guardar y aplicar</button></div>';
+    fh+='</div>';
+    mb.innerHTML=fh;
+  }
+
   else if(type==="fusionar-ruta"){
     const r=routes[id]; if(!r)return;
     const rt=tramos.filter(t=>t.ruta===id);
@@ -1863,12 +1999,23 @@ function openModal(type,id,preTramo){
     const t=tramos.find(x=>x.id===id); if(!t)return;
     mt.textContent="Editar tramo";
     const rOpts=Object.values(routes).map(r=>`<option value="${r.id}"${r.id===t.ruta?" selected":""}>${r.nombre}</option>`).join("");
+    const origenH=getOrigenHerencia(t);
+    const origenHLabel=origenH?(origenH.tipo==='ruta'?('la ruta "'+origenH.obj.nombre+'"'):('el tramo padre "'+origenH.obj.tramo+'"')):null;
+    const flagsH=getHerenciaFlags(t.id);
     mb.innerHTML=`<div class="ff">
       <div class="fl"><label>Nombre del tramo</label><input type="text" class="inp" id="et-n" value="${t.tramo}"></div>
       <div class="frow">
         <div class="fl"><label>Ruta</label><select class="inp" id="et-r">${rOpts}</select></div>
-        <div class="fl"><label>Estado (semáforo)</label><select class="inp" id="et-e">${Object.keys(SC).map(function(e){return '<option value="'+e+'"'+(t.estado===e?' selected':'')+'>'+e+'</option>';}).join('')}</select></div>
+        <div class="fl"><label>Estado (semáforo)</label><select class="inp" id="et-e" ${flagsH.estado?'disabled':''}>${Object.keys(SC).map(function(e){return '<option value="'+e+'"'+(t.estado===e?' selected':'')+'>'+e+'</option>';}).join('')}</select></div>
       </div>
+      ${origenHLabel?`<div class="fl" style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);border-radius:7px;padding:8px 11px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;text-transform:none;font-size:11px;color:var(--text)">
+          <input type="checkbox" id="et-heredar-estado" ${flagsH.estado?'checked':''} style="accent-color:var(--acc)"
+            onchange="document.getElementById('et-e').disabled=this.checked;document.getElementById('et-heredar-note').style.display=this.checked?'block':'none'">
+          Heredar estado de ${origenHLabel}
+        </label>
+        <div id="et-heredar-note" style="display:${flagsH.estado?'block':'none'};font-size:9px;color:var(--muted);margin-top:4px">Se sincroniza automáticamente cada vez que cambie el estado de ${origenHLabel}. El desplegable de arriba se ignora mientras esté marcado.</div>
+      </div>`:''}
       <div class="frow">
         <div class="fl"><label>Actor</label><input type="text" class="inp" id="et-a" value="${t.actor}"></div>
         <div class="fl"><label>Concesión</label><input type="text" class="inp" id="et-c" value="${t.concesion||""}"></div>
@@ -2066,8 +2213,17 @@ function saveEditTramo(id){
   t.tipo_elemento=tipoEl; t.parent_id=parentId||null;
   if(parentId&&!window._openTramos)window._openTramos={};
   if(parentId)window._openTramos[parentId]=true;
+  // Herencia de estado: si el checkbox quedó marcado, el valor mostrado en el
+  // desplegable se ignora y en su lugar se trae el estado actual del origen
+  // (la ruta si es tramo principal, el tramo padre si es subtramo).
+  var chkHE=document.getElementById('et-heredar-estado');
+  if(chkHE){
+    setHerenciaFlags(id,{estado:chkHE.checked});
+    if(chkHE.checked)pullHerenciaAhora(t,{estado:true});
+  }
   closeModal(); renderAll(); refreshLines(); if(selTramo)selT(selTramo); if(editingRoute)selEditRoute(editingRoute);
   var et=tramos.find(function(x){return x.id===id;});if(et)saveTramoToDB(et);
+  cascadeDesdeTramo(id,{estado:true,hitos:false}); // por si este tramo tiene subtramos que heredan su estado
   toast('Tramo actualizado · Guardado en base de datos');
 }
 
@@ -4378,10 +4534,22 @@ function editHito(tramoId){
   var mt=document.getElementById('modal-title');
   var mb=document.getElementById('modal-body');
   mt.textContent='Hitos: '+t.tramo;
+  var origenH=getOrigenHerencia(t);
+  var origenHLabel=origenH?(origenH.tipo==='ruta'?('la ruta "'+origenH.obj.nombre+'"'):('el tramo padre "'+origenH.obj.tramo+'"')):null;
+  var flagsH=getHerenciaFlags(tramoId);
   var fh='<div class="ff">';
+  if(origenHLabel){
+    fh+='<div class="fl" style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);border-radius:7px;padding:8px 11px">'
+      +'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;text-transform:none;font-size:11px;color:var(--text)">'
+      +'<input type="checkbox" id="h-heredar-hitos" '+(flagsH.hitos?'checked':'')+' style="accent-color:var(--acc)" onchange="toggleHitosInputs(this.checked)"> '
+      +'Heredar hitos de '+origenHLabel
+      +'</label>'
+      +'<div id="h-heredar-note" style="display:'+(flagsH.hitos?'block':'none')+';font-size:9px;color:var(--muted);margin-top:4px">Las fechas de abajo se ignoran y se sincronizan automáticamente cada vez que cambien las de '+origenHLabel+'.</div>'
+      +'</div>';
+  }
   for(var ri=0;ri<cols.length;ri+=2){
-    fh+='<div class="frow"><div class="fl"><label>'+cols[ri].label+'</label><input type="date" class="inp" id="h-'+cols[ri].key+'" value="'+(t[cols[ri].key]||'')+'"></div>';
-    if(ri+1<cols.length)fh+='<div class="fl"><label>'+cols[ri+1].label+'</label><input type="date" class="inp" id="h-'+cols[ri+1].key+'" value="'+(t[cols[ri+1].key]||'')+'"></div>';
+    fh+='<div class="frow"><div class="fl"><label>'+cols[ri].label+'</label><input type="date" class="inp" id="h-'+cols[ri].key+'" value="'+(t[cols[ri].key]||'')+'" '+(flagsH.hitos?'disabled':'')+'></div>';
+    if(ri+1<cols.length)fh+='<div class="fl"><label>'+cols[ri+1].label+'</label><input type="date" class="inp" id="h-'+cols[ri+1].key+'" value="'+(t[cols[ri+1].key]||'')+'" '+(flagsH.hitos?'disabled':'')+'></div>';
     fh+='</div>';
   }
   fh+='<div style="display:flex;justify-content:space-between;gap:8px;margin-top:12px"><button class="btn btn-sm" id="h-clear-btn" style="color:#EF4444;border-color:#EF4444">&#128465; Limpiar</button><div style="display:flex;gap:8px"><button class="btn btn-g" onclick="closeModal()">Cancelar</button><button class="btn btn-p" id="h-save-btn">Guardar</button></div></div></div>';
@@ -4390,14 +4558,24 @@ function editHito(tramoId){
   document.getElementById('h-clear-btn').onclick=function(){clearHitos(tramoId);};
   document.getElementById('modal-overlay').classList.add('open');
 }
+function toggleHitosInputs(checked){
+  HITOS.forEach(function(h){var el=document.getElementById('h-'+h.key);if(el)el.disabled=checked;});
+  var note=document.getElementById('h-heredar-note'); if(note)note.style.display=checked?'block':'none';
+}
 function saveHitos(tramoId){
   var t=tramos.find(function(x){return x.id===tramoId;}); if(!t)return;
-  HITOS.forEach(function(h){t[h.key]=gv('h-'+h.key)||'';});
-  closeModal(); saveTramoToDB(t); renderHitos(); toast('Hitos actualizados');
+  var chkHH=document.getElementById('h-heredar-hitos');
+  if(chkHH){
+    setHerenciaFlags(tramoId,{hitos:chkHH.checked});
+    if(chkHH.checked)pullHerenciaAhora(t,{hitos:true});
+  }
+  if(!chkHH||!chkHH.checked){ HITOS.forEach(function(h){t[h.key]=gv('h-'+h.key)||'';}); }
+  closeModal(); saveTramoToDB(t); cascadeDesdeTramo(tramoId,{estado:false,hitos:true}); renderHitos(); toast('Hitos actualizados');
 }
 function clearHitos(tramoId){
   var t=tramos.find(function(x){return x.id===tramoId;}); if(!t)return;
   HITOS.forEach(function(h){t[h.key]='';});
+  setHerenciaFlags(tramoId,{hitos:false});
   closeModal(); saveTramoToDB(t); renderHitos(); toast('Hitos eliminados');
 }
 function openHitosConfig(){

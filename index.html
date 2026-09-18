@@ -206,6 +206,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
         <span class="card-t">&#128506; Mapa KMZ &#8212; trazados reales HORIZON</span>
         <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
           <div id="mapa-route-filters" style="display:contents"></div>
+          <button class="btn btn-g btn-sm" onclick="openModal('export-mapa')" title="Exportar tramos, puntos de interés y/o la capa de referencia oficial (ANI/UPME) a KML o KMZ" style="margin-left:6px">&#11015; Exportar KML/KMZ</button>
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;padding:9px 14px;border-bottom:1px solid #253352;flex-wrap:wrap">
@@ -2090,6 +2091,76 @@ function openModal(type,id,preTramo){
       </div>
     </div>`;
   }
+
+  else if(type==="export-mapa"){
+    mt.textContent="⬇ Exportar mapa (KML / KMZ)";
+    var exRutas=getSortedRoutes();
+    var exRutaChecked=function(rid){ return mapFiltSet.size===0||mapFiltSet.has(rid); };
+    var exPList=(window._dbPuntos&&window._dbPuntos.length)?window._dbPuntos:KMZ_PUNTOS;
+    var exTipos=[]; (exPList||[]).forEach(function(p){ var tp=p.tipo||p.label; if(tp&&tp!=='__config__'&&tp!=='Marcador'&&exTipos.indexOf(tp)<0)exTipos.push(tp); });
+    var exTipoChecked=function(tp){ var chk=document.getElementById('lay-dyn-'+tp.replace(/\s+/g,'_')); return chk?chk.checked:(tp!=='Recamara'); };
+    var exRefActivo=window._aniLayerWanted?(window._aniLayerWantedType||aniActiveType):'';
+    mb.innerHTML=`<div class="ff">
+      <p style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:2px">Genera un archivo para abrir en Google Earth u otro visor SIG, con lo que elijas incluir a continuación.</p>
+
+      <div style="padding:8px 0 4px;border-top:1px solid var(--border);margin-top:6px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:#fff;font-size:11px;font-weight:700">
+          <input type="checkbox" id="ex-inc-tramos" checked onchange="toggleExportSection('tramos')"> Tramos y rutas
+        </label>
+      </div>
+      <div id="ex-tramos-body" style="padding-left:4px">
+        <div class="fl"><label>Nivel de detalle</label>
+          <select class="inp" id="ex-detalle" style="width:auto">
+            <option value="main"${mapDetailLevel==='main'?' selected':''}>Tramos principales</option>
+            <option value="sub"${mapDetailLevel==='sub'?' selected':''}>Subtramos</option>
+            <option value="all"${mapDetailLevel==='all'?' selected':''}>Todos</option>
+          </select>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin:6px 0 4px">Rutas a incluir:</div>
+        <div style="max-height:130px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:6px">
+          ${exRutas.map(function(r){
+            return '<label style="display:flex;align-items:center;gap:6px;padding:3px 2px;cursor:pointer;font-size:11px">'
+              +'<input type="checkbox" class="ex-ruta-chk" data-ruta="'+r.id+'"'+(exRutaChecked(r.id)?' checked':'')+'> '+r.nombre+'</label>';
+          }).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:5px">
+          <button type="button" class="btn btn-g btn-sm" onclick="exSetAllRutas(true)">Marcar todas</button>
+          <button type="button" class="btn btn-g btn-sm" onclick="exSetAllRutas(false)">Ninguna</button>
+        </div>
+      </div>
+
+      <div style="padding:8px 0 4px;border-top:1px solid var(--border);margin-top:10px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:#fff;font-size:11px;font-weight:700">
+          <input type="checkbox" id="ex-inc-puntos"${exTipos.length?' checked':''} onchange="toggleExportSection('puntos')"${exTipos.length?'':' disabled'}> Puntos de interés
+        </label>
+      </div>
+      <div id="ex-puntos-body" style="padding-left:4px">
+        ${exTipos.length? ('<div style="display:flex;flex-wrap:wrap;gap:9px">'+exTipos.map(function(tp){
+          return '<label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer"><input type="checkbox" class="ex-tipo-chk" data-tipo="'+tp+'"'+(exTipoChecked(tp)?' checked':'')+'> '+tp+'</label>';
+        }).join('')+'</div>') : '<div style="font-size:10px;color:var(--muted2)">No hay puntos de interés cargados</div>'}
+      </div>
+
+      <div style="padding:8px 0 4px;border-top:1px solid var(--border);margin-top:10px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:#fff;font-size:11px;font-weight:700">
+          <input type="checkbox" id="ex-inc-ref"${exRefActivo?' checked':''} onchange="toggleExportSection('ref')"> Capa de referencia oficial (ANI / UPME)
+        </label>
+      </div>
+      <div id="ex-ref-body" style="padding-left:4px">
+        <select class="inp" id="ex-ref-tipo" style="width:auto">
+          ${Object.keys(ANI_LAYERS).map(function(k){return '<option value="'+k+'"'+(k===(exRefActivo||aniActiveType)?' selected':'')+'>'+ANI_LAYERS[k].label+'</option>';}).join('')}
+        </select>
+        <div style="font-size:10px;color:var(--muted2);margin-top:5px">${exRefActivo?'Se exportará la capa ya cargada en el mapa. Si eliges otra, se consultará el servicio oficial en el momento de exportar (puede tardar unos segundos).':'Se consultará el servicio oficial (sig.ani.gov.co / geo.upme.gov.co) al exportar — puede tardar unos segundos. Nota: aún no hay una capa de INVIAS integrada, solo ANI (carreteras/férreas) y UPME (transmisión eléctrica).'}</div>
+      </div>
+
+      <div id="ex-status" style="font-size:11px;color:var(--muted);margin-top:9px;min-height:14px"></div>
+      <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:4px">
+        <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-warn" onclick="runExportMapa('kml')">&#11015; Descargar .kml</button>
+        <button class="btn btn-p" onclick="runExportMapa('kmz')">&#11015; Descargar .kmz</button>
+      </div>
+    </div>`;
+    setTimeout(function(){ toggleExportSection('tramos'); toggleExportSection('puntos'); toggleExportSection('ref'); },0);
+  }
 }
 
 function closeModal(){
@@ -2257,6 +2328,213 @@ function saveAlt(id){
   tramos.push({id:uid(),ruta:gv("alt-r"),tramo:gv("alt-n"),actor:gv("alt-a"),km:parseFloat(gv("alt-km"))||t.km,estado:"En gestión",proxima:"Evaluar viabilidad ruta alternativa",fp:"",concesion:"",coords:t.coords.map((c,i)=>[c[0]+(i%2===0?.08:-.05),c[1]+(i%2===0?-.05:.07)])});
   closeModal(); renderAll(); if(mapInst)drawAllLines(); if(editingRoute)selEditRoute(editingRoute);
   toast("Ruta alternativa creada y visible en el mapa");
+}
+
+// ─── EXPORTAR MAPA A KML / KMZ ───────────────────────────────
+// Reutiliza los datos ya cargados (tramos, puntos, capa de referencia ANI/UPME) para generar
+// un KML (o un KMZ = KML comprimido) descargable, sin tocar Supabase.
+function toggleExportSection(section){
+  var chk=document.getElementById('ex-inc-'+section);
+  var body=document.getElementById('ex-'+section+'-body');
+  if(!chk||!body)return;
+  body.style.opacity=chk.checked?'1':'.4';
+  body.style.pointerEvents=chk.checked?'auto':'none';
+}
+function exSetAllRutas(checked){
+  Array.prototype.forEach.call(document.querySelectorAll('.ex-ruta-chk'),function(chk){chk.checked=checked;});
+}
+function xmlEsc(s){
+  return String(s===null||s===undefined?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+function hexToKmlColor(hex,alpha){
+  hex=(hex||'#94A3B8').replace('#','').toLowerCase();
+  if(hex.length===3)hex=hex.split('').map(function(c){return c+c;}).join('');
+  if(hex.length!==6||/[^0-9a-f]/.test(hex))hex='94a3b8';
+  var r=hex.substr(0,2),g=hex.substr(2,2),b=hex.substr(4,2);
+  return (alpha||'ff')+b+g+r;
+}
+function coordsToKmlLine(coords){
+  // coords vienen como [lat,lng] (convención interna) — KML exige "lng,lat,0 lng,lat,0 ..."
+  return coords.map(function(c){return c[1]+','+c[0]+',0';}).join(' ');
+}
+function kmlPlacemarkLine(name,descHtml,coords,colorHex){
+  return '<Placemark><name>'+xmlEsc(name)+'</name>'
+    +(descHtml?('<description><![CDATA['+descHtml+']]></description>'):'')
+    +'<Style><LineStyle><color>'+hexToKmlColor(colorHex)+'</color><width>3</width></LineStyle></Style>'
+    +'<LineString><tessellate>1</tessellate><coordinates>'+coordsToKmlLine(coords)+'</coordinates></LineString></Placemark>';
+}
+function kmlPlacemarkPoint(name,descHtml,lat,lng,colorHex){
+  return '<Placemark><name>'+xmlEsc(name)+'</name>'
+    +(descHtml?('<description><![CDATA['+descHtml+']]></description>'):'')
+    +'<Style><IconStyle><color>'+hexToKmlColor(colorHex)+'</color><scale>1</scale></IconStyle></Style>'
+    +'<Point><coordinates>'+lng+','+lat+',0</coordinates></Point></Placemark>';
+}
+function kmlFolder(name,innerXml){
+  if(!innerXml)return '';
+  return '<Folder><name>'+xmlEsc(name)+'</name>'+innerXml+'</Folder>';
+}
+function tramoDescHtml(t){
+  var parts=['<b>Estado:</b> '+xmlEsc(t.estado||'-'),'<b>Actor:</b> '+xmlEsc(t.actor||'-'),'<b>Concesión:</b> '+xmlEsc(t.concesion||'Invias/directo'),'<b>Km:</b> '+(t.km||0)+' km'];
+  if(t.proxima)parts.push('<b>Próxima acción:</b> '+xmlEsc(t.proxima));
+  return parts.join('<br>');
+}
+// Replica exactamente el filtrado de drawAllLines(): en modo 'sub' solo subtramos; en 'main'/'all'
+// solo tramos principales, dibujando los segmentos de sus hijos (subtramos) cuando existen en vez
+// de la geometría propia del tramo padre — así el KML exportado coincide con lo que se ve en el mapa.
+function collectExportTramos(detailLevel,rutaIdSet){
+  var out=[];
+  tramos.forEach(function(t){
+    if(!rutaIdSet.has(t.ruta))return;
+    var isSub=esSubtramo(t);
+    if(detailLevel==='sub'&&!isSub)return;
+    if(detailLevel!=='sub'&&isSub)return;
+    if(!isSub){
+      var children=tramos.filter(function(x){return x.parent_id===t.id;});
+      if(children.length>0){
+        children.forEach(function(child){ if(child.coords&&child.coords.length>=2)out.push({t:child,coords:child.coords}); });
+        return;
+      }
+    }
+    if(t.coords&&t.coords.length>=2)out.push({t:t,coords:t.coords});
+  });
+  return out;
+}
+// Replica el filtrado de drawPuntos(): mismos límites geográficos y misma regla de visibilidad
+// por ruta (un punto sin ruta asignada se incluye siempre que su tipo esté seleccionado).
+function collectExportPuntos(rutaIdSet,tipoSet){
+  var pList=(window._dbPuntos&&window._dbPuntos.length)?window._dbPuntos:KMZ_PUNTOS;
+  return (pList||[]).filter(function(p){
+    if(!p.lat||!p.lng||isNaN(p.lat)||isNaN(p.lng))return false;
+    if(p.lat<1||p.lat>12||p.lng<-80||p.lng>-65)return false;
+    var tipo=p.tipo||p.label||'';
+    if(!tipo||tipo==='__config__'||tipo==='Marcador')return false;
+    if(!tipoSet.has(tipo))return false;
+    if(p.ruta&&!rutaIdSet.has(p.ruta))return false;
+    return true;
+  });
+}
+// Reutiliza los features ya cargados en el mapa (window._aniLayerFeats, poblado por showAniLayer)
+// si están disponibles; si no, consulta el servicio oficial de ANI/UPME en el momento.
+function collectExportRefLayer(type){
+  var cfg=ANI_LAYERS[type]; if(!cfg)return Promise.resolve(null);
+  var cached=window._aniLayerFeats&&window._aniLayerFeats[type];
+  if(cached&&cached.length)return Promise.resolve({cfg:cfg,feats:cached});
+  return aniQuery('1=1',cfg).then(function(data){ return {cfg:cfg,feats:(data&&data.features)||[]}; });
+}
+function ensureJSZip(){
+  return new Promise(function(resolve,reject){
+    if(typeof JSZip!=='undefined')return resolve();
+    var script=document.createElement('script');
+    script.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    script.onload=function(){resolve();};
+    script.onerror=function(){reject(new Error('No se pudo cargar la librería de compresión ZIP.'));};
+    document.head.appendChild(script);
+  });
+}
+function downloadBlob(filename,blob){
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ try{document.body.removeChild(a);}catch(e){} URL.revokeObjectURL(url); },300);
+}
+function buildExportKML(opts){
+  var count={tramos:0,puntos:0,ref:0};
+  var body='';
+  if(opts.incTramos){
+    var items=collectExportTramos(opts.detalle,opts.rutaIds);
+    var byRuta={};
+    items.forEach(function(it){ (byRuta[it.t.ruta]=byRuta[it.t.ruta]||[]).push(it); });
+    var rutasFolder='';
+    Object.keys(byRuta).forEach(function(rid){
+      var nombre=routes[rid]?routes[rid].nombre:rid;
+      var inner=byRuta[rid].map(function(it){
+        count.tramos++;
+        var color=SC[it.t.estado]||'#94A3B8';
+        return kmlPlacemarkLine(it.t.tramo,tramoDescHtml(it.t),it.coords,color);
+      }).join('');
+      rutasFolder+=kmlFolder(nombre,inner);
+    });
+    body+=kmlFolder('Tramos y rutas',rutasFolder);
+  }
+  if(opts.incPuntos){
+    var puntos=collectExportPuntos(opts.rutaIds,opts.tipos);
+    var byTipo={};
+    puntos.forEach(function(p){ var tp=p.tipo||p.label; (byTipo[tp]=byTipo[tp]||[]).push(p); });
+    var puntosFolder='';
+    Object.keys(byTipo).forEach(function(tp){
+      var color=getLayerColor(tp);
+      var inner=byTipo[tp].map(function(p){
+        count.puntos++;
+        var desc='<b>Tipo:</b> '+xmlEsc(tp)+(p.ruta&&routes[p.ruta]?('<br><b>Ruta:</b> '+xmlEsc(routes[p.ruta].nombre)):'');
+        return kmlPlacemarkPoint(p.nombre||tp,desc,p.lat,p.lng,color);
+      }).join('');
+      puntosFolder+=kmlFolder(tp,inner);
+    });
+    body+=kmlFolder('Puntos de interés',puntosFolder);
+  }
+  var refPromise=(opts.incRef&&opts.refTipo)?collectExportRefLayer(opts.refTipo):Promise.resolve(null);
+  return refPromise.then(function(ref){
+    if(ref){
+      var cfg=ref.cfg,inner='';
+      ref.feats.forEach(function(f){
+        var a=f.attributes||{};
+        if(cfg.geomType==='point'){
+          var pt=aniFeatureToPoint(f); if(!pt)return;
+          count.ref++;
+          inner+=kmlPlacemarkPoint(a[cfg.nameField]||cfg.label,cfg.subtitle?xmlEsc(cfg.subtitle(a)):'',pt.lat,pt.lng,cfg.color);
+        } else {
+          aniFeatureToParts(f).forEach(function(coords){
+            count.ref++;
+            inner+=kmlPlacemarkLine(a[cfg.nameField]||cfg.label,cfg.subtitle?xmlEsc(cfg.subtitle(a)):'',coords,cfg.color);
+          });
+        }
+      });
+      body+=kmlFolder(cfg.label+' (referencia oficial · '+cfg.actor+')',inner);
+    }
+    var kml='<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>'
+      +xmlEsc('Somos Internet — Red Nacional')+'</name>'+body+'</Document></kml>';
+    return {kml:kml,count:count};
+  });
+}
+async function runExportMapa(format){
+  var statusEl=document.getElementById('ex-status');
+  var setStatus=function(s){ if(statusEl)statusEl.textContent=s; };
+  var incTramos=!!(document.getElementById('ex-inc-tramos')&&document.getElementById('ex-inc-tramos').checked);
+  var incPuntos=!!(document.getElementById('ex-inc-puntos')&&document.getElementById('ex-inc-puntos').checked);
+  var incRef=!!(document.getElementById('ex-inc-ref')&&document.getElementById('ex-inc-ref').checked);
+  if(!incTramos&&!incPuntos&&!incRef){ setStatus('Elige al menos una sección para exportar.'); return; }
+  var detalle=gv('ex-detalle')||'main';
+  var rutaIds=new Set();
+  Array.prototype.forEach.call(document.querySelectorAll('.ex-ruta-chk'),function(chk){ if(chk.checked)rutaIds.add(chk.dataset.ruta); });
+  var tipos=new Set();
+  Array.prototype.forEach.call(document.querySelectorAll('.ex-tipo-chk'),function(chk){ if(chk.checked)tipos.add(chk.dataset.tipo); });
+  var refTipo=gv('ex-ref-tipo');
+  if(incTramos&&rutaIds.size===0){ setStatus('Selecciona al menos una ruta, o desmarca "Tramos y rutas".'); return; }
+  if(incPuntos&&tipos.size===0)incPuntos=false;
+  setStatus(incRef?'Generando archivo (consultando capa de referencia si hace falta)…':'Generando archivo…');
+  try{
+    var res=await buildExportKML({incTramos:incTramos,detalle:detalle,rutaIds:rutaIds,incPuntos:incPuntos,tipos:tipos,incRef:incRef,refTipo:refTipo});
+    if(res.count.tramos===0&&res.count.puntos===0&&res.count.ref===0){ setStatus('No hay nada que exportar con esta selección.'); return; }
+    var base='somos_mapa_'+today();
+    if(format==='kmz'){
+      setStatus('Comprimiendo KMZ…');
+      await ensureJSZip();
+      var zip=new JSZip();
+      zip.file('doc.kml',res.kml);
+      var blob=await zip.generateAsync({type:'blob'});
+      downloadBlob(base+'.kmz',blob);
+    } else {
+      var blob2=new Blob([res.kml],{type:'application/vnd.google-earth.kml+xml'});
+      downloadBlob(base+'.kml',blob2);
+    }
+    var resumen=res.count.tramos+' tramo(s)'+(res.count.puntos?', '+res.count.puntos+' punto(s)':'')+(res.count.ref?', '+res.count.ref+' elemento(s) de referencia':'');
+    toast((format==='kmz'?'KMZ':'KML')+' generado: '+resumen+'.');
+    closeModal();
+  }catch(e){
+    console.error('[export mapa]',e);
+    setStatus('Error generando el archivo: '+e.message);
+  }
 }
 
 // ─── GMAIL SIMULADO ──────────────────────────────────────────
@@ -3821,6 +4099,7 @@ function aniImport(i){
 
 // Capa de referencia: dibuja TODAS las concesiones ANI del tipo activo sobre el mapa (solo lectura, no toca Supabase)
 window._aniLayerGroups={};
+window._aniLayerFeats={}; // cache de features crudas por tipo, reutilizado por el exportador KML/KMZ
 function toggleAniLayer(on){
   if(!on){ window._aniLayerWanted=false; hideAllAniLayers(); return; }
   window._aniLayerWanted=true; window._aniLayerWantedType=aniActiveType;
@@ -3843,6 +4122,7 @@ function showAniLayer(){
     var feats=(data&&data.features)||[];
     var grp=L.layerGroup().addTo(mapInst);
     window._aniLayerGroups[type]=grp;
+    window._aniLayerFeats[type]=feats;
     feats.forEach(function(f){
       if(cfg.geomType==='point'){
         var pt=aniFeatureToPoint(f);

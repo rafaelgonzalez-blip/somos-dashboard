@@ -166,6 +166,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
   <!-- OVERVIEW -->
   <div id="t-overview" class="tv active">
     <div class="kpi-row" id="kpi-row"></div>
+    <div id="overview-route-filters" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px"></div>
     <div id="route-summary-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:14px"></div>
     <div class="card">
       <div class="card-h"><span class="card-t">Últimas gestiones</span><button class="btn btn-p btn-sm" onclick="openModal('gestion')">+ Nueva gestión</button></div>
@@ -835,7 +836,24 @@ var apiKey = localStorage.getItem('somos_api_key') || '';
 var markerGroups={}; // dynamic - populated from KMZ layers
 
 var activeTab="overview", fRuta="all", fEst="all", fBit="all";
-var selTramo=null, mapFiltVal="all", editingRoute=null, mapDetailLevel="main";
+var selTramo=null, editingRoute=null, mapDetailLevel="main";
+// Selección múltiple de rutas visibles en el mapa. Vacío = mostrar todas.
+// (Antes era mapFiltVal, un string único; ahora es un Set para poder
+// prender/apagar varias rutas a la vez en el tab Mapa.)
+var mapFiltSet=new Set();
+// Rutas ocultas en las tarjetas del tab Resumen (solo visual: no afecta los
+// KPIs totales de arriba ni ningún otro dato — únicamente qué tarjetas de
+// ruta se dibujan). Se guarda en localStorage para que la preferencia se
+// mantenga entre sesiones.
+var overviewHiddenRoutes=new Set();
+try{
+  var _ohr=localStorage.getItem('somos_overview_hidden_routes');
+  if(_ohr)JSON.parse(_ohr).forEach(function(rid){overviewHiddenRoutes.add(rid);});
+}catch(e){}
+function saveOverviewHiddenRoutes(){
+  try{localStorage.setItem('somos_overview_hidden_routes',JSON.stringify(Array.from(overviewHiddenRoutes)));}catch(e){}
+}
+function mapRouteVisible(rutaId){ return mapFiltSet.size===0||mapFiltSet.has(rutaId); }
 var mapInst=null, mapLines={};
 var emlFiles=[], emlResults=[], emlImported=[];
 var kmzParsed={tramos:[],puntos:[],capas:[]};
@@ -1019,7 +1037,7 @@ function initMap(){
   },300);
 }
 function lineColor(t){
-  if(mapFiltVal!=='all'&&t.ruta!==mapFiltVal)return null;
+  if(!mapRouteVisible(t.ruta))return null;
   return SC[t.estado]||'#94A3B8';
 }
 function buildPopup(t){
@@ -1089,7 +1107,7 @@ function drawAllLines(){
   for(var i=0;i<tramos.length;i++){
     (function(t){
       var color=lineColor(t);if(!color)return;
-      var vis=mapFiltVal==='all'||t.ruta===mapFiltVal;
+      var vis=mapRouteVisible(t.ruta);
       var isSubtramo=!!(t.parent_id||t.tipo_elemento==='subtramo');
       // Mode filters
       if(mapDetailLevel==='sub'&&!isSubtramo)return;
@@ -1135,7 +1153,7 @@ function drawPuntos(){
     (function(p){
       if(!p.lat||!p.lng||isNaN(p.lat)||isNaN(p.lng))return;
       if(p.lat<1||p.lat>12||p.lng<-80||p.lng>-65)return;
-      if(mapFiltVal!=='all'&&p.ruta&&p.ruta!==mapFiltVal)return;
+      if(p.ruta&&!mapRouteVisible(p.ruta))return;
       var tipo=p.tipo||p.label||'';
       if(!tipo||tipo==='__config__'||tipo==='Marcador')return;
       var color=getLayerColor(tipo);
@@ -1238,7 +1256,7 @@ function refreshLines(){
   if(!mapInst)return;
   for(var i=0;i<tramos.length;i++){
     (function(t){
-      var color=lineColor(t);var vis=mapFiltVal==='all'||t.ruta===mapFiltVal;
+      var color=lineColor(t);var vis=mapRouteVisible(t.ruta);
       if(!mapLines[t.id]){
         if(!color)return;
         var line=L.polyline(t.coords,{color:color,weight:5,opacity:0.9,lineCap:'round',lineJoin:'round'}).addTo(mapInst);
@@ -1255,7 +1273,7 @@ function refreshLines(){
 function renderMapSide(){
   var h='';
   if(mapDetailLevel==='sub'){
-    var parents=tramos.filter(function(_t){return !_t.parent_id&&_t.tipo_elemento!=='subtramo'&&(mapFiltVal==='all'||_t.ruta===mapFiltVal);});
+    var parents=tramos.filter(function(_t){return !_t.parent_id&&_t.tipo_elemento!=='subtramo'&&mapRouteVisible(_t.ruta);});
     parents.forEach(function(parent){
       var children=tramos.filter(function(x){return x.parent_id===parent.id;});
       if(children.length===0)return;
@@ -1267,7 +1285,7 @@ function renderMapSide(){
     document.getElementById('map-tlist').innerHTML=h||'<div class="empty">Sin subtramos</div>';
   } else {
     var vis=[];
-    for(var i=0;i<tramos.length;i++){var _t=tramos[i];if(_t.parent_id||_t.tipo_elemento==='subtramo')continue;if(mapFiltVal==='all'||_t.ruta===mapFiltVal)vis.push(_t);}
+    for(var i=0;i<tramos.length;i++){var _t=tramos[i];if(_t.parent_id||_t.tipo_elemento==='subtramo')continue;if(mapRouteVisible(_t.ruta))vis.push(_t);}
     for(var i=0;i<vis.length;i++){var t=vis[i];h+='<div class="ms-item" onclick="focusT(\''+t.id+'\')"><div class="ms-nm">'+t.tramo+'</div><div class="ms-meta">'+sb(t.estado)+' '+t.km+'km</div></div>';}
     document.getElementById('map-tlist').innerHTML=h;
   }
@@ -1282,13 +1300,24 @@ function focusT(id){
 }
 function hlSide(id){
   var items=document.querySelectorAll('#map-tlist .ms-item');
-  var vis=[];for(var i=0;i<tramos.length;i++){if(mapFiltVal==='all'||tramos[i].ruta===mapFiltVal)vis.push(tramos[i]);}
+  var vis=[];for(var i=0;i<tramos.length;i++){if(mapRouteVisible(tramos[i].ruta))vis.push(tramos[i]);}
   for(var i=0;i<items.length;i++)items[i].style.background=(vis[i]&&vis[i].id===id)?'rgba(59,130,246,.15)':'';
 }
+// Alterna una ruta dentro/fuera de la selección múltiple del mapa.
+// 'all' limpia la selección (vuelve a mostrar todas). Cualquier otro id se
+// prende/apaga de forma independiente, así se pueden ver 2 o más rutas a
+// la vez con solo hacer click en cada botón que se quiera activar.
 function mapFilt(v){
-  mapFiltVal=v;
-  var btns=document.querySelectorAll("[id^='mf-']");for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
-  var el=document.getElementById('mf-'+v);if(el)el.classList.add('active');
+  if(v==='all'){ mapFiltSet.clear(); }
+  else{
+    if(mapFiltSet.has(v))mapFiltSet.delete(v);
+    else mapFiltSet.add(v);
+  }
+  var btns=document.querySelectorAll("[id^='mf-']");
+  for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
+  var allBtn=document.getElementById('mf-all');
+  if(allBtn)allBtn.classList.toggle('active',mapFiltSet.size===0);
+  mapFiltSet.forEach(function(rid){var el=document.getElementById('mf-'+rid);if(el)el.classList.add('active');});
   if(mapInst){drawAllLines();drawPuntos();}
   else if(activeTab==='mapa')setTimeout(function(){if(!mapInst)initMap();else mapInst.invalidateSize();},80);
   renderMapSide();
@@ -4139,7 +4168,44 @@ function saveHitosConfigModal(){
   closeModal(); saveHitosConfig(); renderHitos(); toast('Configuracion guardada');
 }
 
+// Botones "prender/apagar" por ruta para el tab Resumen. Solo controla qué
+// tarjetas se dibujan ahí — es un filtro puramente visual, no toca datos ni
+// los KPIs totales de arriba.
+function renderOverviewRouteFilters(){
+  var container=document.getElementById('overview-route-filters');
+  if(!container)return;
+  while(container.firstChild)container.removeChild(container.firstChild);
+  var allBtn=document.createElement('button');
+  allBtn.className='fb'+(overviewHiddenRoutes.size===0?' active':'');
+  allBtn.id='of-all';
+  allBtn.textContent='Mostrar todas';
+  allBtn.onclick=function(){
+    overviewHiddenRoutes.clear();
+    saveOverviewHiddenRoutes();
+    renderRouteSummaryCards();
+  };
+  container.appendChild(allBtn);
+  getSortedRoutes().forEach(function(r){
+    var visible=!overviewHiddenRoutes.has(r.id);
+    var color=r.color||'#60A5FA';
+    var btn=document.createElement('button');
+    btn.className='fb'+(visible?' active':'');
+    btn.id='of-'+r.id;
+    btn.style.cssText=visible?('border-color:'+color+';color:'+color):'';
+    btn.textContent=(visible?'✓ ':'✕ ')+r.nombre;
+    btn.title=visible?'Ocultar esta ruta del resumen':'Mostrar esta ruta en el resumen';
+    btn.onclick=function(){
+      if(overviewHiddenRoutes.has(r.id))overviewHiddenRoutes.delete(r.id);
+      else overviewHiddenRoutes.add(r.id);
+      saveOverviewHiddenRoutes();
+      renderRouteSummaryCards();
+    };
+    container.appendChild(btn);
+  });
+}
+
 function renderRouteSummaryCards(){
+  renderOverviewRouteFilters();
   var container=document.getElementById('route-summary-cards');
   console.log('[RSC] container:', container, 'routes:', JSON.stringify(routes));
   if(!container){console.log('[RSC] NO CONTAINER!');return;}
@@ -4147,6 +4213,7 @@ function renderRouteSummaryCards(){
   var rkeys=Object.keys(routes);
   console.log('[RSC] building cards for:', rkeys);
   getSortedRoutes().forEach(function(r){
+    if(overviewHiddenRoutes.has(r.id))return; // oculta por el usuario: solo visual
     var color=r.color||'#60A5FA';
     var card=document.createElement('div');
     card.className='card';
@@ -4186,7 +4253,8 @@ function renderRouteFilters(){
     while(mrf.firstChild)mrf.removeChild(mrf.firstChild);
     ['all'].concat(Object.keys(routes)).forEach(function(rid){
       var btn=document.createElement('button');
-      btn.className='fb'+(mapFiltVal===rid?' active':'');
+      var isActive=rid==='all'?(mapFiltSet.size===0):mapFiltSet.has(rid);
+      btn.className='fb'+(isActive?' active':'');
       btn.id='mf-'+rid;
       btn.textContent=rid==='all'?'Todas las rutas':(routes[rid]?routes[rid].nombre:rid);
       btn.onclick=(function(id){return function(){mapFilt(id);};})(rid);

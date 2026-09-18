@@ -4320,11 +4320,16 @@ function openHitosTramoPicker(){
       var list=byRoute[r.id];
       if(!list||!list.length)return;
       list.sort(function(a,b){return (a.tramo||'').localeCompare(b.tramo||'');});
-      html+='<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:'+(r.color||'#60A5FA')+';text-transform:uppercase;margin-bottom:4px">'+escapeHtml(r.nombre)+'</div>';
+      var nChecked=list.filter(function(t){return (hitosTramoFilter===null)||hitosTramoFilter.has(t.id);}).length;
+      html+='<div style="margin-bottom:10px">'
+        +'<label style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:'+(r.color||'#60A5FA')+';text-transform:uppercase;margin-bottom:4px;cursor:pointer">'
+        +'<input type="checkbox" class="htp-route-chk" data-ruta="'+r.id+'"'+(nChecked===list.length?' checked':'')+' style="accent-color:'+(r.color||'#60A5FA')+'">'
+        +escapeHtml(r.nombre)+' <span style="font-weight:400;color:var(--muted);text-transform:none">('+nChecked+'/'+list.length+')</span>'
+        +'</label>';
       list.forEach(function(t){
         var checked=(hitosTramoFilter===null)||hitosTramoFilter.has(t.id);
         var isSub=!!(t.parent_id||t.tipo_elemento==='subtramo');
-        html+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 0 3px'+(isSub?' 16px':' 0')+';cursor:pointer'+(isSub?';color:var(--muted)':'')+'">'
+        html+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 0 3px'+(isSub?' 34px':' 18px')+';cursor:pointer'+(isSub?';color:var(--muted)':'')+'">'
           +'<input type="checkbox" class="htp-chk" data-id="'+t.id+'"'+(checked?' checked':'')+' style="accent-color:'+(r.color||'#60A5FA')+'">'
           +(isSub?'&#8627; ':'')+escapeHtml(t.tramo)+'</label>';
       });
@@ -4341,14 +4346,23 @@ function openHitosTramoPicker(){
     renderHitos();
     openHitosTramoPicker();
   };
+  function toggleIds(ids,checked){
+    if(hitosTramoFilter===null)hitosTramoFilter=new Set(cand.map(function(t){return t.id;}));
+    ids.forEach(function(id){ if(checked)hitosTramoFilter.add(id); else hitosTramoFilter.delete(id); });
+    if(hitosTramoFilter.size===cand.length)hitosTramoFilter=null;
+    updateHitosTramoPickerLabel();
+    renderHitos();
+    openHitosTramoPicker(); // re-dibuja para reflejar el nuevo estado (individuales + checkbox de ruta)
+  }
   Array.prototype.forEach.call(mb.querySelectorAll('.htp-chk'),function(chk){
+    chk.onchange=function(){ toggleIds([chk.dataset.id],chk.checked); };
+  });
+  // Casilla por ruta: marca/desmarca de un clic todos los tramos Y subtramos de esa ruta
+  // (byRoute ya incluye subtramos cuando "Incluir subtramos" está activo).
+  Array.prototype.forEach.call(mb.querySelectorAll('.htp-route-chk'),function(chk){
     chk.onchange=function(){
-      var id=chk.dataset.id;
-      if(hitosTramoFilter===null)hitosTramoFilter=new Set(cand.map(function(t){return t.id;}));
-      if(chk.checked)hitosTramoFilter.add(id); else hitosTramoFilter.delete(id);
-      if(hitosTramoFilter.size===cand.length)hitosTramoFilter=null;
-      updateHitosTramoPickerLabel();
-      renderHitos();
+      var ids=(byRoute[chk.dataset.ruta]||[]).map(function(t){return t.id;});
+      toggleIds(ids,chk.checked);
     };
   });
   document.getElementById('modal-overlay').classList.add('open');

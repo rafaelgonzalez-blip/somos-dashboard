@@ -615,6 +615,11 @@ async function saveHitosConfig(){try{await sbUpsert("puntos",[{id:"__hitos_confi
 async function loadHitosConfig(){try{var rows=await sbGet("puntos","id=eq.__hitos_config__");if(rows&&rows.length&&rows[0].label){var p=JSON.parse(rows[0].label);if(p&&p.length)return p;}}catch(e){}return null;}
 async function saveHerenciaConfig(){try{await sbUpsert("puntos",[{id:"__herencia_config__",nombre:"HERENCIA_CONFIG",tipo:"__config__",lat:0,lng:0,label:JSON.stringify(HERENCIA)}]);}catch(e){}}
 async function loadHerenciaConfig(){try{var rows=await sbGet("puntos","id=eq.__herencia_config__");if(rows&&rows.length&&rows[0].label){var p=JSON.parse(rows[0].label);if(p&&typeof p==='object')return {ruta:p.ruta||{},heredar:p.heredar||{}};}}catch(e){}return null;}
+// Orden manual de tramos/subtramos (flechas subir/bajar) — mismo patrón de fila sintética en
+// "puntos" que HITOS_CONFIG/HERENCIA_CONFIG, ya que la tabla "tramos" no tiene columna "orden"
+// y no se puede alterar el esquema desde aquí. Mapa plano {tramoId: numeroOrden}.
+async function saveTramoOrdenConfig(){try{await sbUpsert("puntos",[{id:"__tramo_orden_config__",nombre:"TRAMO_ORDEN_CONFIG",tipo:"__config__",lat:0,lng:0,label:JSON.stringify(TRAMO_ORDEN)}]);}catch(e){}}
+async function loadTramoOrdenConfig(){try{var rows=await sbGet("puntos","id=eq.__tramo_orden_config__");if(rows&&rows.length&&rows[0].label){var p=JSON.parse(rows[0].label);if(p&&typeof p==='object')return p;}}catch(e){}return null;}
 
 
 async function loadScFromSupabase(){
@@ -664,11 +669,73 @@ function _autoSortTramos(){
     .forEach(function(t){sorted.push(t);});
   tramos=sorted;
 }
+// Reordena el array global "tramos" según TRAMO_ORDEN, dentro de cada grupo de "hermanos" (mismo
+// ruta + mismo parent_id — tramos principales de una misma ruta, o subtramos de un mismo tramo
+// padre), SIN afectar el orden relativo entre grupos distintos.
+//
+// OJO: esto NO se puede hacer con un único tramos.sort(comparador) que devuelva 0 para pares de
+// grupos distintos — se probó en vivo contra los ~2500 tramos reales y el resultado fue
+// impredecible: el comparador no es un orden total sobre TODO el array (dos tramos de grupos
+// distintos son "iguales" entre sí, pero cada uno puede tener un orden real frente a un tercero de
+// su propio grupo), y el sort de V8 no garantiza conservar la posición relativa de pares así en un
+// array de este tamaño — el intercambio simplemente no se reflejaba en el array final.
+// En vez de eso: se agrupa, se ordena cada grupo (pequeño) por separado, y se reconstruye el array
+// completo recorriendo el orden ORIGINAL una sola vez, sustituyendo cada grupo por su versión ya
+// ordenada en el punto donde aparecía su primer elemento — así se preserva exactamente el
+// entrelazado original (ruta tras ruta, cada tramo padre seguido de sus subtramos).
+function applyTramoOrden(){
+  if(!TRAMO_ORDEN||!Object.keys(TRAMO_ORDEN).length)return;
+  var byGroup={};
+  tramos.forEach(function(t){
+    var key=t.ruta+'|'+(t.parent_id||'');
+    (byGroup[key]=byGroup[key]||[]).push(t);
+  });
+  Object.keys(byGroup).forEach(function(key){
+    var arr=byGroup[key];
+    if(!arr.some(function(t){return TRAMO_ORDEN[t.id]!==undefined;}))return; // nada que reordenar
+    arr.sort(function(a,b){
+      var oa=TRAMO_ORDEN[a.id],ob=TRAMO_ORDEN[b.id];
+      if(oa===undefined&&ob===undefined)return 0;
+      if(oa===undefined)return 1;
+      if(ob===undefined)return -1;
+      return oa-ob;
+    });
+  });
+  var written={},result=[];
+  tramos.forEach(function(t){
+    var key=t.ruta+'|'+(t.parent_id||'');
+    if(written[key])return;
+    written[key]=true;
+    result=result.concat(byGroup[key]);
+  });
+  tramos=result;
+}
+// Mueve un tramo/subtramo un puesto arriba (dir=-1) o abajo (dir=1) entre sus hermanos (mismos
+// tramos principales de su ruta, o mismos subtramos de su tramo padre). Antes de mover, asigna un
+// valor de orden explícito a TODOS los hermanos que todavía no lo tuvieran (según su posición
+// actual), para que el intercambio sea determinístico y no dependa de heurísticas de nombre.
+function moveTramoOrder(tramoId,dir){
+  var t=tramos.find(function(x){return x.id===tramoId;}); if(!t)return;
+  var pid=t.parent_id||null;
+  var siblings=tramos.filter(function(x){return x.ruta===t.ruta&&(x.parent_id||null)===pid;});
+  siblings.forEach(function(s,idx){ if(TRAMO_ORDEN[s.id]===undefined)TRAMO_ORDEN[s.id]=idx*10; });
+  siblings.sort(function(a,b){return TRAMO_ORDEN[a.id]-TRAMO_ORDEN[b.id];});
+  var i=siblings.findIndex(function(s){return s.id===tramoId;});
+  var j=i+dir;
+  if(i<0||j<0||j>=siblings.length)return;
+  var oa=TRAMO_ORDEN[siblings[i].id]; TRAMO_ORDEN[siblings[i].id]=TRAMO_ORDEN[siblings[j].id]; TRAMO_ORDEN[siblings[j].id]=oa;
+  applyTramoOrden();
+  saveTramoOrdenConfig();
+  if(editingRoute)selEditRoute(editingRoute);
+  renderAll();
+  if(mapInst){drawAllLines();renderMapSide();}
+}
 
 async function loadFromDB(){
   console.log('[LDB] starting...');
   var dbHITOS=await loadHitosConfig();if(dbHITOS&&dbHITOS.length)HITOS=dbHITOS;
   var dbHER=await loadHerenciaConfig();if(dbHER)HERENCIA=dbHER;
+  var dbOrd=await loadTramoOrdenConfig();if(dbOrd)TRAMO_ORDEN=dbOrd;
   // Load SC (estados) - priority: Supabase > localStorage > hardcoded defaults
   var dbSC=await loadScFromSupabase();
   if(dbSC){
@@ -739,8 +806,10 @@ async function loadFromDB(){
     dbLoaded = true;
     showDBStatus('');
     console.log('[LDB] routes after load:', JSON.stringify(routes));
-    // Auto-sort tramos by numeral on load
+    // Auto-sort tramos by numeral on load, then re-aplicar el orden manual guardado (si hay) por
+    // encima de ese resultado — ver applyTramoOrden().
     _autoSortTramos();
+    applyTramoOrden();
     // Load puntos (POIs) from Supabase
     try{
       var dbPuntos=await sbGet('puntos','tipo=neq.__config__');
@@ -951,6 +1020,10 @@ try{var _sc=localStorage.getItem('somos_sc');if(_sc)SC=JSON.parse(_sc);}catch(e)
 //   HERENCIA.heredar[tramoId] = {estado:true/false, hitos:true/false}  (si ESE tramo/subtramo sigue a su origen)
 // El origen de un tramo sin parent_id es su ruta; el de un subtramo es su tramo padre.
 var HERENCIA={ruta:{}, heredar:{}};
+// Orden manual (flechas subir/bajar): {tramoId: numeroOrden}. Se compara solo entre "hermanos"
+// (mismo ruta + mismo parent_id) — ver applyTramoOrden(). No sustituye a _autoSortTramos(), lo
+// complementa: los tramos sin valor manual conservan el orden que ya traían (auto o de la BD).
+var TRAMO_ORDEN={};
 
 var tramos=KMZ_TRAMOS.map(function(t){var r=Object.assign({},t);r.estado=normalizeEstado(r.estado);return r;});
 var routes={};
@@ -1630,15 +1703,15 @@ function moveRoute(rid, dir){
   var sorted=getSortedRoutes();
   var idx=sorted.findIndex(function(r){return r.id===rid;});
   var swapIdx=idx+dir;
-  if(swapIdx<0||swapIdx>=sorted.length)return;
-  // Swap orden values
-  var tmpOrden=sorted[idx].orden||idx;
-  sorted[idx].orden=sorted[swapIdx].orden||swapIdx;
-  sorted[swapIdx].orden=tmpOrden;
-  // Normalize orden values
-  sorted.forEach(function(r,i){r.orden=i;routes[r.id].orden=i;});
-  // Save to Supabase
-  sorted.forEach(function(r){saveRutaToDB(r);});
+  if(idx<0||swapIdx<0||swapIdx>=sorted.length)return;
+  // BUG (corregido): antes esta función intercambiaba solo los VALORES .orden de los dos objetos,
+  // pero el array "sorted" seguía en su orden original — el paso de normalización de abajo
+  // (r.orden=i según la posición en el array) volvía a pisar ese intercambio con el índice
+  // original, así que el botón no cambiaba nada de forma persistente. El arreglo es intercambiar
+  // las POSICIONES en el array antes de normalizar.
+  var tmp=sorted[idx]; sorted[idx]=sorted[swapIdx]; sorted[swapIdx]=tmp;
+  sorted.forEach(function(r,i){ r.orden=i; routes[r.id].orden=i; });
+  sorted.forEach(function(r){ saveRutaToDB(r); });
   renderRutasList();
   renderRouteFilters();
   renderAll();
@@ -1671,16 +1744,26 @@ function selEditRoute(rid){
   document.getElementById("editor-title").textContent="Tramos: "+r.nombre;
   document.getElementById("editor-actions").innerHTML=`<button class="btn btn-sm" onclick="sortTramos()" title="Ordenar tramos por numeral">⇅ Ordenar</button> <button class="btn btn-sm" onclick="openModal('ruta-defaults','${rid}')" title="Estado/hitos por defecto para los tramos que hereden de esta ruta">⇩ Valores por defecto</button> <button class="btn btn-p btn-sm" onclick="openModal('nuevo-tramo','${rid}')">+ Agregar tramo</button>`;
   const rt=tramos.filter(t=>t.ruta===rid);
+  // Grupos de "hermanos" para las flechas subir/bajar: tramos principales de esta ruta por un
+  // lado, y subtramos de cada tramo padre por otro — mismo criterio que moveTramoOrder(). Como
+  // "rt" ya viene en el orden actual del array global, cada grupo queda ya en su orden real.
+  var siblingGroups={};
+  rt.forEach(function(t){ var pid=t.parent_id||null; (siblingGroups[pid]=siblingGroups[pid]||[]).push(t); });
   document.getElementById("tramo-editor-body").innerHTML=`<div style="max-height:380px;overflow-y:auto" class="sc">${
     rt.map(t=>{
       var isSub=esSubtramo(t);
       var fH=getHerenciaFlags(t.id);
       var nSub=isSub?0:tramos.filter(function(x){return x.parent_id===t.id;}).length;
       var herB=(fH.estado||fH.hitos)?'<span title="Hereda: '+(fH.estado?'estado ':'')+(fH.hitos?'hitos':'')+'" style="font-size:8px;font-weight:700;color:var(--acc);border:1px solid var(--acc);border-radius:4px;padding:1px 5px">⇩ HEREDA</span>':'';
+      var grp=siblingGroups[t.parent_id||null]||[t];
+      var gi=grp.indexOf(t);
+      var arrUp='<button class="btn btn-g btn-sm" title="Subir orden" '+(gi<=0?'disabled style="opacity:.3"':'onclick="moveTramoOrder(\''+t.id+'\',-1)"')+'>&#8593;</button>';
+      var arrDn='<button class="btn btn-g btn-sm" title="Bajar orden" '+(gi>=grp.length-1?'disabled style="opacity:.3"':'onclick="moveTramoOrder(\''+t.id+'\',1)"')+'>&#8595;</button>';
       return `<div class="tramo-edit-row"${isSub?' style="margin-left:18px;opacity:.9"':''}>
       <div style="width:5px;height:36px;border-radius:3px;background:${SC[t.estado]};flex-shrink:0"></div>
       <div style="flex:1"><div style="font-size:12px;color:#fff">${isSub?'&#8627; ':''}${t.tramo} ${herB}</div><div style="font-size:9px;color:var(--muted)">${t.actor} · ${t.km} km · ${t.estado}${nSub?' · '+nSub+' subtramo(s)':''}</div></div>
-      <div style="display:flex;gap:4px;flex-wrap:wrap">
+      <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+        ${arrUp}${arrDn}
         ${sb(t.estado)}
         <button class="btn btn-warn btn-sm" onclick="openModal('edit-tramo','${t.id}')">Editar</button>
         <button class="btn btn-warn btn-sm" onclick="openModal('nuevo-tramo','${t.ruta}','${t.id}')">+ Sub</button>
@@ -5158,6 +5241,7 @@ function renderMapLegend(){
 
 function sortTramos(){
   _autoSortTramos();
+  applyTramoOrden(); // conserva los ajustes manuales (flechas) hechos por encima del auto-orden
   renderAll();
   if(mapInst){drawAllLines();renderMapSide();}
   toast('Tramos ordenados por numeral');

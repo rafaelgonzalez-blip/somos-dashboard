@@ -770,17 +770,21 @@ async function loadFromDB(){
 
     // Rutas excluidas del seguimiento de hitos (capas de referencia, no de gestión)
     var dbHRE=await loadHitosRutaExclConfig();
-    if(dbHRE){
-      HITOS_RUTA_EXCLUIDA=dbHRE;
-    } else {
-      // Primera vez que se usa esta config: por defecto excluir rutas de referencia conocidas
-      // (ej. "Fibra EPM disponible", miles de tramos de disponibilidad, no de gestión de permisos)
-      // para que no saturen el límite de la línea de tiempo. Configurable luego desde "Editar ruta".
-      Object.keys(routes).forEach(function(rid){
-        if((routes[rid].nombre||'').trim()==='Fibra EPM disponible') HITOS_RUTA_EXCLUIDA[rid]=true;
-      });
-      if(Object.keys(HITOS_RUTA_EXCLUIDA).length) saveHitosRutaExclConfig();
-    }
+    if(dbHRE) HITOS_RUTA_EXCLUIDA=dbHRE;
+    // Migración ADITIVA: nombres de rutas de referencia conocidas que se excluyen por defecto
+    // la primera vez que se ven (clave ausente en HITOS_RUTA_EXCLUIDA = "nunca decidido"). Una
+    // clave ya presente (true o false) es una decisión explícita del usuario vía "Editar ruta"
+    // y esta migración nunca la sobreescribe, así que agregar nombres nuevos a esta lista en el
+    // futuro es seguro: solo afecta rutas que el usuario todavía no ha decidido.
+    var NOMBRES_REF_DEFAULT=['Fibra EPM disponible'];
+    var hreCambio=false;
+    Object.keys(routes).forEach(function(rid){
+      if(HITOS_RUTA_EXCLUIDA[rid]===undefined && NOMBRES_REF_DEFAULT.indexOf((routes[rid].nombre||'').trim())!==-1){
+        HITOS_RUTA_EXCLUIDA[rid]=true;
+        hreCambio=true;
+      }
+    });
+    if(hreCambio) saveHitosRutaExclConfig();
 
     // Load tramos
     var dbTramos = await sbGet('tramos');
@@ -1121,7 +1125,10 @@ function toast(msg,type){
 
 // ─── KPIs ────────────────────────────────────────────────────
 function kpis(){
-  var solopadres=tramos.filter(function(t){return !t.parent_id;});
+  // Excluye rutas marcadas como "de referencia" (HITOS_RUTA_EXCLUIDA — ver "Editar ruta") de la
+  // cinta de KPIs, igual que ya se excluyen del Gantt/tabla de hitos: una capa de disponibilidad
+  // como "Fibra EPM disponible" no debe inflar el total de tramos ni los conteos por estado.
+  var solopadres=tramos.filter(function(t){return !t.parent_id&&!HITOS_RUTA_EXCLUIDA[t.ruta];});
   var tramos_kpi=solopadres;
   var km=function(a){return a.reduce(function(s,t){return s+t.km;},0);};
   var kpiHtml='<div class="kpi acc"><div class="kpi-l">Tramos</div><div class="kpi-v">'+tramos_kpi.length+'</div><div class="kpi-s">'+km(tramos_kpi)+' km totales</div></div>';
@@ -2014,7 +2021,7 @@ function openModal(type,id,preTramo){
       </div>
       <label style="display:flex;align-items:flex-start;gap:7px;cursor:pointer;padding:8px 0 2px;border-top:1px solid var(--border);margin-top:4px">
         <input type="checkbox" id="er-excl-hitos" style="margin-top:2px"${HITOS_RUTA_EXCLUIDA[id]?' checked':''}>
-        <span style="font-size:11px;color:var(--muted);line-height:1.5">Excluir del seguimiento de hitos (línea de tiempo y tabla) — úsalo para capas de referencia (ej. disponibilidad de fibra) que no son gestión de permisos. No afecta al mapa ni al resto del dashboard.</span>
+        <span style="font-size:11px;color:var(--muted);line-height:1.5">Marcar como ruta de referencia (no de gestión) — la excluye de la cinta de KPIs, las tarjetas de resumen por ruta, y la línea de tiempo/tabla de hitos. Úsalo para capas como disponibilidad de fibra o redes de referencia. No afecta al mapa ni a los tabs Tramos/Editar rutas.</span>
       </label>
       <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
@@ -2355,7 +2362,7 @@ function saveEditRuta(rid){
   if(!isNaN(ordenVal)&&ordenVal>=1) routes[rid].orden=ordenVal;
   var chkExcl=document.getElementById('er-excl-hitos');
   if(chkExcl){
-    if(chkExcl.checked)HITOS_RUTA_EXCLUIDA[rid]=true; else delete HITOS_RUTA_EXCLUIDA[rid];
+    HITOS_RUTA_EXCLUIDA[rid]=!!chkExcl.checked; // true/false = decisión explícita del usuario (nunca "delete", para que una futura migración aditiva no la reescriba)
     saveHitosRutaExclConfig();
   }
   closeModal(); renderRutasList(); renderRouteFilters(); renderAll(); if(mapInst)drawAllLines();
@@ -5083,6 +5090,7 @@ function renderRouteSummaryCards(){
   console.log('[RSC] building cards for:', rkeys);
   getSortedRoutes().forEach(function(r){
     if(overviewHiddenRoutes.has(r.id))return; // oculta por el usuario: solo visual
+    if(HITOS_RUTA_EXCLUIDA[r.id])return; // marcada como ruta de referencia (ver "Editar ruta")
     var color=r.color||'#60A5FA';
     var card=document.createElement('div');
     card.className='card';

@@ -620,6 +620,8 @@ async function loadHerenciaConfig(){try{var rows=await sbGet("puntos","id=eq.__h
 // y no se puede alterar el esquema desde aquí. Mapa plano {tramoId: numeroOrden}.
 async function saveTramoOrdenConfig(){try{await sbUpsert("puntos",[{id:"__tramo_orden_config__",nombre:"TRAMO_ORDEN_CONFIG",tipo:"__config__",lat:0,lng:0,label:JSON.stringify(TRAMO_ORDEN)}]);}catch(e){}}
 async function loadTramoOrdenConfig(){try{var rows=await sbGet("puntos","id=eq.__tramo_orden_config__");if(rows&&rows.length&&rows[0].label){var p=JSON.parse(rows[0].label);if(p&&typeof p==='object')return p;}}catch(e){}return null;}
+async function saveHitosRutaExclConfig(){try{await sbUpsert("puntos",[{id:"__hitos_ruta_excl_config__",nombre:"HITOS_RUTA_EXCL_CONFIG",tipo:"__config__",lat:0,lng:0,label:JSON.stringify(HITOS_RUTA_EXCLUIDA)}]);}catch(e){}}
+async function loadHitosRutaExclConfig(){try{var rows=await sbGet("puntos","id=eq.__hitos_ruta_excl_config__");if(rows&&rows.length&&rows[0].label){var p=JSON.parse(rows[0].label);if(p&&typeof p==='object')return p;}}catch(e){}return null;}
 
 
 async function loadScFromSupabase(){
@@ -765,7 +767,21 @@ async function loadFromDB(){
       // No routes in DB - seed the defaults
       for(var rid in routes){ saveRutaToDB(routes[rid]); }
     }
-    
+
+    // Rutas excluidas del seguimiento de hitos (capas de referencia, no de gestión)
+    var dbHRE=await loadHitosRutaExclConfig();
+    if(dbHRE){
+      HITOS_RUTA_EXCLUIDA=dbHRE;
+    } else {
+      // Primera vez que se usa esta config: por defecto excluir rutas de referencia conocidas
+      // (ej. "Fibra EPM disponible", miles de tramos de disponibilidad, no de gestión de permisos)
+      // para que no saturen el límite de la línea de tiempo. Configurable luego desde "Editar ruta".
+      Object.keys(routes).forEach(function(rid){
+        if((routes[rid].nombre||'').trim()==='Fibra EPM disponible') HITOS_RUTA_EXCLUIDA[rid]=true;
+      });
+      if(Object.keys(HITOS_RUTA_EXCLUIDA).length) saveHitosRutaExclConfig();
+    }
+
     // Load tramos
     var dbTramos = await sbGet('tramos');
     if(dbTramos && dbTramos.length > 0){
@@ -1024,6 +1040,11 @@ var HERENCIA={ruta:{}, heredar:{}};
 // (mismo ruta + mismo parent_id) — ver applyTramoOrden(). No sustituye a _autoSortTramos(), lo
 // complementa: los tramos sin valor manual conservan el orden que ya traían (auto o de la BD).
 var TRAMO_ORDEN={};
+// Rutas marcadas como "de referencia" (no de gestión de permisos) — quedan fuera del conteo y de
+// los filtros de la línea de tiempo / tabla de hitos, para que una capa como "Fibra EPM
+// disponible" (miles de tramos) no bloquee el límite de filas del Gantt para el resto de rutas.
+// {rutaId: true}. Configurable por ruta desde "Editar ruta".
+var HITOS_RUTA_EXCLUIDA={};
 
 var tramos=KMZ_TRAMOS.map(function(t){var r=Object.assign({},t);r.estado=normalizeEstado(r.estado);return r;});
 var routes={};
@@ -1064,7 +1085,7 @@ var hitosRouteFilter=new Set();
 var hitosTramoFilter=null;
 // Si se incluyen subtramos en la línea de tiempo (por defecto solo tramos padre).
 var hitosIncludeSub=false;
-function hitosRouteVisible(rutaId){ return hitosRouteFilter.size===0||hitosRouteFilter.has(rutaId); }
+function hitosRouteVisible(rutaId){ return (hitosRouteFilter.size===0||hitosRouteFilter.has(rutaId))&&!HITOS_RUTA_EXCLUIDA[rutaId]; }
 var mapInst=null, mapLines={};
 var emlFiles=[], emlResults=[], emlImported=[];
 var kmzParsed={tramos:[],puntos:[],capas:[]};
@@ -1991,6 +2012,10 @@ function openModal(type,id,preTramo){
         <div class="fl"><label>Color (hex)</label><input type="text" class="inp" id="er-c" value="${r.color}"></div>
         <div class="fl"><label>Orden (1=primero)</label><input type="number" class="inp" id="er-orden" value="${(r.orden!==null&&r.orden!==undefined&&r.orden!==999)?r.orden:''}" min="1" style="width:80px"></div>
       </div>
+      <label style="display:flex;align-items:flex-start;gap:7px;cursor:pointer;padding:8px 0 2px;border-top:1px solid var(--border);margin-top:4px">
+        <input type="checkbox" id="er-excl-hitos" style="margin-top:2px"${HITOS_RUTA_EXCLUIDA[id]?' checked':''}>
+        <span style="font-size:11px;color:var(--muted);line-height:1.5">Excluir del seguimiento de hitos (línea de tiempo y tabla) — úsalo para capas de referencia (ej. disponibilidad de fibra) que no son gestión de permisos. No afecta al mapa ni al resto del dashboard.</span>
+      </label>
       <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:6px">
         <button class="btn btn-g" onclick="closeModal()">Cancelar</button>
         <button class="btn btn-p" onclick="saveEditRuta('${id}')">Guardar</button>
@@ -2328,6 +2353,11 @@ function saveEditRuta(rid){
   routes[rid].nombre=gv('er-n'); routes[rid].color=gv('er-c');
   var ordenVal=parseInt(gv('er-orden'));
   if(!isNaN(ordenVal)&&ordenVal>=1) routes[rid].orden=ordenVal;
+  var chkExcl=document.getElementById('er-excl-hitos');
+  if(chkExcl){
+    if(chkExcl.checked)HITOS_RUTA_EXCLUIDA[rid]=true; else delete HITOS_RUTA_EXCLUIDA[rid];
+    saveHitosRutaExclConfig();
+  }
   closeModal(); renderRutasList(); renderRouteFilters(); renderAll(); if(mapInst)drawAllLines();
   saveRutaToDB(routes[rid]);
   toast("Ruta actualizada · Guardada en base de datos");
@@ -4619,7 +4649,7 @@ function renderHitosRouteFilters(){
     renderHitos();
   };
   container.appendChild(allBtn);
-  getSortedRoutes().forEach(function(r){
+  getSortedRoutes().filter(function(r){return !HITOS_RUTA_EXCLUIDA[r.id];}).forEach(function(r){
     var active=hitosRouteFilter.size===0||hitosRouteFilter.has(r.id);
     var color=r.color||'#60A5FA';
     var btn=document.createElement('button');
@@ -4796,7 +4826,10 @@ function renderHitosTable(){
 // planeada (t.fp / t.proxima) coloreado igual que el resto de la app
 // (rojo=vencida, ámbar=vence pronto, azul=planeada). El color de ruta se usa
 // solo para identificar la fila (punto junto al nombre), nunca para el estado.
-var MAX_GANTT_ROWS=150;
+// Subido de 150 a 200: tras excluir "Fibra EPM disponible" (ver HITOS_RUTA_EXCLUIDA) las rutas de
+// gestión reales de Rafa suman 152 tramos principales — 150 se quedaba a 2 de bloquear la vista
+// "todas las rutas" por defecto. 200 da margen sin permitir un Gantt de miles de filas.
+var MAX_GANTT_ROWS=200;
 function renderHitosGantt(){
   var wrap=document.getElementById('hitos-gantt-wrap');
   if(!wrap)return;

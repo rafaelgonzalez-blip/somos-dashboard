@@ -5113,10 +5113,15 @@ function renderRouteSummaryCards(){
 
 function renderRouteFilters(){
   console.log('[RRF] routes:', JSON.stringify(routes));
+  // Mismo orden de rutas que en "Resumen" (getSortedRoutes(), respeta las flechas ↑/↓ de
+  // "Editar rutas"). Antes esto usaba Object.keys(routes) — el orden de inserción del objeto,
+  // que no tiene por qué coincidir con el orden configurado — por eso los chips de ruta en
+  // Tramos y Mapa no seguían el mismo orden que en Resumen.
+  var orderedIds=getSortedRoutes().map(function(r){return r.id;});
   var trf=document.getElementById('tramos-route-filters');
   if(trf){
     while(trf.firstChild)trf.removeChild(trf.firstChild);
-    ['all'].concat(Object.keys(routes)).forEach(function(rid){
+    ['all'].concat(orderedIds).forEach(function(rid){
       var btn=document.createElement('button');
       btn.className='fb'+(fRuta===rid?' active':'');
       btn.id='fr-'+rid;
@@ -5128,7 +5133,7 @@ function renderRouteFilters(){
   var mrf=document.getElementById('mapa-route-filters');
   if(mrf){
     while(mrf.firstChild)mrf.removeChild(mrf.firstChild);
-    ['all'].concat(Object.keys(routes)).forEach(function(rid){
+    ['all'].concat(orderedIds).forEach(function(rid){
       var btn=document.createElement('button');
       var isActive=rid==='all'?(mapFiltSet.size===0):mapFiltSet.has(rid);
       btn.className='fb'+(isActive?' active':'');

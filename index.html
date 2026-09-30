@@ -207,6 +207,7 @@ textarea.inp{resize:vertical;min-height:55px;font-family:inherit}
         <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
           <div id="mapa-route-filters" style="display:contents"></div>
           <button class="btn btn-g btn-sm" onclick="openModal('export-mapa')" title="Exportar tramos, puntos de interés y/o la capa de referencia oficial (ANI/UPME) a KML o KMZ" style="margin-left:6px">&#11015; Exportar KML/KMZ</button>
+          <button class="btn btn-g btn-sm" onclick="openModal('gestionar-puntos')" title="Ver, editar o eliminar puntos (puentes, recámaras, peajes, etc.) creados o importados por error" style="margin-left:6px">&#128736; Gestionar puntos</button>
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;padding:9px 14px;border-bottom:1px solid #253352;flex-wrap:wrap">
@@ -2276,6 +2277,221 @@ function openModal(type,id,preTramo){
     </div>`;
     setTimeout(function(){ toggleExportSection('tramos'); toggleExportSection('puntos'); toggleExportSection('ref'); },0);
   }
+
+  else if(type==="gestionar-puntos"){
+    mt.textContent="&#128736; Gestionar puntos";
+    var gpTipos=gpTiposDisponibles();
+    var gpRutas=getSortedRoutes();
+    mb.innerHTML=`<div class="ff">
+      <p style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:2px">
+        Busca puentes, recámaras, peajes y demás puntos creados o importados por error, y edítalos o elimínalos. Los puntos solo se guardan asociados a una <b>ruta</b>, no a un tramo específico &#8212; si eliges un tramo abajo, se muestran los puntos más cercanos a su trazado (por distancia en línea recta), no necesariamente los que se crearon "para" ese tramo.
+      </p>
+      <div class="frow">
+        <div class="fl"><label>Ruta</label>
+          <select class="inp" id="gp-ruta" onchange="gpUpdateTramoOptions()">
+            <option value="all">Todas las rutas</option>
+            ${gpRutas.map(function(r){return '<option value="'+r.id+'">'+escapeHtml(r.nombre)+'</option>';}).join('')}
+          </select>
+        </div>
+        <div class="fl"><label>Tramo (opcional, filtra por cercanía)</label>
+          <select class="inp" id="gp-tramo" onchange="renderGestionPuntosList()" disabled><option value="all">(elige una ruta primero)</option></select>
+        </div>
+      </div>
+      <div class="frow" id="gp-radio-wrap" style="display:none;align-items:flex-end">
+        <div class="fl"><label>Radio de búsqueda (km)</label><input type="number" class="inp" id="gp-radio" value="3" min="0.1" step="0.5" style="width:100px" onchange="renderGestionPuntosList()"></div>
+      </div>
+      <div class="fl"><label>Buscar por nombre</label><input type="text" class="inp" id="gp-buscar" placeholder="ej. recamara, peaje..." oninput="renderGestionPuntosList()"></div>
+      <div style="font-size:10px;color:var(--muted);margin:6px 0 4px">Tipo de punto:</div>
+      <div style="display:flex;flex-wrap:wrap;gap:9px;margin-bottom:4px">
+        ${gpTipos.length? gpTipos.map(function(tp){
+          return '<label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer"><input type="checkbox" class="gp-tipo-chk" data-tipo="'+tp+'" checked onchange="renderGestionPuntosList()"> '+escapeHtml(tp)+'</label>';
+        }).join('') : '<div style="font-size:10px;color:var(--muted2)">No hay puntos cargados</div>'}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+        <span id="gp-count" style="font-size:10px;color:var(--muted)">0 punto(s) encontrado(s)</span>
+        <div style="display:flex;gap:6px">
+          <button type="button" class="btn btn-g btn-sm" onclick="gpSelectAll(true)">Seleccionar todos</button>
+          <button type="button" class="btn btn-g btn-sm" onclick="gpSelectAll(false)">Ninguno</button>
+          <button type="button" class="btn btn-danger btn-sm" onclick="gpDeleteSelected()">&#128465; Eliminar seleccionados</button>
+        </div>
+      </div>
+      <div id="gp-list-body" style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:4px;margin-top:4px"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px">
+        <button class="btn btn-g" onclick="closeModal()">Cerrar</button>
+      </div>
+    </div>`;
+    renderGestionPuntosList();
+  }
+}
+
+// ─── GESTIONAR PUNTOS (puentes, recámaras, peajes, etc.) ──────
+// Los puntos (tabla "puntos") solo guardan {ruta}, no un tramo específico, así que el filtro por
+// tramo aquí es por CERCANÍA (distancia en línea recta al trazado del tramo), no una relación
+// exacta en la base de datos.
+function gpTiposDisponibles(){
+  var pList=(window._dbPuntos&&window._dbPuntos.length)?window._dbPuntos:KMZ_PUNTOS;
+  var tipos=[];
+  (pList||[]).forEach(function(p){ var tp=p.tipo||p.label; if(tp&&tp!=='__config__'&&tipos.indexOf(tp)<0)tipos.push(tp); });
+  return tipos.sort();
+}
+function gpUpdateTramoOptions(){
+  var rid=gv('gp-ruta');
+  var sel=document.getElementById('gp-tramo');
+  var wrap=document.getElementById('gp-radio-wrap');
+  if(!sel)return;
+  if(rid==='all'){
+    sel.innerHTML='<option value="all">(elige una ruta primero)</option>';
+    sel.disabled=true;
+    if(wrap)wrap.style.display='none';
+  } else {
+    var list=tramos.filter(function(t){return t.ruta===rid;});
+    var opts='<option value="all">(toda la ruta — sin filtrar por cercanía)</option>';
+    list.forEach(function(t){
+      var isSub=!!(t.parent_id||t.tipo_elemento==='subtramo');
+      opts+='<option value="'+t.id+'">'+(isSub?'&#8627; ':'')+escapeHtml(t.tramo)+'</option>';
+    });
+    sel.innerHTML=opts;
+    sel.disabled=false;
+    if(wrap)wrap.style.display='none';
+  }
+  renderGestionPuntosList();
+}
+function haversineKm(lat1,lng1,lat2,lng2){
+  var R=6371;
+  var dLat=(lat2-lat1)*Math.PI/180, dLng=(lng2-lng1)*Math.PI/180;
+  var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function puntoDistMinATramo(p,t){
+  if(!t||!t.coords||!t.coords.length)return Infinity;
+  var min=Infinity;
+  for(var i=0;i<t.coords.length;i++){
+    var c=t.coords[i];
+    var d=haversineKm(p.lat,p.lng,c[0],c[1]);
+    if(d<min)min=d;
+  }
+  return min;
+}
+function gpCandidatos(){
+  var rid=gv('gp-ruta')||'all';
+  var tid=gv('gp-tramo')||'all';
+  var radio=parseFloat(gv('gp-radio'))||3;
+  var q=(gv('gp-buscar')||'').trim().toLowerCase();
+  var tiposSel={};
+  Array.prototype.forEach.call(document.querySelectorAll('.gp-tipo-chk'),function(chk){ if(chk.checked)tiposSel[chk.dataset.tipo]=true; });
+  var pList=(window._dbPuntos&&window._dbPuntos.length)?window._dbPuntos:KMZ_PUNTOS;
+  var t=(tid&&tid!=='all')?tramos.find(function(x){return x.id===tid;}):null;
+  var wrap=document.getElementById('gp-radio-wrap');
+  if(wrap)wrap.style.display=t?'flex':'none';
+  var out=(pList||[]).filter(function(p){
+    var tp=p.tipo||p.label||'';
+    if(!tp||tp==='__config__')return false;
+    if(!tiposSel[tp])return false;
+    if(rid!=='all'&&p.ruta&&p.ruta!==rid)return false; // un punto sin ruta asignada se muestra siempre
+    if(q&&(p.nombre||'').toLowerCase().indexOf(q)<0)return false;
+    return true;
+  }).map(function(p){
+    return {p:p, dist:t?puntoDistMinATramo(p,t):null};
+  });
+  if(t){
+    out=out.filter(function(o){return o.dist<=radio;});
+    out.sort(function(a,b){return a.dist-b.dist;});
+  } else {
+    out.sort(function(a,b){
+      var ta=(a.p.tipo||a.p.label||''), tb=(b.p.tipo||b.p.label||'');
+      if(ta!==tb)return ta<tb?-1:1;
+      return (a.p.nombre||'').localeCompare(b.p.nombre||'');
+    });
+  }
+  return out;
+}
+function renderGestionPuntosList(){
+  var body=document.getElementById('gp-list-body');
+  if(!body)return;
+  var cand=gpCandidatos();
+  window._gpCand=cand;
+  var countEl=document.getElementById('gp-count');
+  if(countEl)countEl.textContent=cand.length+' punto(s) encontrado(s)';
+  if(!cand.length){
+    body.innerHTML='<div class="empty" style="padding:16px">Sin puntos que coincidan con el filtro.</div>';
+    return;
+  }
+  body.innerHTML=cand.map(function(o,idx){
+    var p=o.p;
+    var color=getLayerColor(p.tipo||p.label||'');
+    var rn=(p.ruta&&routes[p.ruta])?routes[p.ruta].nombre:(p.ruta||'(sin ruta)');
+    var distTxt=(o.dist!=null&&isFinite(o.dist))?(' · '+o.dist.toFixed(2)+' km del tramo'):'';
+    return '<div class="gp-row" data-idx="'+idx+'" style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.05)">'
+      +'<input type="checkbox" class="gp-row-chk" data-idx="'+idx+'">'
+      +'<span style="width:9px;height:9px;border-radius:50%;background:'+color+';flex:0 0 auto"></span>'
+      +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:11px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escapeHtml(p.nombre||'Sin nombre')+'</div>'
+        +'<div style="font-size:9px;color:var(--muted)">'+escapeHtml(p.tipo||p.label||'')+' &middot; '+escapeHtml(rn)+distTxt+'</div>'
+      +'</div>'
+      +'<button class="btn btn-warn btn-sm" onclick="gpEditRow('+idx+')" title="Editar">&#9998;</button>'
+      +'<button class="btn btn-danger btn-sm" onclick="gpDeleteOne('+idx+')" title="Eliminar">&#128465;</button>'
+      +'</div>';
+  }).join('');
+}
+function gpEditRow(idx){
+  var cand=window._gpCand; if(!cand||!cand[idx])return;
+  var p=cand[idx].p;
+  var row=document.querySelector('.gp-row[data-idx="'+idx+'"]');
+  if(!row)return;
+  row.innerHTML='<div style="display:flex;gap:6px;flex:1;align-items:center;flex-wrap:wrap;padding:2px 0">'
+    +'<input type="text" class="inp" id="gp-edit-nombre-'+idx+'" value="'+escapeHtml(p.nombre||'')+'" placeholder="Nombre" style="flex:1;min-width:120px;font-size:11px;padding:4px 7px">'
+    +'<input type="text" class="inp" id="gp-edit-tipo-'+idx+'" value="'+escapeHtml(p.tipo||p.label||'')+'" placeholder="Tipo (Puente, Recamara, Peaje...)" style="width:150px;font-size:11px;padding:4px 7px">'
+    +'<button class="btn btn-p btn-sm" onclick="gpSaveRow('+idx+')">Guardar</button>'
+    +'<button class="btn btn-g btn-sm" onclick="renderGestionPuntosList()">Cancelar</button>'
+    +'</div>';
+}
+async function gpSaveRow(idx){
+  var cand=window._gpCand; if(!cand||!cand[idx])return;
+  var p=cand[idx].p;
+  var nuevoNombre=gv('gp-edit-nombre-'+idx).trim();
+  var nuevoTipo=gv('gp-edit-tipo-'+idx).trim();
+  if(!nuevoTipo){toast('El tipo no puede quedar vacío','err');return;}
+  p.nombre=nuevoNombre; p.tipo=nuevoTipo; p.label=nuevoTipo;
+  try{
+    await sbPatch('puntos',p.id,{nombre:nuevoNombre,tipo:nuevoTipo,label:nuevoTipo});
+    toast('Punto actualizado');
+  }catch(e){ toast('Error al guardar: '+e.message,'err'); }
+  drawPuntos();
+  renderGestionPuntosList();
+}
+function gpDeleteOne(idx){
+  var cand=window._gpCand; if(!cand||!cand[idx])return;
+  var p=cand[idx].p;
+  if(!confirm('¿Eliminar el punto "'+(p.nombre||'sin nombre')+'" ('+(p.tipo||p.label||'')+')? Esta acción no se puede deshacer.'))return;
+  gpDeleteIds([p.id]);
+}
+function gpSelectAll(checked){
+  Array.prototype.forEach.call(document.querySelectorAll('.gp-row-chk'),function(chk){chk.checked=checked;});
+}
+function gpDeleteSelected(){
+  var ids=[];
+  Array.prototype.forEach.call(document.querySelectorAll('.gp-row-chk'),function(chk){
+    if(chk.checked){
+      var idx=parseInt(chk.dataset.idx,10);
+      var cand=window._gpCand;
+      if(cand&&cand[idx])ids.push(cand[idx].p.id);
+    }
+  });
+  if(!ids.length){toast('No hay puntos seleccionados','err');return;}
+  if(!confirm('¿Eliminar '+ids.length+' punto(s) seleccionados? Esta acción no se puede deshacer.'))return;
+  gpDeleteIds(ids);
+}
+async function gpDeleteIds(ids){
+  var idSet={}; ids.forEach(function(id){idSet[id]=true;});
+  if(window._dbPuntos)window._dbPuntos=window._dbPuntos.filter(function(p){return !idSet[p.id];});
+  drawPuntos();
+  var okCount=0, failCount=0;
+  for(var i=0;i<ids.length;i++){
+    try{ await sbDelete('puntos', ids[i]); okCount++; }
+    catch(e){ failCount++; console.warn('gpDeleteIds:',ids[i],e); }
+  }
+  toast(okCount+' punto(s) eliminado(s)'+(failCount?(' &middot; '+failCount+' con error'):''), failCount?'err':undefined);
+  renderGestionPuntosList();
 }
 
 function closeModal(){

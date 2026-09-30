@@ -887,17 +887,43 @@ function showDBStatus(msg, isErr){
 }
 
 // ─── GUARDAR EN DB ─────────────────────────────────────────
+function tramoToRow(t){
+  return {
+    id:t.id, ruta:t.ruta, tramo:t.tramo, actor:t.actor,
+    km:t.km, estado:t.estado, proxima:t.proxima||'', fp:t.fp||'',
+    concesion:t.concesion||'', coords:t.coords,
+    parent_id:t.parent_id, tipo_elemento:t.tipo_elemento||'tramo',
+    hito_1:t.hito_1||'',hito_2:t.hito_2||'',hito_3:t.hito_3||'',hito_4:t.hito_4||'',hito_5:t.hito_5||'',hito_6:t.hito_6||'',hito_7:t.hito_7||'',hito_8:t.hito_8||'',hito_9:t.hito_9||'',hito_10:t.hito_10||'',
+    updated_at: new Date().toISOString()
+  };
+}
 async function saveTramoToDB(t){
   try{
-    await sbUpsert('tramos', [{
-      id:t.id, ruta:t.ruta, tramo:t.tramo, actor:t.actor,
-      km:t.km, estado:t.estado, proxima:t.proxima||'', fp:t.fp||'',
-      concesion:t.concesion||'', coords:t.coords,
-      parent_id:t.parent_id, tipo_elemento:t.tipo_elemento||'tramo',
-      hito_1:t.hito_1||'',hito_2:t.hito_2||'',hito_3:t.hito_3||'',hito_4:t.hito_4||'',hito_5:t.hito_5||'',hito_6:t.hito_6||'',hito_7:t.hito_7||'',hito_8:t.hito_8||'',hito_9:t.hito_9||'',hito_10:t.hito_10||'',
-      updated_at: new Date().toISOString()
-    }]);
+    await sbUpsert('tramos', [tramoToRow(t)]);
   } catch(e){ console.error('saveTramoToDB:', e); }
+}
+// Guarda MUCHOS tramos de una sola vez, en lotes, en vez de un fetch por tramo.
+// BUG corregido: cascadeDesdeRuta()/cascadeDesdeTramo() guardaban cada tramo con su propia llamada
+// a saveTramoToDB() dentro de un forEach — como forEach no espera las promesas, en una ruta grande
+// (ej. "Fibra EPM disponible", con miles de tramos con "Heredar" activo) esto disparaba miles de
+// peticiones HTTP concurrentes de una vez. El navegador y/o Supabase no sostienen esa concurrencia:
+// la mayoría fallaban en silencio (solo quedaba un console.error, sin aviso al usuario) mientras el
+// cambio SÍ se veía aplicado en pantalla (el array "tramos" en memoria ya estaba actualizado) — por
+// eso al recargar la página la mayoría de los tramos volvían a su valor anterior, aunque unos pocos
+// (los que sí alcanzaron a guardarse) se mantenían. No era un problema de esa ruta en particular:
+// cualquier ruta con muchos tramos heredando a la vez puede disparar el mismo problema.
+var BATCH_SIZE_TRAMOS=300;
+async function guardarTramosEnLotes(tramosArr){
+  if(!tramosArr||!tramosArr.length)return;
+  var porId={}; tramosArr.forEach(function(t){porId[t.id]=t;}); // deduplicar por id
+  var unicos=Object.keys(porId).map(function(id){return porId[id];});
+  var fallidos=0;
+  for(var i=0;i<unicos.length;i+=BATCH_SIZE_TRAMOS){
+    var lote=unicos.slice(i,i+BATCH_SIZE_TRAMOS).map(tramoToRow);
+    try{ await sbUpsert('tramos', lote); }
+    catch(e){ fallidos+=lote.length; console.error('guardarTramosEnLotes:', e); }
+  }
+  if(fallidos)toast('Se aplicó el cambio, pero '+fallidos+' tramo(s) no se pudieron guardar en la base de datos — revisa tu conexión e inténtalo de nuevo','err');
 }
 
 // ── Herencia de estado/hitos: resolución y cascada ───────────────────────
@@ -935,22 +961,9 @@ function pullHerenciaAhora(t,{estado,hitos}={}){
   if(estado){ var e=origenEstadoActual(origen); if(e)t.estado=e; }
   if(hitos){ HITOS.forEach(function(h){ var v=origenHitoActual(origen,h.key); if(v)t[h.key]=v; }); }
 }
-// Empuja el estado/hitos ACTUALES de una ruta hacia sus tramos principales que hereden,
-// y de ahí recursivamente hacia los subtramos que a su vez hereden.
-function cascadeDesdeRuta(rutaId,{estado,hitos}={estado:true,hitos:true}){
-  var hijos=tramos.filter(function(t){return t.ruta===rutaId&&!esSubtramo(t);});
-  hijos.forEach(function(t){
-    var flags=getHerenciaFlags(t.id);
-    var cambio=false;
-    if(estado&&flags.estado){ var e=(HERENCIA.ruta[rutaId]&&HERENCIA.ruta[rutaId].estado)||''; if(e&&t.estado!==e){t.estado=e;cambio=true;} }
-    if(hitos&&flags.hitos){ HITOS.forEach(function(h){ var v=(HERENCIA.ruta[rutaId]&&HERENCIA.ruta[rutaId][h.key])||''; if(v&&t[h.key]!==v){t[h.key]=v;cambio=true;} }); }
-    if(cambio)saveTramoToDB(t);
-    cascadeDesdeTramo(t.id,{estado:estado,hitos:hitos}); // por si este tramo tiene subtramos que heredan de él
-  });
-}
-// Empuja el estado/hitos ACTUALES de un tramo (los que tenga en este momento, sean
-// propios o heredados) hacia sus subtramos que hereden de él.
-function cascadeDesdeTramo(tramoId,{estado,hitos}={estado:true,hitos:true}){
+// Calcula (sin guardar) qué subtramos de un tramo padre cambiarían al heredar su estado/hitos
+// actuales, y los agrega al acumulador "acc". Un solo nivel (subtramos directos), igual que antes.
+function _cascadeColectarDesdeTramo(tramoId,estado,hitos,acc){
   var padre=tramos.find(function(x){return x.id===tramoId;}); if(!padre)return;
   var hijos=tramos.filter(function(t){return t.parent_id===tramoId;});
   hijos.forEach(function(sub){
@@ -958,8 +971,31 @@ function cascadeDesdeTramo(tramoId,{estado,hitos}={estado:true,hitos:true}){
     var cambio=false;
     if(estado&&flags.estado&&padre.estado&&sub.estado!==padre.estado){sub.estado=padre.estado;cambio=true;}
     if(hitos&&flags.hitos){ HITOS.forEach(function(h){ var v=padre[h.key]||''; if(v&&sub[h.key]!==v){sub[h.key]=v;cambio=true;} }); }
-    if(cambio)saveTramoToDB(sub);
+    if(cambio)acc.push(sub);
   });
+}
+// Empuja el estado/hitos ACTUALES de una ruta hacia sus tramos principales que hereden,
+// y de ahí hacia los subtramos que a su vez hereden — todo en memoria primero, y luego UN solo
+// guardado por lotes (ver guardarTramosEnLotes) en vez de un fetch por tramo.
+function cascadeDesdeRuta(rutaId,{estado,hitos}={estado:true,hitos:true}){
+  var hijos=tramos.filter(function(t){return t.ruta===rutaId&&!esSubtramo(t);});
+  var acc=[];
+  hijos.forEach(function(t){
+    var flags=getHerenciaFlags(t.id);
+    var cambio=false;
+    if(estado&&flags.estado){ var e=(HERENCIA.ruta[rutaId]&&HERENCIA.ruta[rutaId].estado)||''; if(e&&t.estado!==e){t.estado=e;cambio=true;} }
+    if(hitos&&flags.hitos){ HITOS.forEach(function(h){ var v=(HERENCIA.ruta[rutaId]&&HERENCIA.ruta[rutaId][h.key])||''; if(v&&t[h.key]!==v){t[h.key]=v;cambio=true;} }); }
+    if(cambio)acc.push(t);
+    _cascadeColectarDesdeTramo(t.id,estado,hitos,acc); // por si este tramo tiene subtramos que heredan de él
+  });
+  guardarTramosEnLotes(acc);
+}
+// Empuja el estado/hitos ACTUALES de un tramo (los que tenga en este momento, sean
+// propios o heredados) hacia sus subtramos que hereden de él. Mismo guardado por lotes.
+function cascadeDesdeTramo(tramoId,{estado,hitos}={estado:true,hitos:true}){
+  var acc=[];
+  _cascadeColectarDesdeTramo(tramoId,estado,hitos,acc);
+  guardarTramosEnLotes(acc);
 }
 
 function saveRutaDefaults(rid){
@@ -969,9 +1005,21 @@ function saveRutaDefaults(rid){
   HITOS.forEach(function(h){var v=gv('rd-'+h.key); if(v)vals[h.key]=v;});
   HERENCIA.ruta[rid]=vals;
   var bulkEstado=document.getElementById('rd-bulk-estado'), bulkHitos=document.getElementById('rd-bulk-hitos');
-  var hijos=tramos.filter(function(t){return t.ruta===rid&&!esSubtramo(t);});
-  if(bulkEstado&&bulkEstado.checked)hijos.forEach(function(t){setHerenciaFlags(t.id,{estado:true});});
-  if(bulkHitos&&bulkHitos.checked)hijos.forEach(function(t){setHerenciaFlags(t.id,{hitos:true});});
+  // BUG corregido: antes este bulk-apply solo marcaba "Heredar" en los tramos PRINCIPALES de la
+  // ruta (hijos = !esSubtramo). cascadeDesdeRuta() sí empuja el valor a los tramos principales y
+  // LUEGO intenta bajarlo en cascada a sus subtramos — pero cascadeDesdeTramo() solo actualiza un
+  // subtramo si ESE subtramo ya tenía su propia bandera "Heredar estado/hitos" activada
+  // individualmente (vía "⇩ Subtramos heredan" en el tramo padre, o el checkbox de "Editar tramo").
+  // Si un subtramo nunca la tuvo activada, "Valores por defecto" lo dejaba intacto — y como su
+  // campo estado nunca se había guardado, al recargar la página normalizeEstado() lo hacía caer al
+  // primer estado configurado ("Inicio - Sin Gestión"). Resultado: unos subtramos sí quedaban con
+  // el valor nuevo (los que ya heredaban) y otros no (los que no heredaban) — no es un problema de
+  // esta ruta en particular, pasa en CUALQUIER ruta que tenga subtramos sin "Heredar" activado.
+  // Arreglo: el bulk-apply ahora también activa "Heredar" en TODOS los subtramos de la ruta, no
+  // solo en los tramos principales, para que "aplicar a todos" realmente llegue a todos.
+  var todaLaRuta=tramos.filter(function(t){return t.ruta===rid;});
+  if(bulkEstado&&bulkEstado.checked)todaLaRuta.forEach(function(t){setHerenciaFlags(t.id,{estado:true});});
+  if(bulkHitos&&bulkHitos.checked)todaLaRuta.forEach(function(t){setHerenciaFlags(t.id,{hitos:true});});
   saveHerenciaConfig();
   cascadeDesdeRuta(rid,{estado:true,hitos:true});
   closeModal(); renderAll(); if(mapInst)drawAllLines(); if(editingRoute)selEditRoute(editingRoute);
@@ -2036,8 +2084,11 @@ function openModal(type,id,preTramo){
     var def=HERENCIA.ruta[id]||{};
     var cols=HITOS.slice().sort(function(a,b){return a.orden-b.orden;});
     var hijos=tramos.filter(function(t){return t.ruta===id&&!esSubtramo(t);});
-    var nHeredanEstado=hijos.filter(function(t){return getHerenciaFlags(t.id).estado;}).length;
-    var nHeredanHitos=hijos.filter(function(t){return getHerenciaFlags(t.id).hitos;}).length;
+    // Conteo sobre TODOS los tramos de la ruta (principales + subtramos): el bulk-apply de abajo
+    // ahora activa "Heredar" en todos ellos, no solo en los principales (ver saveRutaDefaults()).
+    var todaLaRuta=tramos.filter(function(t){return t.ruta===id;});
+    var nHeredanEstado=todaLaRuta.filter(function(t){return getHerenciaFlags(t.id).estado;}).length;
+    var nHeredanHitos=todaLaRuta.filter(function(t){return getHerenciaFlags(t.id).hitos;}).length;
     mt.textContent="Valores por defecto: "+r.nombre;
     var fh='<div class="ff">';
     fh+='<p style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:2px">Estos valores solo se aplican a los tramos de esta ruta que tengan marcado "Heredar" (ver el checkbox en Editar tramo / Hitos de cada tramo, o actívalo aquí para todos de una vez).</p>';
@@ -2048,9 +2099,9 @@ function openModal(type,id,preTramo){
       if(ri+1<cols.length)fh+='<div class="fl"><label>'+cols[ri+1].label+'</label><input type="date" class="inp" id="rd-'+cols[ri+1].key+'" value="'+(def[cols[ri+1].key]||'')+'"></div>';
       fh+='</div>';
     }
-    fh+='<div class="sec-tag">Aplicar a los '+hijos.length+' tramos principales de esta ruta</div>';
-    fh+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="checkbox" id="rd-bulk-estado" style="accent-color:var(--acc)"> Activar "Heredar estado" en los tramos que aún no lo tengan ('+(hijos.length-nHeredanEstado)+' de '+hijos.length+')</label>';
-    fh+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="checkbox" id="rd-bulk-hitos" style="accent-color:var(--acc)"> Activar "Heredar hitos" en los tramos que aún no lo tengan ('+(hijos.length-nHeredanHitos)+' de '+hijos.length+')</label>';
+    fh+='<div class="sec-tag">Aplicar a los '+todaLaRuta.length+' tramos y subtramos de esta ruta ('+hijos.length+' principales + '+(todaLaRuta.length-hijos.length)+' subtramos)</div>';
+    fh+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="checkbox" id="rd-bulk-estado" style="accent-color:var(--acc)"> Activar "Heredar estado" en los que aún no lo tengan ('+(todaLaRuta.length-nHeredanEstado)+' de '+todaLaRuta.length+')</label>';
+    fh+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="checkbox" id="rd-bulk-hitos" style="accent-color:var(--acc)"> Activar "Heredar hitos" en los que aún no lo tengan ('+(todaLaRuta.length-nHeredanHitos)+' de '+todaLaRuta.length+')</label>';
     fh+='<div style="display:flex;justify-content:flex-end;gap:7px;margin-top:10px"><button class="btn btn-g" onclick="closeModal()">Cancelar</button><button class="btn btn-p" onclick="saveRutaDefaults(\''+id+'\')">Guardar y aplicar</button></div>';
     fh+='</div>';
     mb.innerHTML=fh;

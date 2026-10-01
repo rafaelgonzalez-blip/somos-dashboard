@@ -912,18 +912,64 @@ async function saveTramoToDB(t){
 // eso al recargar la página la mayoría de los tramos volvían a su valor anterior, aunque unos pocos
 // (los que sí alcanzaron a guardarse) se mantenían. No era un problema de esa ruta en particular:
 // cualquier ruta con muchos tramos heredando a la vez puede disparar el mismo problema.
-var BATCH_SIZE_TRAMOS=300;
+var BATCH_SIZE_TRAMOS=150;
+function _sleep(ms){ return new Promise(function(res){setTimeout(res,ms);}); }
+// Guarda un lote (array de tramos, no de filas todavía) con reintentos, y si sigue fallando lo
+// divide a la mitad recursivamente para aislar el problema — así una sola fila con un dato raro
+// (o un fallo de red puntual) no se lleva por delante a los demás tramos del mismo lote, que sí
+// se pueden guardar bien por separado. Devuelve la lista de tramos que de verdad no se lograron
+// guardar (después de agotar los reintentos y, si aplica, la división).
+async function _guardarLoteConReintento(lote, reintentosRestantes){
+  try{
+    await sbUpsert('tramos', lote.map(tramoToRow));
+    return [];
+  } catch(e){
+    if(reintentosRestantes>0){
+      await _sleep(700);
+      return _guardarLoteConReintento(lote, reintentosRestantes-1);
+    }
+    if(lote.length>1){
+      var mid=Math.ceil(lote.length/2);
+      var f1=await _guardarLoteConReintento(lote.slice(0,mid),2);
+      var f2=await _guardarLoteConReintento(lote.slice(mid),2);
+      return f1.concat(f2);
+    }
+    console.error('guardarTramosEnLotes: fallo definitivo en',lote[0]&&lote[0].id,e);
+    return lote;
+  }
+}
+// Guarda MUCHOS tramos de una sola vez, en lotes, en vez de un fetch por tramo.
+// BUG #1 (corregido): cascadeDesdeRuta()/cascadeDesdeTramo() guardaban cada tramo con su propia
+// llamada a saveTramoToDB() dentro de un forEach — como forEach no espera las promesas, en una
+// ruta grande (ej. "Fibra EPM disponible", con miles de tramos con "Heredar" activo) esto disparaba
+// miles de peticiones HTTP concurrentes de una vez. El navegador y/o Supabase no sostienen esa
+// concurrencia: la mayoría fallaban en silencio (solo quedaba un console.error, sin aviso al
+// usuario) mientras el cambio SÍ se veía aplicado en pantalla (el array "tramos" en memoria ya
+// estaba actualizado) — por eso al recargar la página la mayoría de los tramos volvían a su valor
+// anterior, aunque unos pocos (los que sí alcanzaron a guardarse) se mantenían. No era un problema
+// de esa ruta en particular: cualquier ruta con muchos tramos heredando a la vez puede disparar el
+// mismo problema.
+// BUG #2 (corregido): agrupar en lotes arregla la concurrencia, pero un solo lote (ej. 300 filas)
+// sigue siendo UNA sola petición — si esa petición falla (una fila con un dato raro, un corte de
+// red puntual, un timeout), se pierden los 300 tramos de ese lote entero, no solo el problemático.
+// Verificado en producción: tras el arreglo #1, "Fibra EPM disponible" seguía con exactamente 300
+// tramos sin actualizar — un lote completo que falló de una sola vez. Por eso ahora cada lote se
+// reintenta, y si sigue fallando se divide a la mitad (recursivamente, hasta tramo por tramo si
+// hace falta) en vez de darlo todo por perdido.
 async function guardarTramosEnLotes(tramosArr){
   if(!tramosArr||!tramosArr.length)return;
   var porId={}; tramosArr.forEach(function(t){porId[t.id]=t;}); // deduplicar por id
   var unicos=Object.keys(porId).map(function(id){return porId[id];});
-  var fallidos=0;
+  var fallidos=[];
   for(var i=0;i<unicos.length;i+=BATCH_SIZE_TRAMOS){
-    var lote=unicos.slice(i,i+BATCH_SIZE_TRAMOS).map(tramoToRow);
-    try{ await sbUpsert('tramos', lote); }
-    catch(e){ fallidos+=lote.length; console.error('guardarTramosEnLotes:', e); }
+    var lote=unicos.slice(i,i+BATCH_SIZE_TRAMOS);
+    var f=await _guardarLoteConReintento(lote,2);
+    if(f.length)fallidos=fallidos.concat(f);
   }
-  if(fallidos)toast('Se aplicó el cambio, pero '+fallidos+' tramo(s) no se pudieron guardar en la base de datos — revisa tu conexión e inténtalo de nuevo','err');
+  if(fallidos.length){
+    var nombres=fallidos.slice(0,5).map(function(t){return t.tramo||t.id;}).join(', ');
+    toast('Se aplicó el cambio, pero '+fallidos.length+' tramo(s) no se pudieron guardar tras varios intentos (ej: '+nombres+(fallidos.length>5?'…':'')+') — revisa tu conexión e inténtalo de nuevo','err');
+  }
 }
 
 // ── Herencia de estado/hitos: resolución y cascada ───────────────────────
